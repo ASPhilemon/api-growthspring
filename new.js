@@ -51,6 +51,7 @@ const PointsMkt = require('./Models/pointsMkt');
 const Earnings = require('./Models/earnings');
 const CashHistory = require('./Models/cashTransactionsHistory');
 const InvestmentUnits = require('./Models/investment_units');
+const Users = require('./auth/models/UserModel');
 
 //auth imports
 const {requireAuth, requireAdmin} = require('./auth/middleware')
@@ -63,8 +64,7 @@ const app = express();
 app.use(express.json());
 
 //connect to mongoDB
-// const dbURI = 'mongodb+srv://blaise1:blaise119976@cluster0.nmt34.mongodb.net/GrowthSpringNew?retryWrites=true&w=majority';
-const dbURI = 'mongodb+srv://PhilemonAriko:M5kKuyHbGEitFwFW@cluster0.z9m53.mongodb.net/growthspring?retryWrites=true&w=majority'
+const dbURI = 'mongodb+srv://blaise1:blaise119976@cluster0.nmt34.mongodb.net/GrowthSpringNew?retryWrites=true&w=majority';
 
 mongoose.connect(dbURI, {useNewUrlParser: true, useUnifiedTopology: true})
     .then((result) => app.listen(4000));
@@ -83,36 +83,6 @@ app.use('/auth', authRoutes)
 //Auntenticated Routes (Logged in members)
 app.use(requireAuth)
 
-//#pages
-//user page
-app.get('/loan_initiate', (req, res) => {
-    res.render('loan_initiate');
-});
-
-app.get('/loan_requests', (req, res) => {
-    res.render('loan_requests');
-});
-
-app.get('/credit', (req, res) => {
-    res.render('credit');
-});
-
-app.get('/points', (req, res) => {
-    res.render('points');
-});
-
-app.get('/deposits', (req, res) => {
-    res.render('deposits');
-});
-
-app.get('/money_locations', (req, res) => {
-    res.render('money_locations');
-});
-
-//admin page
-app.get('/admin', (req, res) => {
-    res.render('adminR');
-});
 
 //#constants
 //CONSTANTS FOR BACKEND
@@ -137,189 +107,242 @@ app.get('/locations-list', (req, res) => {
 
 //Home_page_fetch
 app.get('/homepage-data', async (req, res) => {
-    let memberDashboardData = {
-        summary : {
-          memberDeposits : {
-            yourWorth: 800000,
-          },
-          payments: {
-            avgYearlyReturn: '20% Over 5 years'
-          },
-          loans: {
-            currentDebt: 1500000,
-          },
-          points: {
-            points: 200,
-          },
-          clubDeposits: {
-            clubWorth: 12000000
-          },
-          clubEarnings: {
-            clubWorth: 12000000
-          },
-        },
-        home: {
-          clubWorth: 15800000,
-          members: 20,
-          thisYearDeposits: 6000000,
-          yourWorth: 1200000,
-          risk: '12%',
-          thisYearSavings: 400000,
-          yourDebt: 450000,
-          bestRate: '12%',
-          maxLoanLimit: 3500000,
-          points: 10,
-          pointsWorth : 200000,
-          pointWorth: 20000
-        },
-      
-        memberDeposits: [
-          {
-            year: 2023,
-            total: 2000000,
-            avgMonthyDeposit: 35000,
-            values:  [
-              [ '3/4/2023', 30000, 'Savings'],
-              [ '3/4/2023', 20000, 'Payment'],
-              [ '3/4/2023', 10000, 'Points'],
-            ]
-          },
-          {
-            year: 2022,
-            total: 5000000,
-            avgMonthyDeposit: 95000,
-            values:  [
-              [ '3/4/2022', 90000, 'Savings'],
-              [ '3/4/2022', 10000, 'Payment'],
-              [ '3/4/2022', 30000, 'Points'],
-            ]
-          }, 
-          {
-          year: 2021,
-            total: 0,
-            avgMonthyDeposit: 0,
-            values:  []
-          },
-        ],
-      
-        payments: [
-          {
-            year: 2023,
-            total: 5000000,
-            roi: '14%',
-            values:  [
-              [ '3/4/2023', 30000, 'Profit', 'Withdrawn'],
-              [ '3/4/2023', 20000, 'Points', 'Reinvested'],
-              [ '3/4/2023', 10000, 'Points', 'Reinvested'],
-            ]
-          },
-          {
-            year: 2022,
-            total: 2000000,
-            roi: '18%',
-            values:  [
-              [ '3/4/2023', 30000, 'Profit', 'Withdrawn'],
-              [ '3/4/2023', 20000, 'Points', 'Reinvested'],
-              [ '3/4/2023', 10000, 'Points', 'Reinvested'],
-            ]
-          },
-        ],
-      
-        loans:  [
-          {
-            loanId: 1,
-            issueDate: '2/2/2023',
-            loanAmount: 500000,
-            amountPaid: 400000,
-            nextInstallmentDate: '3/3/2021',
-            agreedLoanDuration: '3 months',
-            annualInterestRate: '15%',
-            pointsSpent: 400,
-            status: 'ongoing',
-            paymentHistory:  [
-              ['2/2/2045',500000],
-              ['2/5/2021',100000],
-              ['5/4/2099',900000],
-            ]
-          },
-          {
-            loanId: 2,
-            issueDate: '20/7/2022',
-            loanAmount: 500000,
-            amountPaid: 400000,
-            nextInstallmentDate: '3/3/2021',
-            agreedLoanDuration: '3 months',
-            annualInterestRate: '12%',
-            pointsSpent: 400,
-            status: 'ongoing',
-            paymentHistory:  [
-              ['2/2/2045',500000],
-              ['2/5/2021',100000],
-              ['5/4/2099',900000],
-            ]
-          },
-        ],
-      
-        points: [
-          {
-            year: 2023,
-            total: 400000,
-            values:  [
-              ['2/2/2045',500, 'Sell'],
-              ['2/5/2021',100, 'Loan'],
-              ['5/4/2099',9000, 'Sell'],
-            ]
-          },
-          {
-            year: 2022,
-            total: 200000,
-            values:  [
-              ['2/2/2045',500, 'Sell'],
-              ['2/5/2021',100, 'Loan'],
-              ['5/4/2099',9000, 'Sell'],
-            ]
-          },
-        ],
-      
-        clubDeposits: [
-          {
-            year: 2023,
-            total: 2000000,
-            avgMonthyDeposit: 600000,
-            values:  [
-              ['January',500000],
-              ['February',100000],
-              ['March',900000],
-            ]
-          },
-          {
-            year: 2022,
-            total: 14000000,
-            values:  [
-              ['January',500000],
-              ['February',10000],
-              ['March',900000],
-              ['April',500000],
-              ['May',100000],
-              ['June',900000],
-              ['July',500000],
-              ['August',100000],
-              ['September',900000],
-              ['October',500000],
-              ['November',100000],
-              ['December',900000],
-            ]
-          }
-        ],
-      
-        clubEarnings: [
-          ['2024', 900000, '1%'],
-          ['2023', 500000, '2%'],
-          ['2022', 300000, '3%'],
-        ]
-      
+    // Helper function for date formatting
+    const formatDate = (dateString) => {
+        const date = new Date(dateString);
+        return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
+    };
+
+    // Helper function for processing arrays
+    const processArray = (array, processDataFunc, noDataValue = 'No Data Available') => 
+        Array.isArray(array) && array.length > 0 ? processDataFunc(array) : noDataValue;
+
+    try {
+        // Fetch data from the database
+        const db = mongoose.connection.db;
+        const collection = db.collection('users');
+        var club = [];
+        collection.find({}).toArray().then(result => club = result);
+        const constants = await Constants.findOne();
+        const memberDeposits = await Deposit.find({ depositor_name: req.user.fullName });
+        const debts = await Loans.find({ borrower_name: req.user.fullName, loan_status: "Ongoing" });
+        const debtHistory = await Loans.find({ borrower_name: req.user.fullName});
+        const earnings = await Earnings.find({ beneficiary_name: req.user.fullName });
+        const points = await PointsSale.find({ name: req.user.fullName, type: "Sell"});
+        const units = await InvestmentUnits.find({ name: req.user.fullName });
+        const clubDeposits = await Deposit.find({});
+        const clubEarnings = await Earnings.find({});
+
+        const currentYear = new Date().getFullYear().toString();
+        var actualInvestmentTotal = 0;
+
+        // Process and calculate various metrics
+        const clubWorth = processArray(club, (c) => c.reduce((total, member) => total + member.investmentAmount, 0));
+        const clubUnits = processArray(units, (u) => getTotalSumsAndSort(u, 'year', 'units'));
+        const depositsArray = processArray(memberDeposits, (md) => getTotalSumsAndSort(md, 'deposit_date', 'deposit_amount'));
+        const earningsArray = processArray(earnings, (e) => getTotalSumsAndSort(e, 'date_of_earning', 'earnings_amount'));
+        const debtRecords = processArray(debtHistory, (dh) => getTotalSumsAndSort(dh, 'loan_date', 'loan_amount'));
+        const clubDepositsArray = processArray(clubDeposits, (cd) => getTotalSumsAndSort(cd, 'deposit_date', 'deposit_amount'));
+        const clubEarningsArray = processArray(clubEarnings, (ce) => getTotalSumsAndSort(ce, 'date_of_earning', 'earnings_amount'));
+        const pointsArray = processArray(points, (p) => getTotalSumsAndSort(p, 'transaction_date', 'points_involved'));
+        const memberYears = req.user ? Math.round((getDaysDifference(req.user.membershipDate) / 365) * 10) / 10 : 'No Data Available';
+        
+        const one_point_value = ((constants.max_lending_rate - constants.min_lending_rate) * 2 * req.user.investmentAmount * 25) / (500 * 100 * 12);
+        const pointsWorth = Math.round(one_point_value * req.user.points);
+        const member_risk = Math.round(req.user.investmentAmount * 100 /clubWorth);// + '%';
+        const totalDebt = debts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
+        const possiblePoints = (req.user.points  / 25);
+        let possibleRate = Math.max(constants.min_lending_rate, Math.min(constants.max_lending_rate, Math.round(((20 - possiblePoints) * 0.4 + 12) * 100) / 100));
+        const maxLimit = req.user.investmentAmount * 20 <= clubWorth ? (req.user.investmentAmount * 5 - totalDebt): ((0.25 * clubWorth) - totalDebt);
+
+        const sortedDepositYears = depositsArray !== 'No Data Available' ? Object.entries(depositsArray.yearsSums).sort((a, b) => b[0] - a[0]) : 'No Data Available';
+        const sortedEarningsYears = earningsArray !== 'No Data Available' ? Object.entries(earningsArray.yearsSums).sort((a, b) => b[0] - a[0]) : 'No Data Available';
+        const sortedPoints = pointsArray !== 'No Data Available' ? Object.entries(pointsArray.yearsSums).sort((a, b) => b[0] - a[0]) : 'No Data Available';
+        const sortedClubDepositYears = clubDepositsArray !== 'No Data Available' ? Object.entries(clubDepositsArray.yearsSums).sort((a, b) => b[0] - a[0]) : 'No Data Available';
+        const sortedClubEarningsYears = clubEarningsArray !== 'No Data Available' ? Object.entries(clubEarningsArray.yearsSums).sort((a, b) => b[0] - a[0]) : 'No Data Available';
+
+        var memberDepositsRecords = [];
+        var memberEarningsRecords = earningsArray !== 'No Data Available' ? [] : [{year: Today.getFullYear(), total: 0, roi: 0, values: []}];
+        var memberDebtRecords = [];
+        var clubDepositsRecords = [];
+        var clubEarningsRecords = [];
+        var pointsRecords = pointsArray !== 'No Data Available' ? [] : [{year: Today.getFullYear(), total: 0, values: []}];
+
+        // Process and structure member deposits records
+        if (depositsArray !== 'No Data Available') {
+            sortedDepositYears.forEach(([year, record]) => {
+                let values = processArray(depositsArray.recordsByYear[year], (records) =>
+                    records.map(depositRecord => [formatDate(depositRecord.deposit_date),
+                    Math.round(depositRecord.deposit_amount),
+                    depositRecord.source]));
+
+                memberDepositsRecords.push({
+                    year,
+                    total: Math.round(record.deposit_amount),
+                    avgMonthyDeposit: year !== currentYear ? Math.round(record.deposit_amount / 12) : Math.round(record.deposit_amount / (new Date().getMonth() + 1)),
+                    values
+                });
+            });
+        }
+
+        // Process and structure member earnings records
+        if (earningsArray !== 'No Data Available') {
+            sortedEarningsYears.forEach(([year, record]) => {
+                units.forEach(entry => {
+                    if (entry.year === year) {
+                        let actualInvestment = entry.units / 365;
+                        actualInvestmentTotal += Math.round(actualInvestment);
+                        let yearObject = {
+                            year: year,
+                            total: Math.round(record.earnings_amount),
+                            roi: year !== currentYear ? Math.round(record.earnings_amount * 100 / actualInvestment) : 0,
+                            values: processArray(earningsArray.recordsByYear[year], (earningsRecords) =>
+                                earningsRecords.map(earningsRecord => [formatDate(earningsRecord.date_of_earning),
+                                Math.round(earningsRecord.earnings_amount),
+                                earningsRecord.source,
+                                earningsRecord.destination]))
+                        };
+                        memberEarningsRecords.push(yearObject);
+                    }
+                });
+            });
+        }
+
+        // Process and structure member debt records
+        if (debtRecords !== 'No Data Available') {
+            Object.entries(debtRecords.recordsByYear).forEach(([year, records]) => {
+                records.forEach(record => {
+                    let paymentHistory = record.payments.map(paymentRecord => [
+                        formatDate(paymentRecord.payment_date),
+                        Math.round(paymentRecord.payment_amount)
+                    ]);
+
+                    let yearObject = {
+                        loanId: record._id,
+                        issueDate: formatDate(record.loan_date),
+                        loanAmount: record.loan_amount,
+                        amountLeft: Math.round(record.principal_left + record.interest_amount),
+                        agreedLoanDuration: record.loan_duration + ' months',
+                        annualInterestRate: record.loan_rate,
+                        pointsSpent: Math.round(record.points_spent),
+                        status: record.loan_status,
+                        paymentHistory: paymentHistory
+                    };
+
+                    memberDebtRecords.push(yearObject);
+                });
+            });
+        }
+
+        // Process and structure club deposits records
+        if (clubDepositsArray !== 'No Data Available') {
+            sortedClubDepositYears.forEach(([year, record]) => {
+                let values = Object.entries(clubDepositsArray.monthlySums[year]).map(([month, mRecord]) => [
+                    month, 
+                    Math.round(mRecord.deposit_amount)
+                ]);
+
+                let yearObject = {
+                    year: year,
+                    total: Math.round(record.deposit_amount),
+                    avgMonthyDeposit: year !== currentYear ? Math.round(record.deposit_amount / 12) : Math.round(record.deposit_amount / (new Date().getMonth() + 1)),
+                    values: values
+                };
+
+                clubDepositsRecords.push(yearObject);
+            });
+        }
+
+        // Process and structure club earnings records
+        if (clubEarningsArray !== 'No Data Available' && clubUnits !== 'No Data Available') {
+            sortedClubEarningsYears.forEach(([year1, record]) => {
+                Object.entries(clubUnits.yearsSums).forEach(([year2, record2]) => {
+                    if (year2 === year1) {
+                        const actualInvestment = record2.units / 365;
+                        const year = year1;
+                        const total = Math.round(record.earnings_amount);
+                        const roi = year !== currentYear ? Math.round(record.earnings_amount * 100 / actualInvestment) : 0;
+                        let value = [year, total, roi];
+
+                        clubEarningsRecords.push(value);
+                    }
+                });
+            });
+        }
+
+        // Process and structure points records
+        if (pointsArray !== 'No Data Available') {
+            sortedPoints.forEach(([year, record]) => {
+                let values = pointsArray.recordsByYear[year].map(pointsRecord => [
+                    formatDate(pointsRecord.transaction_date),
+                    Math.round(pointsRecord.points_involved),
+                    pointsRecord.reason
+                ]);
+
+                let yearObject = {
+                    year: year,
+                    total: Math.round(record.points_involved),
+                    values: values
+                };
+
+                pointsRecords.push(yearObject);
+            });
+        }
+
+
+        const averageEarnings = earningsArray !== 'No Data Available' ? Math.round(earningsArray.totalSumAll.earnings_amount * 100 / actualInvestmentTotal) : 0;
+        
+        // Construct the JSON response
+        let memberDashboardData = {
+            summary: {
+                memberDeposits: {
+                    yourWorth: Math.round(req.user.investmentAmount),
+                },
+                payments: {
+                    avgYearlyReturn: Math.round(averageEarnings) + ' Over ' + memberYears + ' years',
+                },
+                loans: {
+                    currentDebt: Math.round(totalDebt),
+                },
+                points: {
+                    points: Math.round(req.user.points),
+                },
+                clubDeposits: {
+                    clubWorth: Math.round(clubWorth),
+                },
+                clubEarnings: {
+                    clubWorth: Math.round(clubWorth),
+                },
+            },
+            home: {
+                clubWorth: Math.round(clubWorth),
+                members: club.length-1, 
+                thisYearDeposits: clubDepositsArray.yearsSums["2023"] ? clubDepositsArray.yearsSums["2023"].deposit_amount : 'No Data',
+                yourWorth: Math.round(req.user.investmentAmount),
+                risk: member_risk + '%',
+                thisYearSavings: depositsArray.yearsSums?.["2023"] ? depositsArray.yearsSums["2023"].deposit_amount : 'No Data',//check
+                yourDebt: totalDebt,
+                bestRate: possibleRate + '%',
+                maxLoanLimit: Math.round(maxLimit),
+                points: Math.round(req.user.points),
+                pointsWorth: Math.round(pointsWorth),
+                pointWorth: Math.round(one_point_value),
+            },
+            memberDeposits: memberDepositsRecords,
+            payments: memberEarningsRecords,
+            loans: memberDebtRecords,
+            points: pointsRecords,
+            clubDeposits: clubDepositsRecords,
+            clubEarnings: clubEarningsRecords,
+        };
+        
+        res.json(memberDashboardData);
+                  
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ msg: 'An error occurred' });
     }
-    res.json(memberDashboardData)
+     
 });
 
 //Loan Requests Lists
@@ -931,7 +954,7 @@ app.post('/end-ongoing-loan', async (req, res) => {
     }
 });
 
-//Distribute_profits
+//Distribute_profits  Dont forget to actually send the earnings or reinvested
 app.post('/distribute_profits', async (req, res) => {
     try {
         // Input Validation
@@ -1471,3 +1494,4 @@ function distributeProfit(totalProfit, loanDays) {
         return { year: parseInt(yearNumber), amount };
     });
 }
+
