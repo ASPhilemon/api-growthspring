@@ -7,7 +7,7 @@ require('dotenv').config()
 const {sendMail} = require('../../util/sendMail')
 
 function createToken (_id) {
-  const expiryDuration = '3d' 
+  const expiryDuration = '30d' 
   return jwt.sign({_id}, process.env.SECRET || 'top_secret', { expiresIn: expiryDuration })
 }
 

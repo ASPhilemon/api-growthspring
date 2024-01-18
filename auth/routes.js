@@ -8,13 +8,13 @@ const { createOTP} = require('./controllers/OTPController')
 
 const router = express.Router()
 
-// login route
+// login user
 router.post('/login', loginUser)
 
-// signup route
+// create user
 router.post('/create-user', requireAuth, requireAdmin, createUser)
 
-// Get OTP
+// Create OTP
 router.post('/create-otp', createOTP)
 
 // Change password

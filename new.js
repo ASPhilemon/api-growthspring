@@ -57,6 +57,8 @@ const Users = require('./auth/models/UserModel');
 const {requireAuth, requireAdmin} = require('./auth/middleware')
 const authRoutes = require('./auth/routes')
 
+require('dotenv').config()
+
 //express app
 const app = express();
 
@@ -64,7 +66,8 @@ const app = express();
 app.use(express.json());
 
 //connect to mongoDB
-const dbURI = 'mongodb+srv://blaise1:blaise119976@cluster0.nmt34.mongodb.net/GrowthSpringNew?retryWrites=true&w=majority';
+const dbURI = process.env.dbURI || "mongodb+srv://PhilemonAriko:2NHWoECpwyQFhjo3@cluster0.z9m53.mongodb.net/growthspring?retryWrites=true&w=majority"
+//'mongodb+srv://blaise1:blaise119976@cluster0.nmt34.mongodb.net/GrowthSpringNew?retryWrites=true&w=majority';
 
 mongoose.connect(dbURI, {useNewUrlParser: true, useUnifiedTopology: true})
     .then((result) => app.listen(4000));
@@ -80,7 +83,7 @@ app.use(cors())
 //auth routes
 app.use('/auth', authRoutes)
 
-//Auntenticated Routes (Logged in members)
+//Auntenticated Routes below (Logged in members)
 app.use(requireAuth)
 
 
@@ -88,22 +91,6 @@ app.use(requireAuth)
 //CONSTANTS FOR BACKEND
 const Today = new Date(Date.now());
 //COMFIRMATION BOXES FOR ALL SERIOUS BUTTONS
-
-//Page_requests
-//Get member's list
-app.get('/members', (req, res) => {
-    Member.find().then(result => {        
-        res.json({list: result});
-    });
-});
-
-//Get member's list
-app.get('/locations-list', (req, res) => {
-    ClubData.findOne().then(result => {        
-        res.json({list: result.cashLocations});
-    });
-});
-
 
 //Home_page_fetch
 app.get('/homepage-data', async (req, res) => {
@@ -344,6 +331,27 @@ app.get('/homepage-data', async (req, res) => {
     }
      
 });
+
+//Admin actions only below
+app.use(requireAdmin)
+
+//Page_requests
+//Get member's list
+app.get('/members', (req, res) => {
+    Member.find().then(result => {        
+        res.json({list: result});
+    });
+});
+
+//Get member's list
+app.get('/locations-list', (req, res) => {
+    ClubData.findOne().then(result => {        
+        res.json({list: result.cashLocations});
+    });
+});
+
+
+
 
 //Loan Requests Lists
 app.get('/loan-requests-lists', async (req, res) => {
@@ -1355,8 +1363,6 @@ function getTotalSumsAndSort(records, givenDate, ...fields) {
 }
 
 
-
-
 //GET_DURATION_AND_PROFIT_OF_SHORT_LOANS
 async function getProfitAndDuration(object, end_date = new Date()) {
     const constants = await Constants.findOne(); // Await for constants retrieval
@@ -1372,8 +1378,6 @@ async function getProfitAndDuration(object, end_date = new Date()) {
 
     return object;
 }
-
-
 
 //GET_VALUE_OF_POINTS
 async function getValueOfPoints(points, member) {

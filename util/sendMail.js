@@ -14,10 +14,11 @@ function sendMail(
   let emailBody;
 
   let transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: "live.smtp.mailtrap.io",
+    port: 587,
     auth: {
-      user: 'creditme.ug.info@gmail.com',
-      pass: 'xkubwidoohzorewf'
+      user: "api",
+      pass: "2d97f505634eaa761005456acaad2c1f"
     }
   });
 
@@ -27,7 +28,7 @@ function sendMail(
   } )
   
   var mailOptions = {
-    from:`${senderName} <creditme.ug.info@gmail.com>`,
+    from:"<alerts@growthspringers.com>",
     to: recipientEmail,
     subject: emailSubject,
     html: emailBody
