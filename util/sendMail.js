@@ -31,7 +31,8 @@ function sendMail(
     from:"<alerts@growthspringers.com>",
     to: recipientEmail,
     subject: emailSubject,
-    html: emailBody
+    html: emailBody,
+    replyTo: 'philemonariko@gmail.com'
   };
   
   transporter.sendMail(mailOptions, function(err){
