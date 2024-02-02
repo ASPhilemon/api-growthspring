@@ -61,7 +61,11 @@ async function createUser (req, res){
     res.status(400).json({error: err.message})
   }
 }
-
+// get users
+async function getUsers (req, res){
+  const users = await UserModel.find({}).select("_id fullName email")
+  return res.json(users)
+}
 // Change password
 async function changePassword(req, res) {
   const {otpCode, email, newPassword} = req.body
@@ -103,4 +107,4 @@ async function changePassword(req, res) {
   }
 }
 
-module.exports = { createUser, loginUser, changePassword }
+module.exports = { createUser, getUsers, loginUser, changePassword }

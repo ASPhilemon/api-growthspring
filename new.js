@@ -21,6 +21,7 @@
 
 //Loan_Rate_and_request_initiation
 //Buy_Discount
+//Add_non_club_money
 //Approve_loan_requests
 //Remove_loan_requests
 //End_Ongoing_loan
@@ -66,11 +67,24 @@ const app = express();
 app.use(express.json());
 
 //connect to mongoDB
-const dbURI = process.env.dbURI || "mongodb+srv://PhilemonAriko:2NHWoECpwyQFhjo3@cluster0.z9m53.mongodb.net/growthspring?retryWrites=true&w=majority"
-//'mongodb+srv://blaise1:blaise119976@cluster0.nmt34.mongodb.net/GrowthSpringNew?retryWrites=true&w=majority';
+let dbURI = process.env.dbURI || "mongodb+srv://PhilemonAriko:2NHWoECpwyQFhjo3@cluster0.z9m53.mongodb.net/growthspring?retryWrites=true&w=majority"
+dbURI = 'mongodb+srv://blaise1:blaise119976@cluster0.nmt34.mongodb.net/GrowthSpringNew?retryWrites=true&w=majority';
 
-mongoose.connect(dbURI, {useNewUrlParser: true, useUnifiedTopology: true})
-    .then((result) => app.listen(4000));
+var collection = [];
+mongoose.connect(dbURI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then((result) => {
+    const db = mongoose.connection.db;
+    collection = db.collection('users');
+    app.listen(4000);
+    console.log('Connected to MongoDB');
+
+    // Now you can use 'collection' and 'app' as needed
+
+  })
+  .catch((error) => {
+    console.error('Error connecting to MongoDB:', error);
+  });
+
 
 //register view engine
 app.set('view engine', 'ejs');
@@ -90,6 +104,9 @@ app.use(requireAuth)
 //#constants
 //CONSTANTS FOR BACKEND
 const Today = new Date(Date.now());
+const thisYear = new Date().getFullYear();
+const thisMonth = new Date().toLocaleString('default', { month: 'long' });
+const constants = Constants.findOne();
 //COMFIRMATION BOXES FOR ALL SERIOUS BUTTONS
 
 //Home_page_fetch
@@ -106,17 +123,15 @@ app.get('/homepage-data', async (req, res) => {
 
     try {
         // Fetch data from the database
-        const db = mongoose.connection.db;
-        const collection = db.collection('users');
         var club = [];
         collection.find({}).toArray().then(result => club = result);
-        const constants = await Constants.findOne();
         const memberDeposits = await Deposit.find({ depositor_name: req.user.fullName });
         const debts = await Loans.find({ borrower_name: req.user.fullName, loan_status: "Ongoing" });
         const debtHistory = await Loans.find({ borrower_name: req.user.fullName});
         const earnings = await Earnings.find({ beneficiary_name: req.user.fullName });
         const points = await PointsSale.find({ name: req.user.fullName, type: "Sell"});
         const units = await InvestmentUnits.find({ name: req.user.fullName });
+        const clubUnitsRecords = await InvestmentUnits.find({ });
         const clubDeposits = await Deposit.find({});
         const clubEarnings = await Earnings.find({});
 
@@ -125,7 +140,7 @@ app.get('/homepage-data', async (req, res) => {
 
         // Process and calculate various metrics
         const clubWorth = processArray(club, (c) => c.reduce((total, member) => total + member.investmentAmount, 0));
-        const clubUnits = processArray(units, (u) => getTotalSumsAndSort(u, 'year', 'units'));
+        const clubUnits = processArray(clubUnitsRecords, (u) => getTotalSumsAndSort(u, 'year', 'units'));
         const depositsArray = processArray(memberDeposits, (md) => getTotalSumsAndSort(md, 'deposit_date', 'deposit_amount'));
         const earningsArray = processArray(earnings, (e) => getTotalSumsAndSort(e, 'date_of_earning', 'earnings_amount'));
         const debtRecords = processArray(debtHistory, (dh) => getTotalSumsAndSort(dh, 'loan_date', 'loan_amount'));
@@ -173,16 +188,19 @@ app.get('/homepage-data', async (req, res) => {
         }
 
         // Process and structure member earnings records
+        var totalReturns = 0;
         if (earningsArray !== 'No Data Available') {
             sortedEarningsYears.forEach(([year, record]) => {
                 units.forEach(entry => {
                     if (entry.year === year) {
                         let actualInvestment = entry.units / 365;
                         actualInvestmentTotal += Math.round(actualInvestment);
+                        const ROI = year !== currentYear ? Math.round(record.earnings_amount * 100 / actualInvestment) : 0;
+                        totalReturns+= ROI;
                         let yearObject = {
                             year: year,
                             total: Math.round(record.earnings_amount),
-                            roi: year !== currentYear ? Math.round(record.earnings_amount * 100 / actualInvestment) : 0,
+                            roi: ROI,
                             values: processArray(earningsArray.recordsByYear[year], (earningsRecords) =>
                                 earningsRecords.map(earningsRecord => [formatDate(earningsRecord.date_of_earning),
                                 Math.round(earningsRecord.earnings_amount),
@@ -208,7 +226,7 @@ app.get('/homepage-data', async (req, res) => {
                         loanId: record._id,
                         issueDate: formatDate(record.loan_date),
                         loanAmount: record.loan_amount,
-                        amountLeft: Math.round(record.principal_left + record.interest_amount),
+                        amountLeft: Math.round(record.loan_amount + record.interest_amount - record.discount - record.payments.reduce((total, loan) => total + loan.payment_amount, 0)),
                         agreedLoanDuration: record.loan_duration + ' months',
                         annualInterestRate: record.loan_rate,
                         pointsSpent: Math.round(record.points_spent),
@@ -277,7 +295,6 @@ app.get('/homepage-data', async (req, res) => {
         }
 
 
-        const averageEarnings = earningsArray !== 'No Data Available' ? Math.round(earningsArray.totalSumAll.earnings_amount * 100 / actualInvestmentTotal) : 0;
         
         // Construct the JSON response
         let memberDashboardData = {
@@ -286,7 +303,7 @@ app.get('/homepage-data', async (req, res) => {
                     yourWorth: Math.round(req.user.investmentAmount),
                 },
                 payments: {
-                    avgYearlyReturn: Math.round(averageEarnings) + ' Over ' + memberYears + ' years',
+                    avgYearlyReturn: Math.round(totalReturns * 100/memberYears)/100 + '% Over ' + Math.round(memberYears) + ' years',
                 },
                 loans: {
                     currentDebt: Math.round(totalDebt),
@@ -304,10 +321,10 @@ app.get('/homepage-data', async (req, res) => {
             home: {
                 clubWorth: Math.round(clubWorth),
                 members: club.length-1, 
-                thisYearDeposits: clubDepositsArray.yearsSums["2023"] ? clubDepositsArray.yearsSums["2023"].deposit_amount : 'No Data',
+                thisYearDeposits:  clubDepositsArray.yearsSums[thisYear] ? clubDepositsArray.yearsSums[thisYear].deposit_amount : 0,
                 yourWorth: Math.round(req.user.investmentAmount),
                 risk: member_risk + '%',
-                thisYearSavings: depositsArray.yearsSums?.["2023"] ? depositsArray.yearsSums["2023"].deposit_amount : 'No Data',//check
+                thisYearSavings: depositsArray.yearsSums?.[thisYear] ? depositsArray.yearsSums[thisYear].deposit_amount : 0,
                 yourDebt: totalDebt,
                 bestRate: possibleRate + '%',
                 maxLoanLimit: Math.round(maxLimit),
@@ -338,43 +355,559 @@ app.use(requireAdmin)
 //Page_requests
 //Get member's list
 app.get('/members', (req, res) => {
-    Member.find().then(result => {        
+    collection.find().then(result => {        
         res.json({list: result});
     });
 });
 
-//Get member's list
+//Get locations list
 app.get('/locations-list', (req, res) => {
     ClubData.findOne().then(result => {        
         res.json({list: result.cashLocations});
     });
 });
 
+//Admin_page_fetch
+app.get('/adminpage-data', async (req, res) => {
+    // Helper function for date formatting
+    const formatDate = (dateString) => {
+        const date = new Date(dateString);
+        return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
+    };
 
+    // Helper function for processing arrays
+    const processArray = (array, processDataFunc, noDataValue = 'No Data Available') => 
+        Array.isArray(array) && array.length > 0 ? processDataFunc(array) : noDataValue;
 
-
-//Loan Requests Lists
-app.get('/loan-requests-lists', async (req, res) => {
     try {
-        const requests = await Loans.find({ loan_status: "Initiation" });
-        const nonClubmoney = await NonClub.find({ status: "Pending" });
+        // Fetch data from the database
+        var memberData = [];
+        collection.find({}).toArray().then(result => memberData = result);
+        const memberDeposits = await Deposit.find({});
+        const debts = await Loans.find({ loan_status: "Ongoing" });
+        const debtHistory = await Loans.find({ });
+        const pastDebts = await Loans.find({ loan_status: "Ended" });
+        const credit = await Credit.find({ loan_status: "Ongoing" });
+        const creditHistory = await Credit.find({ });
+        const pastCredit = await Credit.find({ loan_status: "Ended" });
+        const earnings = await Earnings.find({ });
+        const clubEarnings = await Earnings.find({beneficiary_name: "Club Fund" });
+        const loanRequests = await Loans.find({ loan_status: "Initiation" });
+        const clubDebts = await Loans.find({ borrower_name: "Club Fund", loan_status: "Ongoing" });
+        const clubOldDebts = await Loans.find({ borrower_name: "Club Fund", loan_status: "Ended" });
+        const transferObligations = await NonClub.find({status: "Not-Sent" });
+        const pointsSold = await PointsSale.find({reason: "Sell" });
+        const pointsMarket = await PointsMkt.find({});
+        const clubData = await ClubData.findOne();
 
+        const pendingLoanRequests = groupAndSortEntries(loanRequests, 'latest_date');
+        const pendingTransferObligations = groupAndSortEntries(transferObligations, 'return_date');
+
+        const shortTermLoansLocation = clubData.cashLocations.find(location => location.location_name == 'Short Term Loans');
+        const pastInvestments = clubData.clubInvestments.find(investment => investment.status == 'Ended');
+        const ongoingInvestments = clubData.clubInvestments.find(investment => investment.status == 'Ongoing');
+        const shortTermLoansCapital = shortTermLoansLocation ? shortTermLoansLocation.location_amount : 0;
+
+        const currentInvestments = clubData.clubInvestments.filter(investment => investment.status === 'Ongoing');
+
+        const totalDebt = debts.reduce((total, loan) => total + loan.principal_left, 0);
+        const totalNonClubMoney = transferObligations.reduce((total, money) => total + money.deposit_amount, 0);
+        const totalCredit = creditHistory.reduce((total, loan) => total + loan.loan_amount, 0);
+        const currentInvestmentsTotal = currentInvestments.reduce((total, investment) => total + investment.capitalLeft, 0);
+        const totalCreditProfit = pastCredit.reduce((total, loan) => total + loan.profit, 0);
+        const totalDebts = debtHistory.reduce((total, loan) => total + loan.loan_amount, 0);
+        const pointsWorthSold = pointsSold.reduce((total, record) => total + record.points_worth, 0);
+        const totalClubOldDebts = clubOldDebts.reduce((total, loan) => total + loan.loan_amount, 0);
+        const totalClubDebts = clubDebts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
+        const totalMoney = clubData.cashLocations.reduce((total, location) => total + location.location_amount, 0);
+
+        const depositsArray = processArray(memberDeposits, (md) => getTotalSumsAndSort(md, 'deposit_date', 'deposit_amount'));
+        const creditArray = processArray(pastCredit, (md) => getTotalSumsAndSort(md, 'loan_date', 'loan_amount', 'profit'));
+        const expensesArray = processArray(clubData.clubExpenses, (ms) => getTotalSumsAndSort(ms, 'date_of_recording', 'expense_amount'));
+        const pastInvestmentsArray = processArray(pastInvestments, (ms) => getTotalSumsAndSort(ms, 'investment_date', 'investment_amount'));
+        const ongoingInvestmentsArray = processArray(ongoingInvestments, (ms) => getTotalSumsAndSort(ms, 'investment_date', 'investment_amount'));
+        const debtRecords = processArray(pastDebts, (dh) => getTotalSumsAndSort(dh, 'loan_date', 'loan_amount'));
+        const pointsSoldArray = processArray(pointsSold, (md) => getTotalSumsAndSort(md, 'transaction_date', 'points_worth'));
+        const incomeRecords = processArray(clubEarnings, (md) => getTotalSumsAndSort(md, 'date_of_earning', 'earnings_amount'));
+
+        const thisMonthSavings = depositsArray?.monthlySums?.[thisYear]?.[thisMonth]?.deposit_amount || 0;
+        const sortedDepositYears = depositsArray !== 'No Data Available' ? Object.entries(depositsArray.yearsSums).sort((a, b) => b[0] - a[0]) : 'No Data Available';
+        const sortedExpenseYears = expensesArray ? Object.entries(expensesArray.yearsSums ?? {}).sort((a, b) => b[0] - a[0]): 'No Data Available';
+        const sortedpastInvestments = pastInvestmentsArray ? Object.entries(pastInvestmentsArray.yearsSums ?? {}).sort((a, b) => b[0] - a[0]) : 'No Data Available';
+        const sortedongoingInvestments = ongoingInvestmentsArray ? Object.entries(ongoingInvestmentsArray.yearsSums ?? {}).sort((a, b) => b[0] - a[0]) : 'No Data Available';
+        const sortedDebts = Object.entries(debtRecords.yearsSums).sort((a, b) => b[0] - a[0]);
+        const sortedCredit = Object.entries(creditArray.yearsSums).sort((a, b) => b[0] - a[0]);
+        const sortedPointsSold = Object.entries(pointsSoldArray.yearsSums).sort((a, b) => b[0] - a[0]);
+        const sortedIncomeRecords = incomeRecords ? Object.entries(incomeRecords.yearsSums ?? {}).sort((a, b) => b[0] - a[0]) : 'No Data Available';
+
+        const banks = clubData.cashLocations.filter(location => location.category === 'Bank Accounts');
+        const admins = clubData.cashLocations.filter(location => location.category === 'Cash With Admins');
+        const bank_total = banks.reduce((total, location) => total + location.location_amount, 0);
+        const banksArray = banks.map(account => [account.location_name, Math.round(account.location_amount)]);
+        
+        const admins_total = admins.reduce((total, location) => total + location.location_amount, 0);
+        const adminsArray = admins.map(admin => [admin.location_name, Math.round(admin.location_amount)]);
+
+        const long_term_items = [];
+
+        for (let loan of debts) {
+            const existingItem = long_term_items.find(item => item[0] === loan.borrower_name);
+          
+            if (existingItem) {
+              existingItem[1] += loan.principal_left + loan.discount;
+            } else {
+                long_term_items.push([loan.borrower_name, Math.round(loan.principal_left + loan.discount)]);
+            }
+          }
+        const long_term_total = debts.reduce((total, item) => total + item.principal_left + item.discount, 0);
+
+        const short_term_items = [];
+
+        for (let loan of credit) {
+          const existingItem = short_term_items.find(item => item[0] === loan.borrower_name);
+        
+          if (existingItem) {
+            existingItem[1] += loan.loan_amount;
+          } else {
+            short_term_items.push([loan.borrower_name, Math.round(loan.loan_amount)]);
+          }
+        }
+        
+
+        const units_location = clubData.cashLocations.find(location => location.location_name === 'Unit Trusts');//category cash holdinngs
+        const units_total = units_location ? units_location.amount : 0;
+        const unitTrustDeposits = await CashHistory.find({ recipient_location_name: 'Unit Trusts' }).exec();
+        const unitTrustWithdrawals = await CashHistory.find({ other_location_name: 'Unit Trusts' }).exec();
+
+        var loanRequestsRecords = [];
+        var ongoingCreditRecords = [];
+        var monthlyCreditRecords = [];
+        var clubDepositsRecords = [];
+        var ongoingDebtRecords = [];
+        var pastDebtRecords = [];
+        var clubExpensesRecords = [];
+        var pastCreditRecords = []; 
+        var pointsRecords = [];
+        var pastClubInvestments = [];
+        var ongoingClubInvestments = [];
+        var clubIncome = [];
+        const market = [];
+        var marketTotal = 0;
+        
+        //points market
+        if(pointsMarket.length > 0) {
+            for (const item of pointsMarket) {
+                const member = memberData.find(person => person.fullName ==  item.seller_name);
+                const result =  await getValueOfPoints(item.points_for_sale, member);
+                marketTotal += result;
+                market.push([item.seller_name, Math.round(result), item.points_for_sale]);
+            }
+        }
+        
+        //points sale records
+        if (pointsSold) {
+            sortedPointsSold.forEach(([year, record]) => {
+                let values = processArray(pointsSoldArray.recordsByYear[year], (records) =>
+                    records.map(record => {
+                        const loan = debtHistory.find(loan => loan._id ==  record.recorded_by);
+                        return [Math.round(record.points_worth), record.name, loan.borrower_name]
+                    })
+                );
+        
+                pointsRecords.push({
+                    year: year,
+                    values: values
+                });
+            });
+        }
+        
+
+        // Process and structure member deposits records
+        if (depositsArray !== 'No Data Available') {
+            sortedDepositYears.forEach(([year, record]) => {
+                let recordsByMonth = processArray(depositsArray.recordsByYear[year], (records) => {
+                    const recordsByMonthMap = new Map();
+        
+                    records.forEach(depositRecord => {
+                        const month = new Date(depositRecord.deposit_date).toLocaleString('en-US', { month: 'long' });
+                        const formattedRecord = {
+                            depositer: depositRecord.depositor_name,
+                            date: formatDate(depositRecord.deposit_date),
+                            amount: Math.round(depositRecord.deposit_amount),
+                            recordedBy: depositRecord.recorded_by
+                        };
+        
+                        if (recordsByMonthMap.has(month)) {
+                            recordsByMonthMap.get(month).valuesByMonth.push(formattedRecord);
+                        } else {
+                            recordsByMonthMap.set(month, { month, valuesByMonth: [formattedRecord] });
+                        }
+                    });
+        
+                    return Array.from(recordsByMonthMap.values());
+                });
+        
+                clubDepositsRecords.push({
+                    year: year,
+                    total: Math.round(record.deposit_amount),
+                    values: recordsByMonth
+                });
+            });
+        }
+        
+        
+        // Process and structure loan request records
+        if (loanRequests) {
+            loanRequests.forEach(record => {
+                    let requestObject = {
+                        loanId: record._id,
+                        borrower: record.borrower_name,
+                        loanAmount: Math.round(record.loan_amount),
+                        earliestDate: formatDate(record.earliest_date),
+                        latestDate: formatDate(record.latest_date),
+                        loanDuration: record.loan_duration + ' months',
+                        interestRate: record.loan_rate,
+                        totalInterest: Math.round(record.interest_amount),
+                        discount: Math.round(record.discount),
+                        spentPoints: record.points_spent,
+                        currentWorth: Math.round(record.worth_at_loan), 
+                        initiatedBy: record.initiated_by
+                    };
+
+                    loanRequestsRecords.push(requestObject);
+                });
+        }
+
+        // Process and structure ongoing loan records
+        if (debts) {
+            debts.forEach(record => {
+                    let paymentHistory = record.payments.map(paymentRecord => [
+                        formatDate(paymentRecord.payment_date),
+                        Math.round(paymentRecord.payment_amount)
+                    ]);
+                    
+                    let loanObject = {
+                        loanId: record._id,
+                        borrower: record.borrower_name,
+                        loanAmount: Math.round(record.loan_amount),
+                        earliestDate: formatDate(record.earliest_date),
+                        latestDate: formatDate(record.latest_date),
+                        loanDuration: record.loan_duration + ' months',
+                        interestRate: record.loan_rate,
+                        totalInterest: Math.round(record.interest_amount),
+                        discount: Math.round(record.discount),
+                        spentPoints: record.points_spent,
+                        currentWorth: Math.round(record.worth_at_loan), 
+                        initiatedBy: record.initiated_by,
+                        approvedBy: record.approved_by,
+                        paymentDate: formatDate(new Date(record.loan_date.getTime() + (record.loan_duration * 30 * 24 * 60 * 60 * 1000))),
+                        issueDate: formatDate(record.loan_date),
+                        amountLeft: Math.round(record.principal_left + record.interest_amount),
+                        paymentHistory: paymentHistory
+                    };
+
+                    ongoingDebtRecords.push(loanObject);
+                });
+        }
+
+        // Process and structure past loans records
+        if (debtRecords) {
+            sortedDebts.forEach(([year, record]) => {
+                let values = processArray(debtRecords.recordsByYear[year], (records) =>
+                    records.map(record => {
+                        let paymentHistory = record.payments.map(paymentRecord => [
+                            formatDate(paymentRecord.payment_date),
+                            Math.round(paymentRecord.payment_amount),
+                            paymentRecord.updated_by
+                        ]);
+                        return {
+                            loanId: record._id,
+                            borrower: record.borrower_name,
+                            loanAmount: Math.round(record.loan_amount),
+                            earliestDate: formatDate(record.earliest_date),
+                            latestDate: formatDate(record.latest_date),
+                            loanDuration: record.loan_duration + ' months',
+                            interestRate: record.loan_rate,
+                            totalInterest: Math.round(record.interest_amount),
+                            discount: Math.round(record.discount),
+                            spentPoints: record.points_spent,
+                            currentWorth: Math.round(record.worth_at_loan), 
+                            initiatedBy: record.initiated_by,
+                            approvedBy: record.approved_by,
+                            issueDate: formatDate(record.loan_date),
+                            paymentHistory: paymentHistory
+                        };
+                    })
+                );
+        
+                pastDebtRecords.push({
+                    year: year,
+                    total: Math.round(record.loan_amount),
+                    values: values
+                });
+            });
+        }
+
+        
+        // Process and structure ongoing credit records
+        const loans = [];
+        for (const loan of credit) {
+            const result = await getProfitAndDuration(loan);
+            loans.push(result);
+        }        
+        if (loans) {
+            loans.forEach((loan) => {
+                let value = {
+                    loanId: loan._id,
+                    borrower: loan.borrower_name,
+                    amount:Math.round(loan.loan_amount),
+                    issueDate:formatDate(loan.loan_date),
+                    elapsedTime:getDaysDifference(loan.loan_date),
+                    returnAmount: Math.round(loan.profit + loan.loan_amount)
+                        };
+        
+                ongoingCreditRecords.push(value);
+            });
+        } 
+
+        // Process and structure monthly credit records
+        if (pastCredit) {
+            sortedCredit.forEach(([year, records]) => {
+                let values = [];
+                for (const month in creditArray.monthlySums[year]) {
+                  const record = creditArray.monthlySums[year][month];
+                  const arrayEntry = [month, Math.round(record.loan_amount), Math.round(record.profit)];
+                  values.push(arrayEntry);
+                }
+
+                monthlyCreditRecords.push({
+                    year: year,
+                    total: Math.round(records.profit),
+                    values: values
+                });                
+              });    
+        }
+        
+        
+        // Process and structure past credit records
+        if (pastCredit) {
+            sortedCredit.forEach(([year, record]) => {
+                let values = processArray(creditArray.recordsByYear[year], (records) =>
+                    records.map(record => {
+                        return [formatDate(record.loan_date), record.borrower_name, Math.round(record.loan_amount)];
+                    })
+                );
+        
+                pastCreditRecords.push({
+                    year: year,
+                    total: Math.round(record.loan_amount),
+                    values: values
+                });
+            });
+        }
+
+        //Process and structure urgent notifications
         // Calculate the date 7 days from now
         const sevenDaysFromNow = new Date();
         sevenDaysFromNow.setDate(Today.getDate() + 7);
 
         // Filter urgent requests with latest_date within the next 7 days
-        const urgentRequests = requests.filter(request => {
+        const urgentRequests = loanRequests.filter(request => {
             const dueDate = new Date(request.latest_date);
             return dueDate <= sevenDaysFromNow;
         });
+        const urgentRequestsMessages = compileMessage('Loan Request by', urgentRequests, 'latestDate', 'borrower', 'LoanRequests');
 
-        const urgentTransfers = nonClubmoney.filter(transfer => {
+        const urgentTransfers = transferObligations.filter(transfer => {
             const dueDate = new Date(transfer.return_date);
             return dueDate <= sevenDaysFromNow;
         });
+        const urgentTransfersMessages = compileMessage('Transfer to', urgentTransfers, 'return_date', 'depositor_name', 'NonClubMoney');
+        
+        const urgentLoanPayments = ongoingDebtRecords.filter(record => {
+            const dueDate = new Date(record.paymentDate);
+            return dueDate <= sevenDaysFromNow;
+        });
+        const urgentLoanPaymentsMessages = compileMessage('Payment on Loan by', urgentLoanPayments, 'paymentDate', 'borrower', 'LongTermLoans');
+        
+        function compileMessage(startPhrase, array, date, label, category){
+            let messageArray = [];
+            for (entry of array) {
+            const dueDays = getDaysDifference(Today, entry[date]);
+            const msg = {
+                category: category,
+                message: startPhrase + ' '+ entry[label] + ' due in '+ dueDays + ' Days'
+                };
+             
+            messageArray.push(msg);
+            }
+            return messageArray
+        }
 
-        return res.json({ loan_requests: requests, urgentRequests: urgentRequests, urgentTransfers: urgentTransfers });
+        // Process and structure club expenses records
+        if (expensesArray !== 'No Data Available') {
+            sortedExpenseYears.forEach(([year, record]) => {
+                let values = processArray(expensesArray.recordsByYear[year], (records) =>
+                    records.map(expenseRecord => [formatDate(expenseRecord.date_of_recording),
+                        Math.round(expenseRecord.expense_amount),
+                        expenseRecord.expense_name]));
+
+                        clubExpensesRecords.push({
+                    year: year,
+                    total: Math.round(record.expense_amount),
+                    avgMonthlyExpense: year !== thisYear ? Math.round(record.expense_amount / 12) : Math.round(record.expense_amount / (new Date().getMonth() + 1)),
+                    values: values
+                });
+            });
+        }
+        
+        // Process and structure club income
+        if (incomeRecords) {
+            sortedIncomeRecords.forEach(([year, recording]) => {
+                let earnings = processArray(incomeRecords.recordsByYear[year], (records) =>
+                    records.map(record => {
+                        let earningsHistory = record.earnings.map(earningsRecord => [
+                            formatDate(earningsRecord.date_of_earning),
+                            Math.round(earningsRecord.earnings_amount),
+                            earningsRecord.source
+                        ]);
+                        return {
+                            year: year,
+                            total: Math.round(recording.earnings_amount),
+                            values: earningsHistory
+                        };
+                    })
+                );
+        
+                clubIncome.push({earnings});
+            });
+        }
+        
+                // Process and structure past club investments
+            if (pastInvestmentsArray) {
+                sortedpastInvestments.forEach(([year, recording]) => {
+                    let values = processArray(pastInvestmentsArray.recordsByYear[year], (records) =>
+                        records.map(record => {
+                            let paymentHistory = record.payments.map(paymentRecord => [
+                                formatDate(paymentRecord.date),
+                                Math.round(paymentRecord.amount),
+                                paymentRecord.recorded_by
+                            ]);
+                            return {
+                                name: record.investment_name,
+                                amount: Math.round(record.investment_amount),
+                                investmentDate: record.investment_date,
+                                about: record.details,
+                                paymentHistory: paymentHistory
+                            };
+                        })
+                    );
+            
+                    pastClubInvestments.push({values});
+                });
+            }
+
+        // Process and structure ongoing club investments
+            if (ongoingInvestmentsArray) {
+                sortedongoingInvestments.forEach(([year, record]) => {
+                    let values = processArray(ongoingInvestmentsArray.recordsByYear[year], (records) =>
+                        records.map(record => {
+                            let paymentHistory = record.payments.map(paymentRecord => [
+                                formatDate(paymentRecord.date),
+                                Math.round(paymentRecord.amount),
+                                paymentRecord.recorded_by
+                            ]);
+                            return {
+                                name: record.investment_name,
+                                amount: Math.round(record.investment_amount),
+                                investmentDate: record.investment_date,
+                                about: record.details,
+                                paymentHistory: paymentHistory
+                            };
+                        })
+                    );
+            
+                    ongoingClubInvestments.push({values});
+                });
+            }
+
+
+        // Construct the JSON response
+        return res.json({
+            adminDashboard: {
+                    summary:{
+                        clubMoneyLocations: {
+                          totalMoney: Math.round(totalMoney),
+                        },
+                        deposits: {
+                          currentMonth: thisMonth,
+                          thisMonthSavings: Math.round(thisMonthSavings)
+                        },
+                        withdrawals: {
+                          totalProfitsWithdrawals: 300000,//Why would we want to know this?
+                          nonClubMoneyInUse: Math.round(totalNonClubMoney),
+                        },
+                        longTermLoans: {
+                          availableForBorrowing: Math.round(totalMoney - totalDebt),
+                          currentlyBorrowed: Math.round(totalDebt),
+                          totalLoansEverIssued: Math.round(totalDebts)
+                        },
+                        shortTermLoans: {
+                          currentCapital: Math.round(shortTermLoansCapital),
+                          totalLoansEverIssued: Math.round(totalCredit),
+                          totalProfits: totalCreditProfit//This doesnt make sence, unless you add average return %
+                        },
+                        points: {
+                          totalPointsWorthSold: Math.round(pointsWorthSold),
+                          totalPointsWorthOnMarket: Math.round(marketTotal)
+                        },
+                        clubFund:{
+                          totalExpenses:  expensesArray.yearsSums?.[thisYear] ? Math.round(expensesArray.yearsSums[thisYear].expense_amount) : 0,
+                          currentInvestments: Math.round(currentInvestmentsTotal),
+                          avGrowthRate: 15.6 + '%', 
+                          clubFundWorth: Math.round(clubData.clubFundWorth),
+                          debt: Math.round(totalClubDebts),
+                        }
+                      },
+                    clubMoneyLocations: {
+                        banks: banksArray,
+                        cashWithAdmins: adminsArray,
+                        longTermLoans : long_term_items,
+                        shortTermLoans : short_term_items,
+                        unitTrustDeposits : unitTrustDeposits,//get format for these 
+                        unitTrustWithdrawals: unitTrustWithdrawals
+                      },
+                      deposits: clubDepositsRecords,
+                      longTermLoans: {
+                        requests: loanRequestsRecords,
+                        ongoingLoans: ongoingDebtRecords.sort((a, b) => new Date(a.paymentDate) - new Date(b.paymentDate)),
+                        pastLoans: pastDebtRecords
+                      },
+                      shortTermLoans: {
+                        ongoingLoans: ongoingCreditRecords,
+                        monthlyHistory: monthlyCreditRecords,
+                        loansHistory: pastCreditRecords
+                      },
+                      noticeBoard: urgentLoanPaymentsMessages + urgentTransfersMessages + urgentRequestsMessages,
+                      points: {
+                        market: market,
+                        transfers:pointsRecords
+                      },
+                      clubFund: {
+                        expenses: clubExpensesRecords,
+                        investments: {
+                          ongoing: ongoingClubInvestments,
+                          past:pastClubInvestments
+                          },
+                          income:clubIncome,
+                          loans:{
+                            ongoing: ongoingDebtRecords.filter(loan => loan.borrower === 'Club Fund'),
+                            past: pastDebtRecords.filter(loan => loan.borrower === 'Club Fund')
+                          }
+                        }
+                } 
+        });
+        
     } catch (error) {
         console.error(error);
         return res.status(500).json({ msg: 'An error occurred' });
@@ -382,184 +915,31 @@ app.get('/loan-requests-lists', async (req, res) => {
 });
 
 
-//Past Loans
-app.get('/past-loans', (req, res) => {
-    Loans.find({loan_status: "Ended"}).then(past_loans => {
-        return res.json({ past_loans: past_loans});
-    });
-    
-});
 
-//Past Deposits
-app.get('/credit-history', async (req, res) => {
-    try {
-        const deposits = await Deposit.find().exec();
 
-        const result = getTotalSumsAndSort(deposits, 'deposit_date', 'deposit_amount');
-        
-        return res.json({ deposit_monthly_totals: result.monthlySums, deposit_totals: result.totalSumAll});
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: 'An error occurred' });
-    }
-    
-    
-});
+
 
 //Ongoing Loans  How to handle the loss? Another section showing overdue loans? Just subtract the amount left from annual profits? Subtract the amount left at the end of the year?
-app.get('/ongoing-loans', async (req, res) => {
-    const ongoingLoans = await Loans.find({loan_status: "Ongoing"});
-                // Filter urgent loans with due_date within the next 7 days
-                const urgentPayments = ongoingLoans.filter(request => {
-                    const loanDate = new Date(request.loan_date);
-    const dueDate = new Date(loanDate.setMonth(loanDate.getMonth() + request.loan_duration));
 
-                    return dueDate <= sevenDaysFromNow;
-                });
-        return res.json({ ongoing_loans: ongoingLoans, urgent_payments: urgentPayments}); //ADD princial_left to profit
-
-    
-});
-
-//Points history
-app.get('/point-sales-history', async (req, res) => {
-    try {
-        const past_sales = await PointsSale.find().exec();
-
-        const result = getTotalSumsAndSort(past_sales, 'transaction_date', 'points_worth');
-        
-        return res.json({ pointsPast: result.recordsByYear});
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: 'An error occurred' });
-    }
-    
-});
-
-
-//Monthly short loan history
-app.get('/credit-history', async (req, res) => {
-    try {
-        const past_credit_loans = await Credit.find({ loan_status: "Ended"}).exec();
-
-        const result = getTotalSumsAndSort(past_credit_loans, 'loan_date', 'loan_amount', 'profit');
-               
-        return res.json({ past_credit_loans_monthly_totals: result.monthlySums, past_credit_loans_totals: result.totalSumAll});
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: 'An error occurred' });
-    }
-    
-});
-
-//Ongoing short loans
-app.get('/ongoing-credit-loans', async (req, res) => {
-    try {
-        const ongoing_credit_loans = await Credit.find({ loan_status: "Ongoing" }).exec();
-
-        const loans = [];
-        for (const loan of ongoing_credit_loans) {
-            const result = await getProfitAndDuration(loan);
-            loans.push(result);
-        }
-
-        return res.json({ ongoing_credit_loans: loans });
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: 'An error occurred' });
-    }
-});
-
-//Club Money Locations
-app.get('/club-money-locations', async (req, res) => {
-    try {
-        const clubdata = await ClubData.findOne();
-
-        const banks = clubdata.cashLocations.filter(location =>
-            location.category === 'Bank Accounts' || location.category === 'Cash With Admins'
-        );
-        const bank_total = banks.reduce((total, location) => total + location.location_amount, 0);
-
-        const admins = clubdata.cashLocations.filter(location =>
-            location.category === 'Cash With Admins'
-        );
-        const admins_total = admins.reduce((total, location) => total + location.location_amount, 0);
-
-        const long_term = await Loans.find({ loan_status: 'Ongoing' }).exec();
-        const long_term_items = [];
-        for (let loan of long_term){
-            const item = { location_amount: loan.principal_left + loan.discount, location_name: loan.borrower_name};
-            long_term_items.push(item);
-        }
-        const long_term_total = long_term.reduce((total, item) => total + item.principal_left + item.discount, 0);
-
-        const short_term = await Credit.find({ loan_status: 'Ongoing' }).exec();
-        const short_term_items = [];
-        for (let loan of short_term){
-            const item = { location_amount: loan.loan_amount, location_name: loan.borrower_name};
-            short_term_items.push(item);
-        }
-        const short_term_location = clubdata.cashLocations.find(location => location.location_name === 'Short Loans');
-        const short_total = short_term_location ? short_term_location.location_amount : 0;
-
-        const units_location = clubdata.cashLocations.find(location => location.location_name === 'Unit Trusts');
-        const units_total = units_location ? units_location.amount : 0;
-
-        const data = {
-            banks: { items: banks, total: bank_total },
-            admins: { items: admins, total: admins_total },
-            long_term: { items: long_term_items, total: long_term_total},
-            short_term: { items: short_term_items, total: short_total },
-            units: { deposit: await CashHistory.find({ recipient_location_name: 'Unit Trusts' }).exec(), withdrawals: await CashHistory.find({ other_location_name: 'Unit Trusts' }).exec(), total: units_total }
-        };
-
-        return res.json(data);
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: 'An error occurred' });
-    }
-});
-
-
-//Points Market
-app.get('/points-mkt', async (req, res) => {
-    try {
-        const items = await PointsMkt.find().exec();
-
-        const market = [];
-        for (const item of items) {
-            const member = await Member.findOne({member_name: item.seller_name});
-            const result =  await getValueOfPoints(item.points_for_sale, member);
-            const newItem = item.toObject();
-            newItem.points_worth = result;
-            market.push(newItem);
-        }
-        return res.json({ onMkt: market });
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: 'An error occurred' });
-    }
-});
 
 //Create_new_account
-// app.post('/create_account', async (req, res) => {
-//     try {
-//         if (!req.body.name || !req.body.email || !req.body.givenName || !req.body.password) {
-//             return res.json({ msg: 'Some Details are missing'});
-//         }
+app.post('/create_account', async (req, res) => {
+    try {
+        if (!req.body.name || !req.body.email || !req.body.givenName || !req.body.password) {
+            return res.json({ msg: 'Some Details are missing'});
+        }
 
-//         Member.create({"member_name": req.body.name,  "email": req.body.email, "investment_amount": 0, "date_of_membership": Today, 'investment_date': Today, 'points': 500, "cummulative_units": 0, "phoneContact": '', "photo": '', "password": req.body.password, "givenName": req.body.givenName}).then();
+        Member.create({"member_name": req.body.name,  "email": req.body.email, "investment_amount": 0, "date_of_membership": Today, 'investment_date': Today, 'points': 500, "cummulative_units": 0, "phoneContact": '', "photo": '', "password": req.body.password, "givenName": req.body.givenName}).then();
         
-//         res.json({ msg: `New Account Successfuly Created` });
+        res.json({ msg: `New Account Successfuly Created` });
 
-//     } catch (error) {
-//         console.error(error);
-//         res.json({ msg: 'An error occurred'});
-//     }
-// });
+    } catch (error) {
+        console.error(error);
+        res.json({ msg: 'An error occurred'});
+    }
+});
 
 //Add_new_expense
-
 app.post('/add_expense', async (req, res) => {
     try {
         if (!req.body.expense_name || !req.body.expense_amount || !req.body.expense_date) {
@@ -619,26 +999,59 @@ app.post('/add_investment', async (req, res) => {
 app.post('/investment_payment', async (req, res) => {
     try {
         if (!req.body.investment_id || !req.body.payment_amount || !req.body.payment_date) {
-            return res.json({ msg: 'Some Details are missing'});
+            return res.json({ msg: 'Some details are missing' });
         }
-        
+
+        const clubData = await ClubData.findOne();
+
+        const thisInvestment = clubData.clubInvestments.find(investment => investment._id == req.body.investment_id);
+
+        const totalPayments = thisInvestment.paymentsHistory.reduce((total, payment) => total + payment.amount, 0) + req.body.payment_amount;
+        let amount = req.body.payment_amount;
+  
+        if (totalPayments > thisInvestment.investment_amount) {
+            let clubEarnings = req.body.payment_amount;
+            amount = 0;
+            if (thisInvestment.capitalLeft == 0) {
+                clubEarnings = req.body.payment_amount - thisInvestment.capitalLeft;
+            }
+
+            await Earnings.create({
+                beneficiary_name: 'Club Fund',
+                date_of_earning: Today,
+                destination: 'Withdrawn',
+                earnings_amount: clubEarnings,
+                source: thisInvestment.investment_name,
+                status: 'Sent'
+            });
+        }
+
         const newPayment = {
             date: req.body.payment_date,
             amount: req.body.payment_amount,
             recorded_by: 'Blaise'
         };
 
-        await ClubData.updateOne(
-            {}, 
-            { $push: { "clubInvestments.$[elem].paymentsHistory": newPayment }}, { arrayFilters: [{ "elem._id": req.body.investment_id }] }).then(response => {
-                res.json({ msg: `Payment Successfuly Recorded` });
-        });     
-
+        const response = await ClubData.updateOne(
+            {},
+            {
+                $inc: { "clubInvestments.$[elem].capitalLeft": -amount },
+                $push: { "clubInvestments.$[elem].paymentsHistory": newPayment }
+            },
+            { arrayFilters: [{ "elem._id": req.body.investment_id }] }
+        );
+    
+        if (response.nModified > 0) {
+            return res.json({ msg: `Payment successfully recorded` });
+        } else {
+            return res.json({ msg: `No matching document found` });
+        }
     } catch (error) {
         console.error(error);
-        res.json({ msg: 'An error occurred'});
+        return res.status(500).json({ msg: 'An error occurred' });
     }
 });
+
 
 //Approve_loan_requests
 app.post('/approve-loan-request', async (req, res) => {
@@ -690,6 +1103,17 @@ app.post('/approve-loan-request', async (req, res) => {
                 $inc: { principal_left: -(loansdata.discount + 0.5 * points_payment) }
             }
         );
+
+        await PointsSale.create({
+            "name": loansdata.borrower_name,
+            "transaction_date": Today,
+            "points_worth": 0,
+            "recorded_by": "Blaise",
+            "points_involved": loansdata.points_spent,
+            "reason": "Loan",
+            "type": "Sell"
+        });
+
         await ClubData.updateOne(
             { },
             { $inc: { "cashLocations.$[elem].location_amount": loansdata.loan_amount } },
@@ -703,7 +1127,7 @@ app.post('/approve-loan-request', async (req, res) => {
         res.json({ msg: 'Loan Approved Successfuly' });
 
         async function updateMemberPoints(memberName, points) {
-            await Member.updateOne({ member_name: memberName }, { $inc: { points } });
+            await collection.updateOne({ fullName: memberName }, { $inc: { points } });
         }
 
         async function updateMarketPoints(loansdata, market) {
@@ -731,7 +1155,7 @@ async function handlePointsSale(loansdata) {
         const market_total = full_market.reduce((total, item) => total + item.points_worth, 0);
 
         for (const item of full_market) {
-            const member = await Member.findOne({ member_name: item.seller_name });
+            const member = await collection.findOne({ fullName: item.seller_name });
             const sale_amount = (item.points_worth / market_total) * points_payment;
             const points_sold = (sale_amount / item.points_worth) * item.points_for_sale;
             const deposit = 0.5 * sale_amount;
@@ -758,7 +1182,7 @@ async function handlePointsSale(loansdata) {
             });
 
             await PointsMkt.updateOne({ seller_name: item.seller_name }, { $inc: { points_for_sale: -points_sold } });
-            await Member.updateOne({ member_name: item.seller_name }, { $inc: { points: -points_sold } });
+            await collection.updateOne({ fullName: item.seller_name }, { $inc: { points: -points_sold } });
         }
     } catch (error) {
         console.error('Error handling points sale:', error);
@@ -781,11 +1205,11 @@ app.post('/points_sale', async (req, res) => {
             return res.json({ msg: 'Points Not Entered'});
         }
 
-        const member = await Member.findOne({_id: req.body.seller_name_id});
+        const member = await collection.findOne({_id: req.body.seller_name_id});
 
         if (member.points >= req.body.points_number){
             if (req.body.status == 1){
-        PointsMkt.create({"added_by": member.member_name,  "date_added": Today, "seller_name": member.member_name, "points_for_sale": req.body.points_number}).then();
+        PointsMkt.create({"added_by": member.fullName,  "date_added": Today, "seller_name": member.fullName, "points_for_sale": req.body.points_number}).then();
          //Added by  
         res.json({ msg: 'Points Added Successfuly'});
             } else {
@@ -870,7 +1294,7 @@ app.post('/buy-discount', async (req, res) => {
         const discounts = await PointsMkt.find().exec();
         var market_total = 0;
         for (const item of discounts) {
-            const member = await Member.findOne({member_name: item.seller_name});
+            const member = await collection.findOne({fullName: item.seller_name});
             const result = await getValueOfPoints(item.points_for_sale, member);
             market_total += result;
         }
@@ -962,7 +1386,7 @@ app.post('/end-ongoing-loan', async (req, res) => {
     }
 });
 
-//Distribute_profits  Dont forget to actually send the earnings or reinvested
+//Distribute_profits
 app.post('/distribute_profits', async (req, res) => {
     try {
         // Input Validation
@@ -971,7 +1395,7 @@ app.post('/distribute_profits', async (req, res) => {
         }
 
         // Data Retrieval
-        const members = await Member.find();
+        const members = await collection.find();
         const thisYear = new Date().getFullYear();
         const profitsData = await ClubData.findOne({});
         const memberProfit = [];
@@ -989,11 +1413,11 @@ app.post('/distribute_profits', async (req, res) => {
 
         // Calculate Member Profits
         for (const member of members) {
-            const investmentDays = getDaysDifference(member.investment_date);
-            const totalUnits = member.cummulative_units + investmentDays * member.investment_amount;
-            await InvestmentUnits.create({ 'name': member.member_name, 'year': thisYear, 'units': totalUnits });
+            const investmentDays = getDaysDifference(member.investmentDate);
+            const totalUnits = member.cummulative_units + investmentDays * member.investmentAmount;
+            await InvestmentUnits.create({ 'name': member.fullName, 'year': thisYear, 'units': totalUnits });
 
-            const info = { 'name': member.member_name, 'amount': 0 };
+            const info = { 'name': member.fullName, 'amount': 0 };
             memberProfit.push(info);
         }
 
@@ -1068,11 +1492,11 @@ app.post('/make-loan-payment', async (req, res) => {
 
         if ((principal_left + interest_amount) <= 0) {//if the last payment exceeds the principal and the interest
             const new_deposit = req.body.payment_amount - loan_finding.principal_left - interest_amount;
-            const member = await Member.findOne({ member_name: loan_finding.borrower_name });
+            const member = await collection.findOne({ fullName: loan_finding.borrower_name });
             principal_left = 0;
             loan_status = "Ended";
             const restored_points = loan_finding.points_spent - points_spent;
-            Member.updateOne({ member_name: loan_finding.borrower_name }, { $inc: { points: restored_points } }).then();
+            collection.updateOne({ fullName: loan_finding.borrower_name }, { $inc: { points: restored_points } }).then();
             await addDeposit(member, new_deposit, req.body.payment_date, "Savings", req.body.payment_location);
             msg = `A Deposit of ${new_deposit} was recorded. It was excess Payment. The Loan is now Ended.`;
 
@@ -1089,7 +1513,7 @@ app.post('/make-loan-payment', async (req, res) => {
         var discount_earnings = await Earnings({recorded_by: loan_finding._id});
         
         for (const item of discount_earnings) {
-            const member = await Member.findOne({ member_name: item.seller_name });
+            const member = await collection.findOne({ fullName: item.seller_name });
 
             await addDeposit(member, item.earnings_amount, req.body.payment_date, 'Points', req.body.payment_location);
 
@@ -1141,21 +1565,21 @@ app.post('/initiate-request', async (req, res) => {
             return res.json({ msg: 'There is an entry missing. Please fill in everything needed', no: 0 });
         }
 
-        const member = await Member.findOne({_id: req.body.borrower_name_id});
+        const member = await collection.findOne({_id: req.body.borrower_name_id});
 
         if (req.body.request_status == 0) {
             if (req.body.interest_rate === '') {
-                const possiblePoints = (member.points * member.investment_amount) / ((req.body.loan_amount - member.investment_amount) * req.body.loan_duration);
+                const possiblePoints = (member.points * member.investmentAmount) / ((req.body.loan_amount - member.investmentAmount) * req.body.loan_duration);
                 let possibleRate = Math.max(12, Math.min(20, Math.round(((20 - possiblePoints) * 0.4 + 12) * 100) / 100));
                 const ratePoints = ((12 - possibleRate) / 8) * 20 + 20;
-                const pointsConsumed = Math.round((req.body.loan_amount - member.investment_amount) / member.investment_amount * ratePoints * req.body.loan_duration);
+                const pointsConsumed = Math.round((req.body.loan_amount - member.investmentAmount) / member.investmentAmount * ratePoints * req.body.loan_duration);
     
-                if (possibleRate === 20 && req.body.loan_amount > member.investment_amount) {
+                if (possibleRate === 20 && req.body.loan_amount > member.investmentAmount) {
                     possibleRate = 20;
                     pointsConsumed = member.points;
                 } else if (possibleRate < 12) {
                     possibleRate = 12;
-                } else if (possibleRate > 20 && req.body.loan_amount <= member.investment_amount) {
+                } else if (possibleRate > 20 && req.body.loan_amount <= member.investmentAmount) {
                     possibleRate = 12;
                     pointsConsumed = 0;
                 }
@@ -1164,7 +1588,7 @@ app.post('/initiate-request', async (req, res) => {
                 return res.json({ msg, no: 1 });
             } else {
                 const ratePoints = ((12 - req.body.interest_rate) / 8) * 20 + 20;
-                const pointsConsumed = Math.round((req.body.loan_amount - member.investment_amount) / member.investment_amount * ratePoints * req.body.loan_duration);
+                const pointsConsumed = Math.round((req.body.loan_amount - member.investmentAmount) / member.investmentAmount * ratePoints * req.body.loan_duration);
     
                 if (pointsConsumed <= member.points && pointsConsumed >= 0) {
                     const msg = `${pointsConsumed} Points are Consumed. Proceed`;
@@ -1173,8 +1597,8 @@ app.post('/initiate-request', async (req, res) => {
                     const msg = '0 Points are Consumed. Proceed';
                     return res.json({ msg, no: 0 });
                 } else {
-                    const possibleAmount = Math.max(50000, (member.points + ratePoints * req.body.loan_duration) * member.investment_amount / (ratePoints * req.body.loan_duration));
-                    const possiblePeriod = (member.points * member.investment_amount) / (ratePoints * (req.body.loan_amount - member.investment_amount));
+                    const possibleAmount = Math.max(50000, (member.points + ratePoints * req.body.loan_duration) * member.investmentAmount / (ratePoints * req.body.loan_duration));
+                    const possiblePeriod = (member.points * member.investmentAmount) / (ratePoints * (req.body.loan_amount - member.investmentAmount));
                     const msg = `Only ${Math.round(member.points)} Points available, yet you need ${Math.round(pointsConsumed)} Points. Change one or more of the following; Reduce amount to ${Math.trunc(possibleAmount).toLocaleString('en-US')}/=, or change period to a maximum value of ${Math.trunc(possiblePeriod)} months.`;
                     return res.json({ msg, no: 3 });
                 }
@@ -1185,12 +1609,12 @@ app.post('/initiate-request', async (req, res) => {
                 return res.json({ msg: 'There is an entry missing. Please fill in everything needed', no: 0 });
             } else {
                 const ratePoints = ((12 - req.body.interest_rate) / 8) * 20 + 20;
-                var pointsConsumed = Math.round((req.body.loan_amount - member.investment_amount) / member.investment_amount * ratePoints * req.body.loan_duration);
+                var pointsConsumed = Math.round((req.body.loan_amount - member.investmentAmount) / member.investmentAmount * ratePoints * req.body.loan_duration);
                 if (pointsConsumed <= member.points && pointsConsumed < 0) {
                     pointsConsumed = 0;
                 };
                 const interest_amount = req.body.interest_rate * req.body.loan_duration * req.body.loan_amount / 1200;
-                Loans.create({"loan_duration": req.body.loan_duration, "loan_units": 0, "loan_rate": req.body.interest_rate, "earliest_date": req.body.earliest_date, "latest_date": req.body.latest_date, "loan_status": "Initiation", "initiated_by": member.member_name, "approved_by": "", "worth_at_loan": member.investment_amount, "loan_amount": req.body.loan_amount, "loan_date": "", "borrower_name": member.member_name, "points_spent": pointsConsumed, "discount": 0, "points_worth_bought": 0, "rate_after_discount": req.body.interest_rate, 'interest_amount': interest_amount, "principal_left": req.body.loan_amount, "last_payment_date": Today}).then();
+                Loans.create({"loan_duration": req.body.loan_duration, "loan_units": 0, "loan_rate": req.body.interest_rate, "earliest_date": req.body.earliest_date, "latest_date": req.body.latest_date, "loan_status": "Initiation", "initiated_by": member.fullName, "approved_by": "", "worth_at_loan": member.investmentAmount, "loan_amount": req.body.loan_amount, "loan_date": "", "borrower_name": member.fullName, "points_spent": pointsConsumed, "discount": 0, "points_worth_bought": 0, "rate_after_discount": req.body.interest_rate, 'interest_amount': interest_amount, "principal_left": req.body.loan_amount, "last_payment_date": Today}).then();
             }// why is payments having empty new field? //initiated by...
         }     
     } catch (error) {
@@ -1206,9 +1630,9 @@ app.post('/credit', async (req, res) => {
             return res.json({ msg: 'There is an entry missing. Please fill in everything needed'});
         }
 
-        const member = await Member.findOne({_id: req.body.borrower_name_id});
+        const member = await collection.findOne({_id: req.body.borrower_name_id});
 
-        Credit.create({"loan_status": "Ongoing", "issued_by": "Blaise", "ended_by": "", "profit": 0, "loan_amount": req.body.credit_amount, "loan_date": req.body.credit_date, "borrower_name": member.member_name, "end_date": "", "duration": 0}).then(); 
+        Credit.create({"loan_status": "Ongoing", "issued_by": "Blaise", "ended_by": "", "profit": 0, "loan_amount": req.body.credit_amount, "loan_date": req.body.credit_date, "borrower_name": member.fullName, "end_date": "", "duration": 0}).then(); 
 //issued by    
     } catch (error) {
         console.error(error);
@@ -1219,14 +1643,43 @@ app.post('/credit', async (req, res) => {
 
 //Deposit_initalisation
 app.post('/deposit', async (req, res) => {
+
     try {
         if (!req.body.deposit_amount || !req.body.deposit_date) {
+            
             return res.json({ msg: 'There is an entry missing. Please fill in everything needed'});
+            
         }
 
-        const member = await Member.findOne({_id: req.body.depositor_name_id});
+        const member = await collection.findOne({_id: req.body.depositor_name_id});
         const msg = await addDeposit(member, req.body.deposit_amount, req.body.deposit_date, 'Savings', req.body.deposit_location);
 
+res.json({ msg: msg });   
+    } catch (error) {
+        console.error(error);
+        res.json({ msg: 'An error occurred'});
+    }
+    
+});
+
+//Add_non_club_money
+app.post('/non-club', async (req, res) => {
+    try {
+        if (!req.body.deposit_amount || !req.body.deposit_date || !req.body.return_date) {
+            return res.json({ msg: 'There is an entry missing. Please fill in everything needed'});
+        }
+        const member = await collection.findOne({_id: req.body.depositor_name_id});
+        // Record deposit
+        await NonClub.create({
+            depositor_name: member.fullName,
+            deposit_date: req.body.deposit_date,
+            deposit_amount: req.body.deposit_amount,
+            recorded_by: "String",
+            return_date: req.body.return_date,
+            status: "Not-Sent",
+            sent_by: "",
+        });
+        
 res.json({ msg: msg });   
     } catch (error) {
         console.error(error);
@@ -1255,21 +1708,21 @@ function getDaysDifference(earlierDate, laterDate = new Date()) {
 //DEPOSIT_FUNCTION
 async function addDeposit(member, depositAmount, depositDate, source, depositLocation) {
     try {
-        const days = getDaysDifference(member.investment_date, depositDate);
-        const newUnits =  member.investment_amount * days;
+        const days = getDaysDifference(member.investmentDate, depositDate);
+        const newUnits =  member.investmentAmount * days;
 
         // Record deposit
         await Deposit.create({
             "recorded_by": "Blaise",
             "deposit_amount": depositAmount,
             "deposit_date": depositDate,
-            "depositor_name": member.member_name,
-            "balance_before": member.investment_amount,
+            "depositor_name": member.fullName,
+            "balance_before": member.investmentAmount,
             "source": source
         });
 
         // Update member's investment details
-        await Member.updateOne(
+        await collection.updateOne(
             { _id: member._id },
             {
                 $set: { investment_date: depositDate },
@@ -1294,6 +1747,7 @@ async function addDeposit(member, depositAmount, depositDate, source, depositLoc
 
 //GET_TOTALS_FROM_RECORDS
 function getTotalSumsAndSort(records, givenDate, ...fields) {
+    if (records.length > 0) {
     const totalSumAll = {};
     const yearsSums = {};
     const recordsByYear = {};
@@ -1361,6 +1815,9 @@ function getTotalSumsAndSort(records, givenDate, ...fields) {
         sortedRecords,
     };
 }
+}
+
+
 
 
 //GET_DURATION_AND_PROFIT_OF_SHORT_LOANS
@@ -1379,11 +1836,13 @@ async function getProfitAndDuration(object, end_date = new Date()) {
     return object;
 }
 
+
+
 //GET_VALUE_OF_POINTS
-async function getValueOfPoints(points, member) {
+async function getValueOfPoints(points, user) {
     try {
         const constants = await Constants.findOne();
-        const one_point_value = ((constants.max_lending_rate - constants.min_lending_rate) * 25 * 2 * member.investment_amount) / (100 * 12 * 500);
+        const one_point_value = ((constants.max_lending_rate - constants.min_lending_rate) * 25 * 2 * user.investmentAmount) / (100 * 12 * 500);
         const points_worth = points * one_point_value;
 
         return points_worth;
@@ -1401,7 +1860,7 @@ async function updateMarket() {
         const market = [];
 
         for (const item of full_market) {
-            const member = await Member.findOne({ member_name: item.seller_name });
+            const member = club.find( members => members.fullName == item.seller_name );
 
             if (member) {
                 const result = await getValueOfPoints(item.points_for_sale, member);
@@ -1487,6 +1946,7 @@ async function calculateLoanDays(loanDate, currentDate, interest_amount) {
     });
 }
 
+//distribute_profits
 function distributeProfit(totalProfit, loanDays) {
     const totalLoanDays = loanDays.reduce((total, year) => total + Object.values(year)[0], 0);
     const profitPerDay = totalProfit / totalLoanDays;
@@ -1498,4 +1958,31 @@ function distributeProfit(totalProfit, loanDays) {
         return { year: parseInt(yearNumber), amount };
     });
 }
+
+//sort_entries_by_date
+function groupAndSortEntries(entriesArray, sortByProperty) {
+    // Step 1: Sort the array based on the specified property
+    entriesArray.sort((a, b) => new Date(a[sortByProperty]) - new Date(b[sortByProperty]));
+  
+    // Step 2: Group the entries by the specified property
+    const groupedEntries = entriesArray.reduce((acc, entry) => {
+      const propertyValue = entry[sortByProperty];
+  
+      if (!acc[propertyValue]) {
+        acc[propertyValue] = [];
+      }
+  
+      acc[propertyValue].push({ entry: entry.entry });
+  
+      return acc;
+    }, {});
+  
+    // Step 3: Convert the groupedEntries object into an array
+    const newArray = Object.entries(groupedEntries).map(([value, entries]) => ({
+      [value]: entries,
+    }));
+  
+    return newArray;
+  }
+  
 
