@@ -67,8 +67,7 @@ const app = express();
 app.use(express.json());
 
 //connect to mongoDB
-const dbURI = process.env.dbURI || 'mongodb+srv://blaise1:blaise119976@cluster0.nmt34.mongodb.net/GrowthSpringTest?retryWrites=true&w=majority';
-//'mongodb+srv://blaise1:blaise119976@cluster0.nmt34.mongodb.net/GrowthSpringNew?retryWrites=true&w=majority';
+const dbURI = process.env.dbURI || 'mongodb+srv://blaise1:blaise119976@cluster0.nmt34.mongodb.net/GrowthSpringNew?retryWrites=true&w=majority';
 
 
 mongoose.connect(dbURI, { useNewUrlParser: true, useUnifiedTopology: true })
@@ -107,7 +106,6 @@ app.use(requireAuth)
 const Today = new Date(Date.now());
 const thisYear = new Date().getFullYear();
 const thisMonth = new Date().toLocaleString('default', { month: 'long' });
-const constants = Constants.findOne();
 //COMFIRMATION BOXES FOR ALL SERIOUS BUTTONS
 
 //Home_page_fetch
@@ -134,6 +132,7 @@ app.get('/homepage-data', async (req, res) => {
         const clubUnitsRecords = await InvestmentUnits.find({ });
         const clubDeposits = await Deposit.find({});
         const clubEarnings = await Earnings.find({});
+        const constants = await Constants.findOne();
 
         const currentYear = new Date().getFullYear().toString();
         var actualInvestmentTotal = 0;
@@ -200,7 +199,7 @@ app.get('/homepage-data', async (req, res) => {
                         let yearObject = {
                             year: year,
                             total: Math.round(record.earnings_amount),
-                            roi: ROI,
+                            roi: ROI + '%',
                             values: processArray(earningsArray.recordsByYear[year], (earningsRecords) =>
                                 earningsRecords.map(earningsRecord => [formatDate(earningsRecord.date_of_earning),
                                 Math.round(earningsRecord.earnings_amount),
@@ -1723,7 +1722,7 @@ async function addDeposit(member, depositAmount, depositDate, source, depositLoc
             { _id: member._id },
             {
                 $set: { investmentDate: depositDate },
-                $inc: { cummulative_units: newUnits, investmentAmount: depositAmount }
+                $inc: { cummulativeUnits: newUnits, investmentAmount: depositAmount }
             }
         );
 
