@@ -67,23 +67,24 @@ const app = express();
 app.use(express.json());
 
 //connect to mongoDB
-let dbURI = process.env.dbURI || "mongodb+srv://PhilemonAriko:2NHWoECpwyQFhjo3@cluster0.z9m53.mongodb.net/growthspring?retryWrites=true&w=majority"
-dbURI = 'mongodb+srv://blaise1:blaise119976@cluster0.nmt34.mongodb.net/GrowthSpringNew?retryWrites=true&w=majority';
+const dbURI = process.env.dbURI || 'mongodb+srv://blaise1:blaise119976@cluster0.nmt34.mongodb.net/GrowthSpringTest?retryWrites=true&w=majority';
+//'mongodb+srv://blaise1:blaise119976@cluster0.nmt34.mongodb.net/GrowthSpringNew?retryWrites=true&w=majority';
 
-var collection = [];
+
 mongoose.connect(dbURI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then((result) => {
-    const db = mongoose.connection.db;
-    collection = db.collection('users');
-    app.listen(4000);
-    console.log('Connected to MongoDB');
+  .then(async (result) => {
 
-    // Now you can use 'collection' and 'app' as needed
-
+    try {
+      app.listen(4000);
+      console.log('Connected to MongoDB');
+    } catch (error) {
+      console.error('Error retrieving documents:', error);
+    }
   })
   .catch((error) => {
     console.error('Error connecting to MongoDB:', error);
   });
+
 
 
 //register view engine
@@ -123,8 +124,7 @@ app.get('/homepage-data', async (req, res) => {
 
     try {
         // Fetch data from the database
-        var club = [];
-        collection.find({}).toArray().then(result => club = result);
+        var club = await Users.find({});
         const memberDeposits = await Deposit.find({ depositor_name: req.user.fullName });
         const debts = await Loans.find({ borrower_name: req.user.fullName, loan_status: "Ongoing" });
         const debtHistory = await Loans.find({ borrower_name: req.user.fullName});
@@ -355,7 +355,7 @@ app.use(requireAdmin)
 //Page_requests
 //Get member's list
 app.get('/members', (req, res) => {
-    collection.find().then(result => {        
+    Users.find().then(result => {        
         res.json({list: result});
     });
 });
@@ -381,8 +381,7 @@ app.get('/adminpage-data', async (req, res) => {
 
     try {
         // Fetch data from the database
-        var memberData = [];
-        collection.find({}).toArray().then(result => memberData = result);
+        var memberData = await Users.find({ });
         const memberDeposits = await Deposit.find({});
         const debts = await Loans.find({ loan_status: "Ongoing" });
         const debtHistory = await Loans.find({ });
@@ -435,9 +434,9 @@ app.get('/adminpage-data', async (req, res) => {
         const sortedExpenseYears = expensesArray ? Object.entries(expensesArray.yearsSums ?? {}).sort((a, b) => b[0] - a[0]): 'No Data Available';
         const sortedpastInvestments = pastInvestmentsArray ? Object.entries(pastInvestmentsArray.yearsSums ?? {}).sort((a, b) => b[0] - a[0]) : 'No Data Available';
         const sortedongoingInvestments = ongoingInvestmentsArray ? Object.entries(ongoingInvestmentsArray.yearsSums ?? {}).sort((a, b) => b[0] - a[0]) : 'No Data Available';
-        const sortedDebts = Object.entries(debtRecords.yearsSums).sort((a, b) => b[0] - a[0]);
-        const sortedCredit = Object.entries(creditArray.yearsSums).sort((a, b) => b[0] - a[0]);
-        const sortedPointsSold = Object.entries(pointsSoldArray.yearsSums).sort((a, b) => b[0] - a[0]);
+        const sortedDebts = debtRecords ? Object.entries(debtRecords.yearsSums ?? {}).sort((a, b) => b[0] - a[0]) : 'No Data Available';
+        const sortedCredit = creditArray ? Object.entries(creditArray.yearsSums ?? {}).sort((a, b) => b[0] - a[0]) : 'No Data Available';
+        const sortedPointsSold = pointsSoldArray ? Object.entries(pointsSoldArray.yearsSums ?? {}).sort((a, b) => b[0] - a[0]) : 'No Data Available';
         const sortedIncomeRecords = incomeRecords ? Object.entries(incomeRecords.yearsSums ?? {}).sort((a, b) => b[0] - a[0]) : 'No Data Available';
 
         const banks = clubData.cashLocations.filter(location => location.category === 'Bank Accounts');
@@ -1127,7 +1126,7 @@ app.post('/approve-loan-request', async (req, res) => {
         res.json({ msg: 'Loan Approved Successfuly' });
 
         async function updateMemberPoints(memberName, points) {
-            await collection.updateOne({ fullName: memberName }, { $inc: { points } });
+            await Users.updateOne({ fullName: memberName }, { $inc: { points } });
         }
 
         async function updateMarketPoints(loansdata, market) {
@@ -1155,7 +1154,7 @@ async function handlePointsSale(loansdata) {
         const market_total = full_market.reduce((total, item) => total + item.points_worth, 0);
 
         for (const item of full_market) {
-            const member = await collection.findOne({ fullName: item.seller_name });
+            const member = await Users.findOne({ fullName: item.seller_name });
             const sale_amount = (item.points_worth / market_total) * points_payment;
             const points_sold = (sale_amount / item.points_worth) * item.points_for_sale;
             const deposit = 0.5 * sale_amount;
@@ -1182,7 +1181,7 @@ async function handlePointsSale(loansdata) {
             });
 
             await PointsMkt.updateOne({ seller_name: item.seller_name }, { $inc: { points_for_sale: -points_sold } });
-            await collection.updateOne({ fullName: item.seller_name }, { $inc: { points: -points_sold } });
+            await Users.updateOne({ fullName: item.seller_name }, { $inc: { points: -points_sold } });
         }
     } catch (error) {
         console.error('Error handling points sale:', error);
@@ -1205,7 +1204,7 @@ app.post('/points_sale', async (req, res) => {
             return res.json({ msg: 'Points Not Entered'});
         }
 
-        const member = await collection.findOne({_id: req.body.seller_name_id});
+        const member = await Users.findOne({_id: req.body.seller_name_id});
 
         if (member.points >= req.body.points_number){
             if (req.body.status == 1){
@@ -1294,7 +1293,7 @@ app.post('/buy-discount', async (req, res) => {
         const discounts = await PointsMkt.find().exec();
         var market_total = 0;
         for (const item of discounts) {
-            const member = await collection.findOne({fullName: item.seller_name});
+            const member = await Users.findOne({fullName: item.seller_name});
             const result = await getValueOfPoints(item.points_for_sale, member);
             market_total += result;
         }
@@ -1395,7 +1394,7 @@ app.post('/distribute_profits', async (req, res) => {
         }
 
         // Data Retrieval
-        const members = await collection.find();
+        const members = await Users.find();
         const thisYear = new Date().getFullYear();
         const profitsData = await ClubData.findOne({});
         const memberProfit = [];
@@ -1492,11 +1491,11 @@ app.post('/make-loan-payment', async (req, res) => {
 
         if ((principal_left + interest_amount) <= 0) {//if the last payment exceeds the principal and the interest
             const new_deposit = req.body.payment_amount - loan_finding.principal_left - interest_amount;
-            const member = await collection.findOne({ fullName: loan_finding.borrower_name });
+            const member = await Users.findOne({ fullName: loan_finding.borrower_name });
             principal_left = 0;
             loan_status = "Ended";
             const restored_points = loan_finding.points_spent - points_spent;
-            collection.updateOne({ fullName: loan_finding.borrower_name }, { $inc: { points: restored_points } }).then();
+            Users.updateOne({ fullName: loan_finding.borrower_name }, { $inc: { points: restored_points } }).then();
             await addDeposit(member, new_deposit, req.body.payment_date, "Savings", req.body.payment_location);
             msg = `A Deposit of ${new_deposit} was recorded. It was excess Payment. The Loan is now Ended.`;
 
@@ -1513,7 +1512,7 @@ app.post('/make-loan-payment', async (req, res) => {
         var discount_earnings = await Earnings({recorded_by: loan_finding._id});
         
         for (const item of discount_earnings) {
-            const member = await collection.findOne({ fullName: item.seller_name });
+            const member = await Users.findOne({ fullName: item.seller_name });
 
             await addDeposit(member, item.earnings_amount, req.body.payment_date, 'Points', req.body.payment_location);
 
@@ -1565,7 +1564,7 @@ app.post('/initiate-request', async (req, res) => {
             return res.json({ msg: 'There is an entry missing. Please fill in everything needed', no: 0 });
         }
 
-        const member = await collection.findOne({_id: req.body.borrower_name_id});
+        const member = await Users.findOne({_id: req.body.borrower_name_id});
 
         if (req.body.request_status == 0) {
             if (req.body.interest_rate === '') {
@@ -1630,7 +1629,7 @@ app.post('/credit', async (req, res) => {
             return res.json({ msg: 'There is an entry missing. Please fill in everything needed'});
         }
 
-        const member = await collection.findOne({_id: req.body.borrower_name_id});
+        const member = await Users.findOne({_id: req.body.borrower_name_id});
 
         Credit.create({"loan_status": "Ongoing", "issued_by": "Blaise", "ended_by": "", "profit": 0, "loan_amount": req.body.credit_amount, "loan_date": req.body.credit_date, "borrower_name": member.fullName, "end_date": "", "duration": 0}).then(); 
 //issued by    
@@ -1643,15 +1642,12 @@ app.post('/credit', async (req, res) => {
 
 //Deposit_initalisation
 app.post('/deposit', async (req, res) => {
-
     try {
         if (!req.body.deposit_amount || !req.body.deposit_date) {
-            
             return res.json({ msg: 'There is an entry missing. Please fill in everything needed'});
-            
         }
 
-        const member = await collection.findOne({_id: req.body.depositor_name_id});
+        const member = await Users.findOne({_id : req.body.depositor_name_id});
         const msg = await addDeposit(member, req.body.deposit_amount, req.body.deposit_date, 'Savings', req.body.deposit_location);
 
 res.json({ msg: msg });   
@@ -1668,7 +1664,7 @@ app.post('/non-club', async (req, res) => {
         if (!req.body.deposit_amount || !req.body.deposit_date || !req.body.return_date) {
             return res.json({ msg: 'There is an entry missing. Please fill in everything needed'});
         }
-        const member = await collection.findOne({_id: req.body.depositor_name_id});
+        const member = await Users.findOne({_id: req.body.depositor_name_id});
         // Record deposit
         await NonClub.create({
             depositor_name: member.fullName,
@@ -1710,10 +1706,11 @@ async function addDeposit(member, depositAmount, depositDate, source, depositLoc
     try {
         const days = getDaysDifference(member.investmentDate, depositDate);
         const newUnits =  member.investmentAmount * days;
+        console.log(days, newUnits);
 
         // Record deposit
         await Deposit.create({
-            "recorded_by": "Blaise",
+            "recorded_by": 'req.user.fullName',
             "deposit_amount": depositAmount,
             "deposit_date": depositDate,
             "depositor_name": member.fullName,
@@ -1722,11 +1719,11 @@ async function addDeposit(member, depositAmount, depositDate, source, depositLoc
         });
 
         // Update member's investment details
-        await collection.updateOne(
+        await Users.updateOne(
             { _id: member._id },
             {
-                $set: { investment_date: depositDate },
-                $inc: { cummulative_units: newUnits, investment_amount: depositAmount }
+                $set: { investmentDate: depositDate },
+                $inc: { cummulative_units: newUnits, investmentAmount: depositAmount }
             }
         );
 
