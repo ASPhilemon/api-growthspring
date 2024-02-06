@@ -6,9 +6,9 @@ const jwt = require('jsonwebtoken')
 require('dotenv').config()
 const {sendMail} = require('../../util/sendMail')
 
-function createToken (_id) {
-  const expiryDuration = '30d' 
-  return jwt.sign({_id}, process.env.SECRET || 'top_secret', { expiresIn: expiryDuration })
+function createToken (_id, fullName){
+  const expiryDuration = '60d' 
+  return jwt.sign({_id, fullName},  process.env.SECRET || 'top-secret-asphilemon', { expiresIn: expiryDuration })
 }
 
 // login a user
@@ -19,7 +19,7 @@ async function loginUser(req, res) {
     let user = await UserModel.login(email, password)
 
     // create a token
-    const token = createToken(user._id)
+    const token = createToken(user._id, user.fullName)
     user = {
       id: user._id,
       email: user.email,

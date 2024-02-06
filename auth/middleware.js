@@ -3,7 +3,6 @@ const UserModel = require('./models/UserModel')
 require('dotenv').config()
 
 async function requireAuth(req, res, next){
- 
 
   const { authorization } = req.headers
   if (!authorization) {

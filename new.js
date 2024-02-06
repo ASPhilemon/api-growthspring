@@ -65,6 +65,7 @@ const app = express();
 
 // Use the express.json() middleware to parse JSON data
 app.use(express.json());
+app.use(express.urlencoded({extended:true}))
 
 //connect to mongoDB
 const dbURI = process.env.dbURI || 'mongodb+srv://blaise1:blaise119976@cluster0.nmt34.mongodb.net/GrowthSpringNew?retryWrites=true&w=majority';
