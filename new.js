@@ -340,6 +340,23 @@ app.get('/homepage-data', async (req, res) => {
             clubEarnings: clubEarningsRecords,
         };
         
+        //Add credits and discounts section in member dashboard
+        memberDashboardData.summary.credits = {
+            yourCredits: 12,
+            yourDiscount: '70%'
+        }
+
+        memberDashboardData.discounts = [
+            {
+                year: 2024,
+                total: 50000,
+                values:[
+                    ['1/1/2024', 400000, 'Source 1'],
+                    ['1/3/2024', 200000, 'Source 2']
+                ]
+            }
+        ]
+
         res.json(memberDashboardData);
                   
     } catch (error) {
