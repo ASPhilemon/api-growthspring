@@ -98,6 +98,12 @@ app.use(cors())
 //auth routes
 app.use('/auth', authRoutes)
 
+//Discounts handler
+app.post('/discounts', (req, res)=>{
+    console.log(req.body);
+    res.json({discountsData: "data"})
+})
+
 //Auntenticated Routes below (Logged in members)
 app.use(requireAuth)
 
