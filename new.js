@@ -18,6 +18,8 @@
 
 //Add_to_points_market
 //Remove_points_sale
+//Get_discount_codes
+//make_discount_payment
 
 //Loan_Rate_and_request_initiation
 //Buy_Discount
@@ -52,7 +54,10 @@ const PointsMkt = require('./Models/pointsMkt');
 const Earnings = require('./Models/earnings');
 const CashHistory = require('./Models/cashTransactionsHistory');
 const InvestmentUnits = require('./Models/investment_units');
+const Discount = require('./Models/discounts');
 const Users = require('./auth/models/UserModel');
+const Codes =  require('./Models/codes');
+const Initiatives =  require('./Models/discount_initiatives');
 
 //auth imports
 const {requireAuth, requireAdmin} = require('./auth/middleware')
@@ -65,10 +70,10 @@ const app = express();
 
 // Use the express.json() middleware to parse JSON data
 app.use(express.json());
-app.use(express.urlencoded({extended:true}))
 
 //connect to mongoDB
 const dbURI = process.env.dbURI || 'mongodb+srv://blaise1:blaise119976@cluster0.nmt34.mongodb.net/GrowthSpringNew?retryWrites=true&w=majority';
+//'mongodb+srv://blaise1:blaise119976@cluster0.nmt34.mongodb.net/GrowthSpringNew?retryWrites=true&w=majority';
 
 
 mongoose.connect(dbURI, { useNewUrlParser: true, useUnifiedTopology: true })
@@ -98,11 +103,155 @@ app.use(cors())
 //auth routes
 app.use('/auth', authRoutes)
 
-//Discounts handler
-app.post('/discounts', (req, res)=>{
-    console.log(req.body);
-    res.json({discountsData: "data"})
-})
+// POST endpoint to get discount
+app.post('/get-discount', async (req, res) => {
+    
+    try {
+        // Validate request body
+        const { user_code, merchant_code, amount } = req.body;
+        if (!user_code || !merchant_code || !amount) {
+            return res.json({ msg: 'Please provide all details' });
+        }
+
+        // Check if merchant exists
+        const merchant = await Initiatives.findOne({ merchant_code });
+        const constants = await Constants.findOne();
+        if (!merchant) {
+            return res.json({ msg: `Invalid Merchant Code: <span style="color: blue; font-weight: bold;">${merchant_code} </span>` });
+        }
+
+        //check if user is authorized
+        if (merchant.personal_code != user_code && merchant.category == "Personal") {
+            return res.json({ msg: `User Code <span style="color: blue; font-weight: bold;">${merchant_code} </span>is not Authorized`});
+        }
+
+        //check that the amount is not negative
+        if (req.body.amount <= 0 ) {
+            return res.json({ msg: 'Enter Correct Amount'});
+        }
+
+        //check that the amount is right
+        if (merchant.debt < req.body.amount && merchant.category == "Personal") {
+            return res.json({ msg: 'Maximum Acceptable Amount is: <span style="color: red; font-weight: bold;">UGX ' + Math.round(merchant.debt).toLocaleString('en-US') + '</span>'});
+        }
+
+        //function to calculate discount
+        async function getDiscountRate(user) {
+            const units = await InvestmentUnits.find({ name: user.fullName });
+            const currentUnitsSum = units.reduce((total, unit) => total + unit.units, 0) + user.investmentAmount * getDaysDifference(user.investmentDate);
+            const credits = Math.round(currentUnitsSum * 100/15000000)/100;
+            var discountPercentage = credits > constants.max_credits ? 100 : Math.round(credits * 100/constants.max_credits);
+            discountPercentage = Math.max(discountPercentage, constants.min_discount);
+            return discountPercentage
+        }
+        
+        // Function to get user by code
+        async function getUserByCode(identifier) {
+            const code = await Codes.findOne({ secondary_codes_identifier: identifier });
+            if (code) {
+                return await Users.findOne({ fullName: code.primary_name });
+            }
+            return null;
+        }
+
+        // Function to generate message for general category merchant
+        function generateMessageForGeneralMerchant(discount_amount, amount) {
+            const cashToPay = amount - discount_amount;
+            return `You get a discount of <span style="color: gold; font-weight: bold;">UGX ${Math.round(discount_amount).toLocaleString('en-US')}</span>. You can Pay Cash of <span style="color: gold; font-weight: bold;">UGX ${Math.round(cashToPay).toLocaleString('en-US')}</span>`;
+        }
+
+        // Function to apply discount for secondary or one-time code user
+        async function applyDiscountForSecondaryOrOneTimeCodeUser(user, merchant, earnings) {
+
+            // Register earning for primary user
+            await Earnings.create({
+                beneficiary_name: user.fullName,
+                date_of_earning: new Date(),
+                destination: 'Withdrawn',
+                earnings_amount: earnings,
+                source: merchant.initiative_name,
+                status: 'Not-Sent'
+            });
+        }
+
+        //calculate remaining amount for individual initiatives
+        var debt = merchant.debt - req.body.amount;
+        var msg = 'Amount Left is: <span style="color: gold; font-weight: bold;">UGX ' + Math.round(debt).toLocaleString('en-US')+ '</span>';
+
+        // Apply discount based on user code length
+        if (user_code.length === 4) {
+            const code = await Codes.findOne({primary_code: req.body.user_code});
+            if (!code) {
+                return res.json({ msg: `Invalid User Code: <span style="color: blue; font-weight: bold;">${user_code}</span>` });
+            }
+
+            if (merchant.category == "General") {
+                const user = await getUserByCode(code.secondary_codes_identifier);
+                const discount_rate = await getDiscountRate(user);
+                const discount_amount = Math.floor(merchant.percentage * discount_rate * amount / (500 * 10000)) * 500;
+                await Discount.create(
+                    {
+                        source: merchant.initiative_name,
+                        discount_amount: discount_amount,
+                        date: Today,
+                        beneficiary_name: code.primary_name,
+                        percentage: discount_rate,
+                    }
+                );
+                debt = merchant.debt;
+                msg = generateMessageForGeneralMerchant(discount_amount, amount);
+            }
+        } else if (user_code.length === 5 || user_code.length === 6) {   
+            const checkCode1 = merchant.secondary_codes.find(codes => codes.code === req.body.user_code);
+            const checkCode2 = merchant.one_time_codes.find(codes => codes.code === req.body.user_code);
+            const verifiedCode = !checkCode1 ? checkCode2 : checkCode1;
+            
+            if (!verifiedCode) {
+                return res.json({ msg: `Invalid User Code: <span style="color: blue; font-weight: bold;">${user_code}</span>` });                
+            }
+
+            if (verifiedCode.limit != 'None' && req.body.amount > verifiedCode.limit) {
+                return res.json({ msg: 'Spend Limit of <span style="color: red; font-weight: bold;">' + Math.round(verifiedCode.limit).toLocaleString('en-US') + "</span> Exceeded. Please reduce amount"});
+            }
+
+            // Apply discount for secondary or one-time code user
+            if (merchant.category == "General") {
+            const identifier = user_code.substring(0, 2);
+            const user = await getUserByCode(identifier);
+            const discount_rate = await getDiscountRate(user);
+            const full_discount = discount_rate * merchant.percentage * req.body.amount/10000;
+            const discount_amount =  Math.floor(full_discount * (100 - constants.discount_profit_percentage) / (500 * 100)) * 500; 
+            const earnings = full_discount * constants.discount_profit_percentage / 100;
+            await applyDiscountForSecondaryOrOneTimeCodeUser(user, merchant, earnings);
+            debt = merchant.debt;
+            msg = generateMessageForGeneralMerchant(discount_amount, amount);
+            }
+
+            if (checkCode2) {            
+                // Delete used code
+                await Initiatives.updateOne(
+                    { merchant_code: merchant.merchant_code },
+                    { $pull: { "one_time_codes": { code: user_code } } }
+                );                
+            }
+        } else {
+            return res.json({ msg: `Invalid User Code: <span style="color: blue; font-weight: bold;">${user_code}</span>` });
+        }
+
+        // Update transaction history and debt
+        merchant.transactions_history.push({ date: new Date(), amount, code: user_code });
+        await Initiatives.updateOne(
+            { merchant_code: merchant.merchant_code },
+            { $set: { debt: debt, transactions_history: merchant.transactions_history } }
+        );        
+
+        // Send response
+        res.json({ msg : msg });
+    } catch (error) {
+        console.error('Error:', error);
+        res.json({ msg: 'An error occurred' });
+    }
+});
 
 //Auntenticated Routes below (Logged in members)
 app.use(requireAuth)
@@ -120,7 +269,7 @@ app.get('/homepage-data', async (req, res) => {
     // Helper function for date formatting
     const formatDate = (dateString) => {
         const date = new Date(dateString);
-        return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
+        return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
     };
 
     // Helper function for processing arrays
@@ -133,6 +282,7 @@ app.get('/homepage-data', async (req, res) => {
         const memberDeposits = await Deposit.find({ depositor_name: req.user.fullName });
         const debts = await Loans.find({ borrower_name: req.user.fullName, loan_status: "Ongoing" });
         const debtHistory = await Loans.find({ borrower_name: req.user.fullName});
+        const discounts = await Discount.find({ beneficiary_name: req.user.fullName});
         const earnings = await Earnings.find({ beneficiary_name: req.user.fullName });
         const points = await PointsSale.find({ name: req.user.fullName, type: "Sell"});
         const units = await InvestmentUnits.find({ name: req.user.fullName });
@@ -153,27 +303,34 @@ app.get('/homepage-data', async (req, res) => {
         const clubDepositsArray = processArray(clubDeposits, (cd) => getTotalSumsAndSort(cd, 'deposit_date', 'deposit_amount'));
         const clubEarningsArray = processArray(clubEarnings, (ce) => getTotalSumsAndSort(ce, 'date_of_earning', 'earnings_amount'));
         const pointsArray = processArray(points, (p) => getTotalSumsAndSort(p, 'transaction_date', 'points_involved'));
+        const discountArray = processArray(discounts, (u) => getTotalSumsAndSort(u, 'date', 'discount_amount'));
         const memberYears = req.user ? Math.round((getDaysDifference(req.user.membershipDate) / 365) * 10) / 10 : 'No Data Available';
         
         const one_point_value = ((constants.max_lending_rate - constants.min_lending_rate) * 2 * req.user.investmentAmount * 25) / (500 * 100 * 12);
         const pointsWorth = Math.round(one_point_value * req.user.points);
-        const member_risk = Math.round(req.user.investmentAmount * 100 /clubWorth);// + '%';
+        const member_risk = Math.round(req.user.investmentAmount * 100 /clubWorth);
         const totalDebt = debts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
         const possiblePoints = (req.user.points  / 25);
         let possibleRate = Math.max(constants.min_lending_rate, Math.min(constants.max_lending_rate, Math.round(((20 - possiblePoints) * 0.4 + 12) * 100) / 100));
         const maxLimit = req.user.investmentAmount * 20 <= clubWorth ? (req.user.investmentAmount * 5 - totalDebt): ((0.25 * clubWorth) - totalDebt);
+        const currentUnitsSum = units.reduce((total, unit) => total + unit.units, 0) + req.user.investmentAmount * getDaysDifference(req.user.investmentDate);
+        const credits = Math.round(currentUnitsSum * 100/15000000)/100;
+        var discountPercentage = credits > constants.max_credits ? 100 : Math.round(credits * 100/constants.max_credits);
+        discountPercentage = Math.max(discountPercentage, constants.min_discount);
 
         const sortedDepositYears = depositsArray !== 'No Data Available' ? Object.entries(depositsArray.yearsSums).sort((a, b) => b[0] - a[0]) : 'No Data Available';
         const sortedEarningsYears = earningsArray !== 'No Data Available' ? Object.entries(earningsArray.yearsSums).sort((a, b) => b[0] - a[0]) : 'No Data Available';
         const sortedPoints = pointsArray !== 'No Data Available' ? Object.entries(pointsArray.yearsSums).sort((a, b) => b[0] - a[0]) : 'No Data Available';
         const sortedClubDepositYears = clubDepositsArray !== 'No Data Available' ? Object.entries(clubDepositsArray.yearsSums).sort((a, b) => b[0] - a[0]) : 'No Data Available';
         const sortedClubEarningsYears = clubEarningsArray !== 'No Data Available' ? Object.entries(clubEarningsArray.yearsSums).sort((a, b) => b[0] - a[0]) : 'No Data Available';
+        const sorteddiscountArray = discounts ? Object.entries(discountArray.yearsSums ?? {}).sort((a, b) => b[0] - a[0]) : 'No Data Available';
 
         var memberDepositsRecords = [];
         var memberEarningsRecords = earningsArray !== 'No Data Available' ? [] : [{year: Today.getFullYear(), total: 0, roi: 0, values: []}];
         var memberDebtRecords = [];
         var clubDepositsRecords = [];
         var clubEarningsRecords = [];
+        var memberDiscountRecords = []; 
         var pointsRecords = pointsArray !== 'No Data Available' ? [] : [{year: Today.getFullYear(), total: 0, values: []}];
 
         // Process and structure member deposits records
@@ -192,6 +349,22 @@ app.get('/homepage-data', async (req, res) => {
                 });
             });
         }
+
+        // Process and structure member discounts records
+        if (discounts) {
+            sorteddiscountArray.forEach(([year, record]) => {
+                let values = processArray(discountArray.recordsByYear[year], (records) =>
+                    records.map(discountRecord => [formatDate(discountRecord.date),
+                    Math.round(discountRecord.discount_amount),
+                    discountRecord.source]));
+
+                memberDiscountRecords.push({
+                    year,
+                    total: Math.round(record.discount_amount),
+                    values
+                });
+            });
+        }        
 
         // Process and structure member earnings records
         var totalReturns = 0;
@@ -317,6 +490,10 @@ app.get('/homepage-data', async (req, res) => {
                 points: {
                     points: Math.round(req.user.points),
                 },
+                credits: {
+                    yourCredits: credits,//new addition
+                    yourDiscount: discountPercentage + '% of'
+                },
                 clubDeposits: {
                     clubWorth: Math.round(clubWorth),
                 },
@@ -344,25 +521,9 @@ app.get('/homepage-data', async (req, res) => {
             points: pointsRecords,
             clubDeposits: clubDepositsRecords,
             clubEarnings: clubEarningsRecords,
+            discounts: memberDiscountRecords//new addition
         };
         
-        //Add credits and discounts section in member dashboard
-        memberDashboardData.summary.credits = {
-            yourCredits: 12,
-            yourDiscount: '70%'
-        }
-
-        memberDashboardData.discounts = [
-            {
-                year: 2024,
-                total: 50000,
-                values:[
-                    ['1/1/2024', 400000, 'Source 1'],
-                    ['1/3/2024', 200000, 'Source 2']
-                ]
-            }
-        ]
-
         res.json(memberDashboardData);
                   
     } catch (error) {
@@ -1367,6 +1528,133 @@ app.post('/end_points_sale', async (req, res) => {
     }
 });
 
+//Get_discount_codes
+//register one time earning if member gets another member
+
+//make_discount_payment
+/*app.post('/get-discount', async (req, res) => {
+    try {       
+        if (!req.body.user_code || !req.body.merchant_code || !req.body.amount) {
+            return res.json({ msg: 'Enter all Details'});
+        }
+        const merchant = Initiatives.findOne({merchant_code: req.body.merchant_code});
+        const constants = await Constants.findOne();
+
+        if (!merchant) {
+            return res.json({ msg: 'Invalid Merchant Code: ' + req.body.merchant_code});
+        }
+
+        if (merchant.category == "Individual" && merchant.debt < req.body.amount) {
+            return res.json({ msg: 'Maximum Acceptable Amount is: UGX ' + Math.round(merchant.debt).toLocaleString('en-US')});
+        }
+
+        var debt = merchant.debt - req.body.amount;
+        var msg = 'Amount Left is: UGX ' + Math.round(merchant.debt).toLocaleString('en-US');
+
+       async function getDiscountRate(user) {
+            const units = await InvestmentUnits.find({ name: user.fullName });
+            const currentUnitsSum = units.reduce((total, unit) => total + unit.units, 0) + user.investmentAmount * getDaysDifference(user.investmentDate);
+            const credits = Math.round(currentUnitsSum * 100/15000000)/100;
+            var discountPercentage = credits > constants.max_credits ? 100 : Math.round(credits * 100/constants.max_credits);
+            discountPercentage = Math.max(discountPercentage, constants.min_discount);
+            return discountPercentage
+        }
+
+        if (req.body.user_code.length < 5) {
+        const code = await Codes.findOne({primary_code: req.body.user_code});
+        const user = await Users.findOne({fullName: code.primary_name});
+        const discount_amount = getDiscountRate(user) * req.body.amount;
+
+        if (merchant.category == "General") {
+            await Discount.create(
+                {
+                    source: merchant.initiative_name,
+                    discount_amount: discount_amount,
+                    date: Today,
+                    beneficiary_name: code.primary_name,
+                    percentage: discount_rate,
+                    type: 'Primary',
+                }
+            );
+            debt = merchant.debt;
+            msg = "You get a discount of " + Math.round(discount_amount).toLocaleString('en-US') + "/=. You can Pay Cash of " + (req.body.amount - Math.round(discount_amount)).toLocaleString('en-US') + "/=";
+        } 
+
+        } else if (req.body.user_code.length == 5) {
+            const verifiedCode = merchant.secondary_codes.find(codes => codes.code === req.body.user_code);
+            if (!verifiedCode) {
+                return res.json({ msg: "Invalid User Code: " + req.body.user_code});
+            }
+            if (verifiedCode.limit != 'None' && req.body.amount > verifiedCode.limit) {
+                return res.json({ msg: "Spend Limit of " + Math.round(verifiedCode.limit).toLocaleString('en-US') + " Exceeded. Please reduce amount"});
+            }
+            //get primary user 
+            const identifier = req.body.user_code.substring(0, 2);
+            const code = await Codes.findOne({secondary_codes_identifier: identifier});
+            const user = await Users.findOne({fullName: code.primary_name});
+            const sec_discount_amount = getDiscountRate(user) * req.body.amount * (100 - constants.discount_profit_percentage)/100;
+            const earnings = getDiscountRate(user) * req.body.amount * constants.discount_profit_percentage/100;
+            msg = "You get a discount of " + Math.round(sec_discount_amount).toLocaleString('en-US') + "/=. You can Pay Cash of " + (req.body.amount - Math.round(sec_discount_amount)).toLocaleString('en-US') + "/=";
+            //register earning for primary user
+            await Earnings.create({
+                beneficiary_name: user.fullName,
+                date_of_earning: Today,
+                destination: 'Withdrawn',
+                earnings_amount: earnings,
+                source: merchant.initiative_name,
+                status: 'Not-Sent'
+            });
+
+        }  else if (req.body.user_code.length == 6) {
+            const verifiedCode = merchant.one_time_codes.find(codes => codes.code === req.body.user_code);
+            if (!verifiedCode) {
+                return res.json({ msg: "Invalid User Code: " + req.body.user_code});
+            }
+            if (verifiedCode.limit != 'None' && req.body.amount > verifiedCode.limit) {
+                return res.json({ msg: "Spend Limit of " + Math.round(verifiedCode.limit).toLocaleString('en-US') + " Exceeded. Please reduce amount"});
+            } 
+            const identifier = req.body.user_code.substring(0, 2);
+            const code = await Codes.findOne({secondary_codes_identifier: identifier});
+            const user = await Users.findOne({fullName: code.primary_name});
+            const sec_discount_amount = getDiscountRate(user) * req.body.amount * (100 - constants.discount_profit_percentage)/100;
+            const earnings = getDiscountRate(user) * req.body.amount * constants.discount_profit_percentage/100;
+            msg = "You get a discount of " + Math.round(sec_discount_amount).toLocaleString('en-US') + "/=. You can Pay Cash of " + (req.body.amount - Math.round(sec_discount_amount)).toLocaleString('en-US') + "/=";
+            //register earning for primary user
+            await Earnings.create({
+                beneficiary_name: user.fullName,
+                date_of_earning: Today,
+                destination: 'Withdrawn',
+                earnings_amount: earnings,
+                source: merchant.initiative_name,
+                status: 'Not-Sent'
+            });
+
+            //delete code           
+        await Initiatives.updateOne(
+            {merchant_code: req.body.merchant_code},
+            { $pull: {"one_time_codes.$[elem].code"}},
+            { arrayFilters: [{ "elem.code": req.body.user_code }]
+        );
+        } else {
+            return res.json({ msg: "Invalid User Code: " + req.body.user_code});
+        }
+
+        //add to transactions and debt
+        const TransactionHistory = merchant.transactions_history.append({'date': Today, 'amount': req.body.amount, code: req.body.user_code});
+        await Initiatives.updateOne(
+            {merchant_code: req.body.merchant_code},
+            { $set: {"debt": debt, 'transactions_history': TransactionHistory}},
+        );
+
+        res.json({ msg: msg});
+    } catch (error) {
+        console.error(error);
+        res.json({ msg: 'An error occurred'});
+    }
+});*/
+
+
+
 //End_Ongoing_Short_loan
 app.post('/end_credit_loan', async (req, res) => {
     try {     
@@ -1629,15 +1917,17 @@ app.post('/initiate-request', async (req, res) => {
             
             if (!req.body.earliest_date || !req.body.latest_date || !req.body.interest_rate) {
                 return res.json({ msg: 'There is an entry missing. Please fill in everything needed', no: 0 });
-            } else {
+            } 
+            //check if earlier restrictions have been adhered to
                 const ratePoints = ((12 - req.body.interest_rate) / 8) * 20 + 20;
                 var pointsConsumed = Math.round((req.body.loan_amount - member.investmentAmount) / member.investmentAmount * ratePoints * req.body.loan_duration);
                 if (pointsConsumed <= member.points && pointsConsumed < 0) {
                     pointsConsumed = 0;
                 };
                 const interest_amount = req.body.interest_rate * req.body.loan_duration * req.body.loan_amount / 1200;
-                Loans.create({"loan_duration": req.body.loan_duration, "loan_units": 0, "loan_rate": req.body.interest_rate, "earliest_date": req.body.earliest_date, "latest_date": req.body.latest_date, "loan_status": "Initiation", "initiated_by": member.fullName, "approved_by": "", "worth_at_loan": member.investmentAmount, "loan_amount": req.body.loan_amount, "loan_date": "", "borrower_name": member.fullName, "points_spent": pointsConsumed, "discount": 0, "points_worth_bought": 0, "rate_after_discount": req.body.interest_rate, 'interest_amount': interest_amount, "principal_left": req.body.loan_amount, "last_payment_date": Today}).then();
-            }// why is payments having empty new field? //initiated by...
+                await Loans.create({"loan_duration": req.body.loan_duration, "loan_units": 0, "loan_rate": req.body.interest_rate, "earliest_date": req.body.earliest_date, "latest_date": req.body.latest_date, "loan_status": "Initiation", "initiated_by": member.fullName, "approved_by": "", "worth_at_loan": member.investmentAmount, "loan_amount": req.body.loan_amount, "loan_date": "", "borrower_name": member.fullName, "points_spent": pointsConsumed, "discount": 0, "points_worth_bought": 0, "rate_after_discount": req.body.interest_rate, 'interest_amount': interest_amount, "principal_left": req.body.loan_amount, "last_payment_date": Today}).then();
+                res.json({ msg: 'Request Successful' });
+                // why is payments having empty new field? //initiated by...
         }     
     } catch (error) {
         console.error(error);
@@ -1654,7 +1944,7 @@ app.post('/credit', async (req, res) => {
 
         const member = await Users.findOne({_id: req.body.borrower_name_id});
 
-        Credit.create({"loan_status": "Ongoing", "issued_by": "Blaise", "ended_by": "", "profit": 0, "loan_amount": req.body.credit_amount, "loan_date": req.body.credit_date, "borrower_name": member.fullName, "end_date": "", "duration": 0}).then(); 
+        await Credit.create({"loan_status": "Ongoing", "issued_by": "Blaise", "ended_by": "", "profit": 0, "loan_amount": req.body.credit_amount, "loan_date": req.body.credit_date, "borrower_name": member.fullName, "end_date": "", "duration": 0}).then(); 
 //issued by    
     } catch (error) {
         console.error(error);
@@ -1733,7 +2023,7 @@ async function addDeposit(member, depositAmount, depositDate, source, depositLoc
 
         // Record deposit
         await Deposit.create({
-            "recorded_by": 'req.user.fullName',
+            "recorded_by": 'Mwebe Blaise Adrian',
             "deposit_amount": depositAmount,
             "deposit_date": depositDate,
             "depositor_name": member.fullName,
