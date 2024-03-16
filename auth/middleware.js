@@ -2,21 +2,12 @@ const jwt = require('jsonwebtoken')
 const UserModel = require('./models/UserModel')
 require('dotenv').config()
 
-async function requireAuth(req, res, next){
-
-  const { authorization } = req.headers
-  if (!authorization) {
-    return res.status(401).json({error: 'Authentication failed'})
-  }
-  const token = authorization.split(' ')[1]
-
-  try {
-    const { _id } = jwt.verify(token, process.env.SECRET || 'top-secret-asphilemon')
-    req.user = await UserModel.findOne({ _id })
-    next()
-  } catch (err) {
-    res.status(401).json({error: 'Authentication failed'})
-  }
+async function requireAuth(req, res, next) {
+  const id = cookieAuth(req) || headerAuth(req)
+  if(!id) return res.status(400).json({error: "Authentication failed"})
+  const user = await UserModel.findById(id)
+  req.user = user
+  next()
 }
 
 function requireAdmin(req, res, next){
@@ -24,6 +15,35 @@ function requireAdmin(req, res, next){
     return res.status(403).json({error: 'Authorization failed'})
   }
   next()
+}
+
+function cookieAuth(req){
+  //cookie token
+  const token = req.cookies.jwt;
+  try {
+    const { id } = jwt.verify(token, process.env.SECRET || 'top_secret_xyz123')
+    return id
+  } catch (err) {
+    return null
+  }
+}
+
+function headerAuth(req){
+
+  const authorization = req.headers['authorization']
+
+  if (!authorization) {
+    return null
+  }
+
+  const token = authorization.split(' ')[1]
+
+  try {
+    const { id } = jwt.verify(token, process.env.SECRET || 'top_secret_xyz123')
+    return id
+  } catch (err) {
+    return null
+  }
 }
 
 

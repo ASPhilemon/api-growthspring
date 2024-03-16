@@ -42,6 +42,7 @@
 
 const express = require('express');
 const cors = require('cors')
+const cookieParser = require('cookie-parser')
 const mongoose = require('mongoose');
 const Deposit = require('./Models/deposits');
 const NonClub = require('./Models/nonClubmoney');
@@ -70,6 +71,7 @@ const app = express();
 
 // Use the express.json() middleware to parse JSON data
 app.use(express.json());
+app.use(cookieParser())
 
 //connect to mongoDB
 const dbURI = process.env.dbURI || 'mongodb+srv://blaise1:blaise119976@cluster0.nmt34.mongodb.net/GrowthSpringNew?retryWrites=true&w=majority';
@@ -98,7 +100,7 @@ app.set('view engine', 'ejs');
 //middleware
 app.use(express.static('public'));
 app.use(express.urlencoded({ extended: true }));
-app.use(cors())
+app.use(cors({origin: true, credentials: true}))
 
 //auth routes
 app.use('/auth', authRoutes)
@@ -477,6 +479,7 @@ app.get('/homepage-data', async (req, res) => {
         
         // Construct the JSON response
         let memberDashboardData = {
+            user: req.user,
             summary: {
                 memberDeposits: {
                     yourWorth: Math.round(req.user.investmentAmount),
