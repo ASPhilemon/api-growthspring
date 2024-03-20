@@ -69,7 +69,7 @@ require('dotenv').config()
 //express app
 const app = express();
 
-app.use(cors({origin: '*', credentials: true}))
+app.use(cors({origin:  ['growthspringers.com', 'www.growthspringers.com', 'admin.growthspringers.com' ], credentials: true}))
 
 // Use the express.json() middleware to parse JSON data
 app.use(express.json());
