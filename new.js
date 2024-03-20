@@ -100,7 +100,7 @@ app.set('view engine', 'ejs');
 //middleware
 app.use(express.static('public'));
 app.use(express.urlencoded({ extended: true }));
-app.use(cors({origin: true, credentials: true}))
+app.use(cors({origin: '*', credentials: true}))
 
 //auth routes
 app.use('/auth', authRoutes)
