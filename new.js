@@ -69,6 +69,8 @@ require('dotenv').config()
 //express app
 const app = express();
 
+app.use(cors({origin: '*', credentials: true}))
+
 // Use the express.json() middleware to parse JSON data
 app.use(express.json());
 app.use(cookieParser())
