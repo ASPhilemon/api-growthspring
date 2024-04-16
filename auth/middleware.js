@@ -39,8 +39,8 @@ function headerAuth(req){
   const token = authorization.split(' ')[1]
 
   try {
-    const { id } = jwt.verify(token, process.env.SECRET || 'top_secret_xyz123')
-    return id
+    const { _id } = jwt.verify(token, process.env.SECRET || 'top_secret_xyz123')
+    return _id
   } catch (err) {
     return null
   }

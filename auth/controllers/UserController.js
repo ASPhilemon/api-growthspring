@@ -8,7 +8,7 @@ const {sendMail} = require('../../util/sendMail')
 
 function createToken (_id, fullName){
   const expiryDuration = '60d' 
-  return jwt.sign({_id, fullName},  process.env.SECRET || 'top-secret-asphilemon', { expiresIn: expiryDuration })
+  return jwt.sign({_id, fullName},  process.env.SECRET || 'top_secret_xyz123', { expiresIn: expiryDuration })
 }
 
 // login a user
