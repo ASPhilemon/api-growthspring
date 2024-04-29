@@ -3,8 +3,8 @@ const mongoose = require('mongoose');
 
 const Schema = mongoose.Schema;
 const LogSchema = new Schema({
-  email: {
-    user: String,
+  user: {
+    type: String,
     required: true
   },
   page: {

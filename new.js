@@ -59,7 +59,7 @@ const Discount = require('./Models/discounts');
 const Users = require('./auth/models/UserModel');
 const Codes =  require('./Models/codes');
 const Initiatives =  require('./Models/discount_initiatives');
-import LogModel from './auth/models/LogModel';
+const LogModel = require('./auth/models/LogModel')
 
 //auth imports
 const {requireAuth, requireAdmin} = require('./auth/middleware')
