@@ -6,9 +6,9 @@ const jwt = require('jsonwebtoken')
 require('dotenv').config()
 const {sendMail} = require('../../util/sendMail')
 
-function createToken (_id, fullName){
+function createToken (id, fullName){
   const expiryDuration = '60d' 
-  return jwt.sign({_id, fullName},  process.env.SECRET || 'top_secret_xyz123', { expiresIn: expiryDuration })
+  return jwt.sign({id, fullName},  'top_secret_xyz123', { expiresIn: expiryDuration })
 }
 
 // login a user

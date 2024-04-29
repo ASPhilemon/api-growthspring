@@ -21,9 +21,10 @@ function cookieAuth(req){
   //cookie token
   const token = req.cookies.jwt;
   try {
-    const { id } = jwt.verify(token, process.env.SECRET || 'top_secret_xyz123')
+    const { id } = jwt.verify(token,  'top_secret_xyz123')
     return id
   } catch (err) {
+    console.log('cookie auth error', err)
     return null
   }
 }
@@ -37,14 +38,14 @@ function headerAuth(req){
   }
 
   const token = authorization.split(' ')[1]
-
   try {
-    const { _id } = jwt.verify(token, process.env.SECRET || 'top_secret_xyz123')
-    return _id
+    const {id } = jwt.verify(token, 'top_secret_xyz123')
+    return id
   } catch (err) {
+    console.log('header auth error', err)
     return null
   }
 }
 
 
-module.exports = { requireAuth, requireAdmin}
+module.exports = { requireAuth, requireAdmin }

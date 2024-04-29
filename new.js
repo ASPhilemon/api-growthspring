@@ -59,6 +59,7 @@ const Discount = require('./Models/discounts');
 const Users = require('./auth/models/UserModel');
 const Codes =  require('./Models/codes');
 const Initiatives =  require('./Models/discount_initiatives');
+import LogModel from './auth/models/LogModel';
 
 //auth imports
 const {requireAuth, requireAdmin} = require('./auth/middleware')
@@ -109,6 +110,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/auth', authRoutes)
 
 // POST endpoint to get discount
+//make_discount_payment
 app.post('/get-discount', async (req, res) => {
     
     try {
@@ -261,6 +263,11 @@ app.post('/get-discount', async (req, res) => {
 //Auntenticated Routes below (Logged in members)
 app.use(requireAuth)
 
+//Logger
+app.post('/log', async (req, res)=>{
+    const log = await LogModel.create({page: req.body.page, user: req.user.fullName})
+})
+
 
 //#constants
 //CONSTANTS FOR BACKEND
@@ -271,6 +278,100 @@ const thisMonth = new Date().toLocaleString('default', { month: 'long' });
 
 //Home_page_fetch
 app.get('/homepage-data', async (req, res) => {
+    
+    const constants = await Constants.findOne();
+    const clubDeposits = await Deposit.find({});
+
+    if (req.user.fullName === "Anabelle Joan") {
+        const one_point_value = ((constants.max_lending_rate - constants.min_lending_rate) * req.user.investmentAmount * 2* 25) / (500 * 100 * 12);
+        const pointsWorth = Math.round(one_point_value * req.user.points);
+        const clubDepositsArray = getTotalSumsAndSort(clubDeposits, 'deposit_date', 'deposit_amount');
+        let memberDashboardData = {
+            user: req.user,
+            summary: {
+                memberDeposits: {
+                    yourWorth: 1000000,
+                },
+                payments: {
+                    avgYearlyReturn: 13 + '% Over 4 years',
+                },
+                loans: {
+                    currentDebt: 500000,
+                },
+                points: {
+                    points: Math.round(req.user.points),
+                },
+                credits: {
+                    yourCredits: 15,
+                    yourDiscount: 70 + '% of'
+                },
+                clubDeposits: {
+                    clubWorth: Math.round(clubWorth),
+                },
+                clubEarnings: {
+                    clubWorth: Math.round(clubWorth),
+                },
+            },
+            home: {
+                clubWorth: Math.round(clubWorth),
+                members: club.length-2, 
+                thisYearDeposits:  clubDepositsArray.yearsSums[thisYear] ? clubDepositsArray.yearsSums[thisYear].deposit_amount : 0,
+                yourWorth: 1000000,
+                risk: '20%',
+                riskAmount: 200000,
+                riskAmountOfSavings:100000,
+                riskPercentageOfSavings: '%',
+                thisYearSavings: 120000,
+                yourDebt: 500000,
+                bestRate: '12%',
+                maxLoanLimit: 5000000,
+                points: Math.round(req.user.points),
+                pointsWorth: Math.round(pointsWorth),
+                pointWorth: Math.round(one_point_value),
+            },
+            memberDeposits: [{
+                year:'2023',
+                total: 500000,
+                avgMonthyDeposit: 50000,
+                values:['21/04/2023', 500000, 'Savings']
+            }],
+            payments: [{
+                "year": "2023",
+                "total": 19000,
+                "roi": "6%",
+                "values": [
+                    [
+                        "29/12/2023",
+                        19000,
+                        "Distribution",
+                        "Re-Invested"
+                    ]
+                ]
+            }],
+            loans: [],
+            points: [        {
+                "year": 2024,
+                "total": 0,
+                "values": []
+            }],
+            clubDeposits: club_deposits(),
+            clubEarnings: club_earnings(),
+            discounts: [        {
+                "year": "2024",
+                "total": 2050,
+                "values": [
+                    [
+                        "8/2/2024",
+                        2050,
+                        "Angella's Boutique"
+                    ]
+                ]
+            }]
+        };
+        
+        return res.json(memberDashboardData);
+    }
+
     // Helper function for date formatting
     const formatDate = (dateString) => {
         const date = new Date(dateString);
@@ -292,10 +393,8 @@ app.get('/homepage-data', async (req, res) => {
         const points = await PointsSale.find({ name: req.user.fullName, type: "Sell"});
         const units = await InvestmentUnits.find({ name: req.user.fullName });
         const clubUnitsRecords = await InvestmentUnits.find({ });
-        const clubDeposits = await Deposit.find({});
         const clubEarnings = await Earnings.find({});
-        const constants = await Constants.findOne();
-
+        const currentUnits = (await getTotalAmountAndUnits(req.user)).totalUnits;
         const currentYear = new Date().getFullYear().toString();
         var actualInvestmentTotal = 0;
 
@@ -311,13 +410,12 @@ app.get('/homepage-data', async (req, res) => {
         const discountArray = processArray(discounts, (u) => getTotalSumsAndSort(u, 'date', 'discount_amount'));
         const memberYears = req.user ? Math.round((getDaysDifference(req.user.membershipDate) / 365) * 10) / 10 : 'No Data Available';
         
-        const one_point_value = ((constants.max_lending_rate - constants.min_lending_rate) * 2 * req.user.investmentAmount * 25) / (500 * 100 * 12);
+        const one_point_value = ((constants.max_lending_rate - constants.min_lending_rate) * req.user.investmentAmount * 2* 25) / (500 * 100 * 12);
         const pointsWorth = Math.round(one_point_value * req.user.points);
-        const member_risk = Math.round(req.user.investmentAmount * 100 /clubWorth);
         const totalDebt = debts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
         const possiblePoints = (req.user.points  / 25);
         let possibleRate = Math.max(constants.min_lending_rate, Math.min(constants.max_lending_rate, Math.round(((20 - possiblePoints) * 0.4 + 12) * 100) / 100));
-        const maxLimit = req.user.investmentAmount * 20 <= clubWorth ? (req.user.investmentAmount * 5 - totalDebt): ((0.25 * clubWorth) - totalDebt);
+        
         const currentUnitsSum = units.reduce((total, unit) => total + unit.units, 0) + req.user.investmentAmount * getDaysDifference(req.user.investmentDate);
         const credits = Math.round(currentUnitsSum * 100/15000000)/100;
         var discountPercentage = credits > constants.max_credits ? 100 : Math.round(credits * 100/constants.max_credits);
@@ -329,12 +427,24 @@ app.get('/homepage-data', async (req, res) => {
         const sortedClubDepositYears = clubDepositsArray !== 'No Data Available' ? Object.entries(clubDepositsArray.yearsSums).sort((a, b) => b[0] - a[0]) : 'No Data Available';
         const sortedClubEarningsYears = clubEarningsArray !== 'No Data Available' ? Object.entries(clubEarningsArray.yearsSums).sort((a, b) => b[0] - a[0]) : 'No Data Available';
         const sorteddiscountArray = discounts ? Object.entries(discountArray.yearsSums ?? {}).sort((a, b) => b[0] - a[0]) : 'No Data Available';
+        const maxLimit = await getLoanLimit(req.user);
 
+        // Calculate used pool
+        let usedPool = 0;
+        const allDebts = await Loans.find({ loan_status: "Ongoing" });
+        for (const clubMember of club) {
+            const memberDebts = allDebts.filter(loan => loan.borrower_name === clubMember.fullName);
+            const memberDebtsTotal = memberDebts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
+            usedPool += Math.max(0, memberDebtsTotal - req.user.investmentAmount);
+        }
+        //const maxLimit = await getLoanLimit(req.user) - ((req.user.investmentAmount / clubWorth) * usedPool);
+        const riskPercentageOfWorth = usedPool / clubWorth;
+        const riskOfWorth = riskPercentageOfWorth * req.user.investmentAmount;
         var memberDepositsRecords = [];
         var memberEarningsRecords = earningsArray !== 'No Data Available' ? [] : [{year: Today.getFullYear(), total: 0, roi: 0, values: []}];
         var memberDebtRecords = [];
-        var clubDepositsRecords = [];
-        var clubEarningsRecords = [];
+        var club_Deposits = club_deposits();
+        var club_Earnings = club_earnings();
         var memberDiscountRecords = []; 
         var pointsRecords = pointsArray !== 'No Data Available' ? [] : [{year: Today.getFullYear(), total: 0, values: []}];
 
@@ -373,6 +483,7 @@ app.get('/homepage-data', async (req, res) => {
 
         // Process and structure member earnings records
         var totalReturns = 0;
+        var totalEarnings = 0;
         if (earningsArray !== 'No Data Available') {
             sortedEarningsYears.forEach(([year, record]) => {
                 units.forEach(entry => {
@@ -381,6 +492,7 @@ app.get('/homepage-data', async (req, res) => {
                         actualInvestmentTotal += Math.round(actualInvestment);
                         const ROI = year !== currentYear ? Math.round(record.earnings_amount * 100 / actualInvestment) : 0;
                         totalReturns+= ROI;
+                        totalEarnings = year !== currentYear ? totalEarnings + record.earnings_amount : totalEarnings;
                         let yearObject = {
                             year: year,
                             total: Math.round(record.earnings_amount),
@@ -396,7 +508,8 @@ app.get('/homepage-data', async (req, res) => {
                 });
             });
         }
-
+        const riskOfSavings = riskOfWorth - totalEarnings;
+        const riskPercentageOfSavings = riskOfSavings / (req.user.investmentAmount - totalEarnings);
         // Process and structure member debt records
         if (debtRecords !== 'No Data Available') {
             Object.entries(debtRecords.recordsByYear).forEach(([year, records]) => {
@@ -424,39 +537,47 @@ app.get('/homepage-data', async (req, res) => {
         }
 
         // Process and structure club deposits records
-        if (clubDepositsArray !== 'No Data Available') {
-            sortedClubDepositYears.forEach(([year, record]) => {
-                let values = Object.entries(clubDepositsArray.monthlySums[year]).map(([month, mRecord]) => [
-                    month, 
-                    Math.round(mRecord.deposit_amount)
-                ]);
-
-                let yearObject = {
-                    year: year,
-                    total: Math.round(record.deposit_amount),
-                    avgMonthyDeposit: year !== currentYear ? Math.round(record.deposit_amount / 12) : Math.round(record.deposit_amount / (new Date().getMonth() + 1)),
-                    values: values
-                };
-
-                clubDepositsRecords.push(yearObject);
-            });
+        function club_deposits(){        
+        var clubDepositsRecords = [];
+            if (clubDepositsArray !== 'No Data Available') {
+                sortedClubDepositYears.forEach(([year, record]) => {
+                    let values = Object.entries(clubDepositsArray.monthlySums[year]).map(([month, mRecord]) => [
+                        month, 
+                        Math.round(mRecord.deposit_amount)
+                    ]);
+    
+                    let yearObject = {
+                        year: year,
+                        total: Math.round(record.deposit_amount),
+                        avgMonthyDeposit: year !== currentYear ? Math.round(record.deposit_amount / 12) : Math.round(record.deposit_amount / (new Date().getMonth() + 1)),
+                        values: values
+                    };
+    
+                    clubDepositsRecords.push(yearObject);
+                });
+            }
+            return clubDepositsRecords
         }
 
         // Process and structure club earnings records
-        if (clubEarningsArray !== 'No Data Available' && clubUnits !== 'No Data Available') {
-            sortedClubEarningsYears.forEach(([year1, record]) => {
-                Object.entries(clubUnits.yearsSums).forEach(([year2, record2]) => {
-                    if (year2 === year1) {
-                        const actualInvestment = record2.units / 365;
-                        const year = year1;
-                        const total = Math.round(record.earnings_amount);
-                        const roi = year !== currentYear ? Math.round(record.earnings_amount * 100 / actualInvestment) : 0;
-                        let value = [year, total, roi];
-
-                        clubEarningsRecords.push(value);
-                    }
+        function club_earnings(){
+            var clubEarningsRecords = [];
+            if (clubEarningsArray !== 'No Data Available' && clubUnits !== 'No Data Available') {
+                sortedClubEarningsYears.forEach(([year1, record]) => {
+                    Object.entries(clubUnits.yearsSums).forEach(([year2, record2]) => {
+                        if (year2 === year1) {
+                            const actualInvestment = record2.units / 365;
+                            const year = year1;
+                            const total = Math.round(record.earnings_amount);
+                            const roi = year !== currentYear ? Math.round(record.earnings_amount * 100 / actualInvestment) : 0;
+                            let value = [year, total, roi];
+    
+                            clubEarningsRecords.push(value);
+                        }
+                    });
                 });
-            });
+            }
+            return clubEarningsRecords
         }
 
         // Process and structure points records
@@ -509,10 +630,13 @@ app.get('/homepage-data', async (req, res) => {
             },
             home: {
                 clubWorth: Math.round(clubWorth),
-                members: club.length-1, 
+                members: club.length-2, 
                 thisYearDeposits:  clubDepositsArray.yearsSums[thisYear] ? clubDepositsArray.yearsSums[thisYear].deposit_amount : 0,
                 yourWorth: Math.round(req.user.investmentAmount),
-                risk: member_risk + '%',
+                risk: Math.round(riskPercentageOfWorth * 10000)/100 + '%',
+                riskAmount: Math.round(riskOfWorth/1000) * 1000,
+                riskAmountOfSavings:Math.round(riskOfSavings/1000) * 1000,
+                riskPercentageOfSavings: Math.round(riskPercentageOfSavings * 10000)/100 + '%',
                 thisYearSavings: depositsArray.yearsSums?.[thisYear] ? depositsArray.yearsSums[thisYear].deposit_amount : 0,
                 yourDebt: totalDebt,
                 bestRate: possibleRate + '%',
@@ -525,8 +649,8 @@ app.get('/homepage-data', async (req, res) => {
             payments: memberEarningsRecords,
             loans: memberDebtRecords,
             points: pointsRecords,
-            clubDeposits: clubDepositsRecords,
-            clubEarnings: clubEarningsRecords,
+            clubDeposits: club_Deposits,
+            clubEarnings: club_Earnings,
             discounts: memberDiscountRecords//new addition
         };
         
@@ -1262,10 +1386,10 @@ app.post('/approve-loan-request', async (req, res) => {
         const clubdata = await ClubData.findOne();
 
         for (const source of req.body.sources) {
-            const foundLocation = clubdata.cashLocations.find(location => location._id == source.location);
+            const foundLocation = clubdata.cashLocations.find(location => location.location_name == source.location);
         
             if (foundLocation && foundLocation.location_amount >= source.amount) {
-                await updateLocations(-source.amount, "Long-Term Loans", foundLocation.location_name);
+                await updateLocations(-source.amount, "Long-Term Loans", foundLocation.location_name, req.user);
             } else {
                 return res.json({ msg: `There is not enough money in '${foundLocation.location_name}'` });
             }
@@ -1287,7 +1411,7 @@ app.post('/approve-loan-request', async (req, res) => {
                     "loan_status": "Ongoing",
                     "rate_after_discount": rate_after_discount,
                     "loan_date": Today,
-                    "approved_by": "Blaise"
+                    "approved_by": req.user.fullName
                 },
                 $inc: { principal_left: -(loansdata.discount + 0.5 * points_payment) }
             }
@@ -1452,7 +1576,7 @@ app.post('/transfer-club-money', async (req, res) => {
         const foundLocation2 = clubdata.cashLocations.find(location => location._id == req.body.sending_location_id);
         
         if(foundLocation2.location_amount >= req.body.transfer_amount){
-            await updateLocations(-req.body.transfer_amount, foundLocation.location_name, foundLocation2.location_name);
+            await updateLocations(-req.body.transfer_amount, foundLocation.location_name, foundLocation2.location_name, req.user);
         } else {
             return res.json({msg: `There is not enough money in '${foundLocation2.location_name}`});
         }
@@ -1537,128 +1661,6 @@ app.post('/end_points_sale', async (req, res) => {
 //Get_discount_codes
 //register one time earning if member gets another member
 
-//make_discount_payment
-/*app.post('/get-discount', async (req, res) => {
-    try {       
-        if (!req.body.user_code || !req.body.merchant_code || !req.body.amount) {
-            return res.json({ msg: 'Enter all Details'});
-        }
-        const merchant = Initiatives.findOne({merchant_code: req.body.merchant_code});
-        const constants = await Constants.findOne();
-
-        if (!merchant) {
-            return res.json({ msg: 'Invalid Merchant Code: ' + req.body.merchant_code});
-        }
-
-        if (merchant.category == "Individual" && merchant.debt < req.body.amount) {
-            return res.json({ msg: 'Maximum Acceptable Amount is: UGX ' + Math.round(merchant.debt).toLocaleString('en-US')});
-        }
-
-        var debt = merchant.debt - req.body.amount;
-        var msg = 'Amount Left is: UGX ' + Math.round(merchant.debt).toLocaleString('en-US');
-
-       async function getDiscountRate(user) {
-            const units = await InvestmentUnits.find({ name: user.fullName });
-            const currentUnitsSum = units.reduce((total, unit) => total + unit.units, 0) + user.investmentAmount * getDaysDifference(user.investmentDate);
-            const credits = Math.round(currentUnitsSum * 100/15000000)/100;
-            var discountPercentage = credits > constants.max_credits ? 100 : Math.round(credits * 100/constants.max_credits);
-            discountPercentage = Math.max(discountPercentage, constants.min_discount);
-            return discountPercentage
-        }
-
-        if (req.body.user_code.length < 5) {
-        const code = await Codes.findOne({primary_code: req.body.user_code});
-        const user = await Users.findOne({fullName: code.primary_name});
-        const discount_amount = getDiscountRate(user) * req.body.amount;
-
-        if (merchant.category == "General") {
-            await Discount.create(
-                {
-                    source: merchant.initiative_name,
-                    discount_amount: discount_amount,
-                    date: Today,
-                    beneficiary_name: code.primary_name,
-                    percentage: discount_rate,
-                    type: 'Primary',
-                }
-            );
-            debt = merchant.debt;
-            msg = "You get a discount of " + Math.round(discount_amount).toLocaleString('en-US') + "/=. You can Pay Cash of " + (req.body.amount - Math.round(discount_amount)).toLocaleString('en-US') + "/=";
-        } 
-
-        } else if (req.body.user_code.length == 5) {
-            const verifiedCode = merchant.secondary_codes.find(codes => codes.code === req.body.user_code);
-            if (!verifiedCode) {
-                return res.json({ msg: "Invalid User Code: " + req.body.user_code});
-            }
-            if (verifiedCode.limit != 'None' && req.body.amount > verifiedCode.limit) {
-                return res.json({ msg: "Spend Limit of " + Math.round(verifiedCode.limit).toLocaleString('en-US') + " Exceeded. Please reduce amount"});
-            }
-            //get primary user 
-            const identifier = req.body.user_code.substring(0, 2);
-            const code = await Codes.findOne({secondary_codes_identifier: identifier});
-            const user = await Users.findOne({fullName: code.primary_name});
-            const sec_discount_amount = getDiscountRate(user) * req.body.amount * (100 - constants.discount_profit_percentage)/100;
-            const earnings = getDiscountRate(user) * req.body.amount * constants.discount_profit_percentage/100;
-            msg = "You get a discount of " + Math.round(sec_discount_amount).toLocaleString('en-US') + "/=. You can Pay Cash of " + (req.body.amount - Math.round(sec_discount_amount)).toLocaleString('en-US') + "/=";
-            //register earning for primary user
-            await Earnings.create({
-                beneficiary_name: user.fullName,
-                date_of_earning: Today,
-                destination: 'Withdrawn',
-                earnings_amount: earnings,
-                source: merchant.initiative_name,
-                status: 'Not-Sent'
-            });
-
-        }  else if (req.body.user_code.length == 6) {
-            const verifiedCode = merchant.one_time_codes.find(codes => codes.code === req.body.user_code);
-            if (!verifiedCode) {
-                return res.json({ msg: "Invalid User Code: " + req.body.user_code});
-            }
-            if (verifiedCode.limit != 'None' && req.body.amount > verifiedCode.limit) {
-                return res.json({ msg: "Spend Limit of " + Math.round(verifiedCode.limit).toLocaleString('en-US') + " Exceeded. Please reduce amount"});
-            } 
-            const identifier = req.body.user_code.substring(0, 2);
-            const code = await Codes.findOne({secondary_codes_identifier: identifier});
-            const user = await Users.findOne({fullName: code.primary_name});
-            const sec_discount_amount = getDiscountRate(user) * req.body.amount * (100 - constants.discount_profit_percentage)/100;
-            const earnings = getDiscountRate(user) * req.body.amount * constants.discount_profit_percentage/100;
-            msg = "You get a discount of " + Math.round(sec_discount_amount).toLocaleString('en-US') + "/=. You can Pay Cash of " + (req.body.amount - Math.round(sec_discount_amount)).toLocaleString('en-US') + "/=";
-            //register earning for primary user
-            await Earnings.create({
-                beneficiary_name: user.fullName,
-                date_of_earning: Today,
-                destination: 'Withdrawn',
-                earnings_amount: earnings,
-                source: merchant.initiative_name,
-                status: 'Not-Sent'
-            });
-
-            //delete code           
-        await Initiatives.updateOne(
-            {merchant_code: req.body.merchant_code},
-            { $pull: {"one_time_codes.$[elem].code"}},
-            { arrayFilters: [{ "elem.code": req.body.user_code }]
-        );
-        } else {
-            return res.json({ msg: "Invalid User Code: " + req.body.user_code});
-        }
-
-        //add to transactions and debt
-        const TransactionHistory = merchant.transactions_history.append({'date': Today, 'amount': req.body.amount, code: req.body.user_code});
-        await Initiatives.updateOne(
-            {merchant_code: req.body.merchant_code},
-            { $set: {"debt": debt, 'transactions_history': TransactionHistory}},
-        );
-
-        res.json({ msg: msg});
-    } catch (error) {
-        console.error(error);
-        res.json({ msg: 'An error occurred'});
-    }
-});*/
-
 
 
 //End_Ongoing_Short_loan
@@ -1702,7 +1704,7 @@ app.post('/end-ongoing-loan', async (req, res) => {
     }
 });
 
-//Distribute_profits
+/*/Distribute_profits
 app.post('/distribute_profits', async (req, res) => {
     try {
         // Input Validation
@@ -1725,7 +1727,8 @@ app.post('/distribute_profits', async (req, res) => {
             }
         ]);
 
-        const shortLoansProfit = shortLoans.reduce((total, loans) => total + loans.loan_amount, 0);;
+        const shortLoansProfit = shortLoans.reduce((total, loans) => total + loans.loan_amount, 0);
+
 
         // Calculate Member Profits
         for (const member of members) {
@@ -1752,6 +1755,19 @@ app.post('/distribute_profits', async (req, res) => {
                 }
             }
         }
+        // Update member's investment details
+        await Users.updateOne(
+            { _id: member._id },
+            {
+                $set: { investmentDate: depositDate },
+                $inc: { cummulativeUnits: newUnits, investmentAmount: depositAmount }
+            }
+        );
+        
+        const days = getDaysDifference(member.investmentDate, depositDate);
+        const newUnits =  member.investmentAmount * days;
+        //ubtract loan unit with limit being worth of member at loan time from cummulative unit for fully completed loan if they were paid that year.
+        //interet correponding to the worth at loan time then given to member
 
         // Send Response
         res.json({ profitDistribution: memberProfit });
@@ -1772,7 +1788,7 @@ function getLastDayOfMonth(date) {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0);
 }
 });
-
+*/
 
 
 //Make_Loan_Payments Consider if payments extend beyond the agreed date, 
@@ -1783,38 +1799,49 @@ app.post('/make-loan-payment', async (req, res) => {
         }
 
         const loan_finding = await Loans.findOne({ _id: req.body.loan_id });
+        const constants = await Constants.findOne();
+        const member = await Users.findOne({fullName: loan_finding.borrower_name});
 
         if (!loan_finding) {
             return res.json({ msg: 'Loan not found' });
         }
 
         let principal_left = loan_finding.principal_left - req.body.payment_amount;
+        let loan_duration = loan_finding.loan_duration;
         const last_payment_period = getDaysDifference(loan_finding.last_payment_date, req.body.payment_date);
         let loan_units = loan_finding.loan_units + loan_finding.principal_left * last_payment_period;
-        const loan_period = loan_finding.loan_duration * (365 / 12);
-        const loan_units_ratio = loan_units / (loan_finding.loan_amount * loan_period);
-        let points_spent = loan_units_ratio <= 1 ? loan_finding.points_spent - loan_finding.points_spent * loan_units_ratio : loan_finding.points_spent;
-        let interest_amount = loan_units_ratio <= 1 ? loan_finding.interest_amount * loan_units_ratio : loan_finding.interest_amount;
+        const loan_period = loan_units/(loan_finding.loan_amount * 30);
+        console.log(loan_period);
+        const high_rate = Math.max(20, (constants.min_monthly_rate + (((constants.max_lending_rate/12) - constants.min_monthly_rate)/11) * (loan_period - 1)) * 12);
+        const low_rate = Math.max(12, (constants.min_monthly_rate + (((constants.min_lending_rate/12) - constants.min_monthly_rate)/11) * (loan_period - 1)) * 12);
+        const low_rate_amount = low_rate * loan_period * (loan_finding.loan_amount) / 1200;
+        const high_rate_amount = loan_finding.loan_rate == low_rate? low_rate_amount : high_rate * loan_period * (loan_finding.loan_amount - loan_finding.worth_at_loan) / 1200 + low_rate * loan_period * (loan_finding.worth_at_loan) / 1200;        
+        const one_point_value = ((constants.max_lending_rate - constants.min_lending_rate) * 2 * 25 * loan_finding.worth_at_loan) / (100 * 12 * 500);
+        let interest_amount = (principal_left + loan_finding.interest_amount) <= 0 ? high_rate_amount - (loan_finding.points_spent * one_point_value) : loan_finding.interest_amount;// considering scenarios where the loan period exceeds agreed duration
+        let actualRate = interest_amount * 100 * 12 /(loan_finding * loan_period);
         let transfer_amount = (principal_left + interest_amount) <= 0 ? loan_finding.principal_left : req.body.payment_amount;
 
         
         const clubdata = await ClubData.findOne();
-        const foundLocation = clubdata.cashLocations.find(location => location._id == req.body.payment_location);
+        const foundLocation = clubdata.cashLocations.find(location => location.location_name == req.body.payment_location);
 
-        await updateLocations(transfer_amount, foundLocation.location_name, "Long-Term Loans", req.body.payment_date);
+        await updateLocations(transfer_amount, foundLocation.location_name, "Long-Term Loans", req.user, req.body.payment_date);
 
         let msg = '';
         let loan_status = loan_finding.loan_status;
 
         if ((principal_left + interest_amount) <= 0) {//if the last payment exceeds the principal and the interest
             const new_deposit = req.body.payment_amount - loan_finding.principal_left - interest_amount;
-            const member = await Users.findOne({ fullName: loan_finding.borrower_name });
             principal_left = 0;
             loan_status = "Ended";
-            const restored_points = loan_finding.points_spent - points_spent;
-            Users.updateOne({ fullName: loan_finding.borrower_name }, { $inc: { points: restored_points } }).then();
+            loan_duration = getDaysDifference(loan_finding.loan_date)/30;
+            interest_amount = high_rate_amount - (loan_finding.points_spent * one_point_value);
+            let msg1 = "";
+            if (new_deposit >= 5000){
             await addDeposit(member, new_deposit, req.body.payment_date, "Savings", req.body.payment_location);
-            msg = `A Deposit of ${new_deposit} was recorded. It was excess Payment. The Loan is now Ended.`;
+            msg1 = `A Deposit of ${new_deposit} was recorded. It was excess Payment.`;
+            }
+            msg = msg1 + `The Loan is now Ended.`;
 
             await ClubData.updateOne(
                 {},
@@ -1822,7 +1849,7 @@ app.post('/make-loan-payment', async (req, res) => {
                 { arrayFilters: [{ "elem.location_name": req.body.payment_location }] }
             );
 
-            await calculateLoanDays(loan_finding.loan_date, req.body.payment_date, interest_amount);
+           // await calculateLoanDays(loan_finding.loan_date, req.body.payment_date, interest_amount);
 
             if (loan_finding.discount > 0) {
                 
@@ -1847,22 +1874,27 @@ app.post('/make-loan-payment', async (req, res) => {
         } else if ((principal_left + interest_amount) <= interest_amount){//if the last payment exceeds the principal but doesnt finish the interest
             interest_amount = principal_left + interest_amount;
             principal_left = 0;
-        }
+        } 
 
         const updatedLoan = {
             principal_left,
             interest_amount,
-            points_spent,
             loan_units,
             last_payment_date: req.body.payment_date,
-            loan_status
+            loan_status,
+            loan_duration
         };
 
-        updatedLoan.payments = {
+        // Add new payment object to the payments array
+        loan_finding.payments.push({
             payment_date: req.body.payment_date,
             payment_amount: req.body.payment_amount,
-            updated_by: "Blaise"
-        };
+            updated_by: req.user.fullName
+        });
+
+        // Assign the modified payments array to updatedLoan.payments
+        updatedLoan.payments = loan_finding.payments;
+
 
         await Loans.updateOne({ _id: req.body.loan_id }, { $set: updatedLoan }).then(response => {
             msg += ' Payment was successfully Recorded';
@@ -1874,7 +1906,7 @@ app.post('/make-loan-payment', async (req, res) => {
     }
 });
 
-//Loan_Rate_and_request_initiation //CONSIDER EDITING AS ANOTHER STATUS TO PULL THEN CREATE
+//Loan_Rate_and_request_initiation 
 app.post('/initiate-request', async (req, res) => {
     try {
         if (!req.body.loan_amount || !req.body.loan_duration) {
@@ -1882,64 +1914,91 @@ app.post('/initiate-request', async (req, res) => {
         }
 
         const member = await Users.findOne({_id: req.body.borrower_name_id});
+        const loan_limit = await getLoanLimit(member);
 
-        if (req.body.request_status == 0) {
+        if (req.body.loan_amount > loan_limit) {
+            return res.json({ msg: `The Loan Limit of ${Math.round(loan_limit).toLocaleString('en-US')}, has been exceeded!`, no: 0 });
+        }
+        
+        const constants = await Constants.findOne();
+        const high_rate = Math.max(20, (constants.min_monthly_rate + (((constants.max_lending_rate/12) - constants.min_monthly_rate)/11) * (req.body.loan_duration - 1)) * 12);
+        const low_rate = Math.max(12, (constants.min_monthly_rate + (((constants.min_lending_rate/12) - constants.min_monthly_rate)/11) * (req.body.loan_duration - 1)) * 12);
+        const low_rate_amount = low_rate * req.body.loan_duration * (req.body.loan_amount) / 1200;
+        const high_rate_amount = req.body.loan_amount <= member.investmentAmount? low_rate_amount : high_rate * req.body.loan_duration * (req.body.loan_amount - member.investmentAmount) / 1200 + low_rate * req.body.loan_duration * (member.investmentAmount) / 1200;        
+        const point_worth = await getValueOfPoints(1, member);
+        let potentialPointsConsumed = (high_rate_amount - low_rate_amount)/point_worth;
+        const actualPointsConsumed = potentialPointsConsumed <= member.points ? potentialPointsConsumed : member.points;
+        const interest_amount = high_rate_amount - (actualPointsConsumed * point_worth);
+        let possibleRate = interest_amount * 100 * 12 /(req.body.loan_amount * req.body.loan_duration);
+
+        if (req.body.request_status == 0) {//this status happens anytime the amount or member changes, but only after the duration has been entered
             if (req.body.interest_rate === '') {
-                const possiblePoints = (member.points * member.investmentAmount) / ((req.body.loan_amount - member.investmentAmount) * req.body.loan_duration);
-                let possibleRate = Math.max(12, Math.min(20, Math.round(((20 - possiblePoints) * 0.4 + 12) * 100) / 100));
-                const ratePoints = ((12 - possibleRate) / 8) * 20 + 20;
-                const pointsConsumed = Math.round((req.body.loan_amount - member.investmentAmount) / member.investmentAmount * ratePoints * req.body.loan_duration);
-    
-                if (possibleRate === 20 && req.body.loan_amount > member.investmentAmount) {
-                    possibleRate = 20;
-                    pointsConsumed = member.points;
-                } else if (possibleRate < 12) {
-                    possibleRate = 12;
-                } else if (possibleRate > 20 && req.body.loan_amount <= member.investmentAmount) {
-                    possibleRate = 12;
-                    pointsConsumed = 0;
+                const msg1 = `Best Annual Rate is ${Math.round(possibleRate * 100)/100}%, ${Math.round(possibleRate * 100/12)/100}% monthly, requiring interest payment of ${Math.round(interest_amount).toLocaleString('en-US')}, and spending of ${Math.round(actualPointsConsumed)} points.`;
+                const savings = Math.round(high_rate_amount - interest_amount).toLocaleString('en-US');
+                
+                const points_worth = await getValueOfPoints(actualPointsConsumed, member);
+                
+                var msg2 = ` If the highest rate of ${Math.round(high_rate * 100)/100}% is paid, the required interest will be ${Math.round(high_rate_amount).toLocaleString('en-US')}, and Zero points spent. An extra ${savings} if the member can handle it and Save the Points worth ${ Math.round(points_worth).toLocaleString('en-US')}.`;
+                if (Math.round(possibleRate) === Math.round(high_rate) || low_rate_amount === high_rate_amount) {
+                    msg2 = '';
                 }
-    
-                const msg = `Best Rate is ${possibleRate}%, and ${pointsConsumed} points used`;
+                if (Math.round(possibleRate) === Math.round(low_rate) && req.body.loan_amount <= member.investmentAmount) {
+                    msg2 = '';
+                }
+                const msg = msg1 + msg2;
                 return res.json({ msg, no: 1 });
             } else {
-                const ratePoints = ((12 - req.body.interest_rate) / 8) * 20 + 20;
-                const pointsConsumed = Math.round((req.body.loan_amount - member.investmentAmount) / member.investmentAmount * ratePoints * req.body.loan_duration);
+                const rateInterest =  req.body.interest_rate * req.body.loan_duration * (req.body.loan_amount - member.investmentAmount) / 1200 + low_rate * req.body.loan_duration * (member.investmentAmount) / 1200;
+                const pointsConsumed = Math.round((high_rate_amount - rateInterest)/point_worth);
     
-                if (pointsConsumed <= member.points && pointsConsumed >= 0) {
+                if (pointsConsumed <= member.points && pointsConsumed >= 0 && req.body.interest_rate > possibleRate) {
                     const msg = `${pointsConsumed} Points are Consumed. Proceed`;
                     return res.json({ msg, no: 2 });
-                } else if (pointsConsumed <= member.points && pointsConsumed < 0) {
+                } else if (pointsConsumed <= member.points && pointsConsumed <= 0 && req.body.interest_rate > possibleRate) {
                     const msg = '0 Points are Consumed. Proceed';
                     return res.json({ msg, no: 0 });
+                } else if (req.body.interest_rate < possibleRate) {
+                    return res.json({ msg: `You sneaky Person, you've been caught redhanded! Enter an acceptable rate, above ${Math.round(possibleRate * 100)/100}%.`});
                 } else {
-                    const possibleAmount = Math.max(50000, (member.points + ratePoints * req.body.loan_duration) * member.investmentAmount / (ratePoints * req.body.loan_duration));
-                    const possiblePeriod = (member.points * member.investmentAmount) / (ratePoints * (req.body.loan_amount - member.investmentAmount));
-                    const msg = `Only ${Math.round(member.points)} Points available, yet you need ${Math.round(pointsConsumed)} Points. Change one or more of the following; Reduce amount to ${Math.trunc(possibleAmount).toLocaleString('en-US')}/=, or change period to a maximum value of ${Math.trunc(possiblePeriod)} months.`;
-                    return res.json({ msg, no: 3 });
+                    const possibleAmount = ((low_rate * member.investmentAmount/100) + (member.points * point_worth)) * 100/req.body.interest_rate;
+                    const possiblePeriod = ((low_rate * member.investmentAmount/100) + (member.points * point_worth)) * 100 * 12/(req.body.interest_rate * req.body.loan_amount);
+                    const msg1 = `Only ${Math.round(member.points)} Points available, yet ${Math.round(pointsConsumed)} Points are needed. You can Reduce the amount to ${Math.trunc(possibleAmount).toLocaleString('en-US')}/=`;
+                    var msg2 = ` , or change period to a maximum value of ${Math.trunc(possiblePeriod)} months.`
+                    if(req.body.loan_duration < 11){
+                        msg2 = '';
+                    }
+                    const msg =  msg1 + msg2;
+                    return res.json({msg, no: 3 });
                 }
             }
-        } else if (req.body.request_status == 1) {
+        } else if (req.body.request_status == 1) {//this status happens when the admin clicks on "submit request" button which only become active when every thing above has been entered
             
             if (!req.body.earliest_date || !req.body.latest_date || !req.body.interest_rate) {
                 return res.json({ msg: 'There is an entry missing. Please fill in everything needed', no: 0 });
             } 
-            //check if earlier restrictions have been adhered to
-                const ratePoints = ((12 - req.body.interest_rate) / 8) * 20 + 20;
-                var pointsConsumed = Math.round((req.body.loan_amount - member.investmentAmount) / member.investmentAmount * ratePoints * req.body.loan_duration);
+
+            if (req.body.interest_rate < possibleRate) {
+                return res.json({ msg: `You sneaky Person, you've been caught redhanded! Enter an acceptable rate, above ${Math.round(possibleRate * 100)/100}%.`});
+            }
+            //check if earlier restrictions of minimum and maximum rate and period have been adhered to
+                const rateInterest =  req.body.interest_rate * req.body.loan_duration * (req.body.loan_amount - member.investmentAmount) / 1200 + low_rate * req.body.loan_duration * (member.investmentAmount) / 1200;
+                const pointsConsumed = Math.round((high_rate_amount - rateInterest)/point_worth);
                 if (pointsConsumed <= member.points && pointsConsumed < 0) {
+                    pointsConsumed = 0;
+                };
+                if (req.body.interest_rate >= Math.trunc(high_rate)) {
                     pointsConsumed = 0;
                 };
                 const interest_amount = req.body.interest_rate * req.body.loan_duration * req.body.loan_amount / 1200;
                 await Loans.create({"loan_duration": req.body.loan_duration, "loan_units": 0, "loan_rate": req.body.interest_rate, "earliest_date": req.body.earliest_date, "latest_date": req.body.latest_date, "loan_status": "Initiation", "initiated_by": member.fullName, "approved_by": "", "worth_at_loan": member.investmentAmount, "loan_amount": req.body.loan_amount, "loan_date": "", "borrower_name": member.fullName, "points_spent": pointsConsumed, "discount": 0, "points_worth_bought": 0, "rate_after_discount": req.body.interest_rate, 'interest_amount': interest_amount, "principal_left": req.body.loan_amount, "last_payment_date": Today}).then();
                 res.json({ msg: 'Request Successful' });
-                // why is payments having empty new field? //initiated by...
         }     
     } catch (error) {
         console.error(error);
         res.json({ msg: 'An error occurred', no: 0 });
     }
 });
+
 
 //Short_term_Loans_initalisation
 app.post('/credit', async (req, res) => {
@@ -2023,9 +2082,6 @@ function getDaysDifference(earlierDate, laterDate = new Date()) {
 //DEPOSIT_FUNCTION
 async function addDeposit(member, depositAmount, depositDate, source, depositLocation) {
     try {
-        const days = getDaysDifference(member.investmentDate, depositDate);
-        const newUnits =  member.investmentAmount * days;
-        console.log(days, newUnits);
 
         // Record deposit
         await Deposit.create({
@@ -2041,8 +2097,7 @@ async function addDeposit(member, depositAmount, depositDate, source, depositLoc
         await Users.updateOne(
             { _id: member._id },
             {
-                $set: { investmentDate: depositDate },
-                $inc: { cummulativeUnits: newUnits, investmentAmount: depositAmount }
+                $inc: { investmentAmount: depositAmount }
             }
         );
 
@@ -2133,7 +2188,30 @@ function getTotalSumsAndSort(records, givenDate, ...fields) {
 }
 }
 
+//ADD_DEPOSITS_TO_CUMMULATIVE_UNITS
+async function getTotalAmountAndUnits(member) {
+    try {
 
+        const startDate = new Date(member.investmentDate);
+        const query = { depositor_name: member.fullName, deposit_date: { $gte: startDate } };
+        const options = { sort: { deposit_date: 1 } };
+        const depositRecords = await Deposit.find(query, options);
+        let totalUnits = 0;
+        let totalDeposits = 0;
+        for (const deposit of depositRecords) {
+            totalUnits += deposit.deposit_amount * getDaysDifference(deposit.deposit_date);
+            totalDeposits += deposit.deposit_amount;
+        }
+
+        // Calculate total units
+        totalUnits += (member.investmentAmount - totalDeposits) * getDaysDifference(member.investmentDate);
+
+        return { totalUnits};
+    } catch (error) {
+        console.error('Error in getTotalAmountAndUnits:', error);
+        throw error;
+    }
+}
 
 
 //GET_DURATION_AND_PROFIT_OF_SHORT_LOANS
@@ -2158,9 +2236,9 @@ async function getProfitAndDuration(object, end_date = new Date()) {
 async function getValueOfPoints(points, user) {
     try {
         const constants = await Constants.findOne();
-        const one_point_value = ((constants.max_lending_rate - constants.min_lending_rate) * 25 * 2 * user.investmentAmount) / (100 * 12 * 500);
+        const one_point_value = ((constants.max_lending_rate - constants.min_lending_rate) * 2 * 25 * user.investmentAmount) / (100 * 12 * 500);
         const points_worth = points * one_point_value;
-
+        
         return points_worth;
     } catch (error) {
         console.error(error);
@@ -2168,6 +2246,52 @@ async function getValueOfPoints(points, user) {
         return 0; // You might want to handle errors more gracefully
     }
 }
+
+//GET_LOAN_LIMIT
+async function getLoanLimit(member) {
+    try { 
+        const constants = await Constants.findOne();     
+        // Fetch all users
+        const club = await Users.find({});
+
+        // Calculate total number of members (excluding the club Fund)
+        const membersCount = club.length - 2;
+
+        // Calculate total club worth
+        const clubWorth = club.reduce((total, user) => total + user.investmentAmount, 0);
+
+        // Calculate available pool
+        const availablePool = Math.max(0, constants.loan_risk * (clubWorth - member.investmentAmount) / 100);//include CF Contribution
+
+        // Calculate used pool
+        let usedPool = 0;
+        const allDebts = await Loans.find({ loan_status: "Ongoing" });
+        for (const clubMember of club) {
+            const memberDebts = allDebts.filter(loan => loan.borrower_name === clubMember.fullName);
+            const memberDebtsTotal = memberDebts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
+            usedPool += Math.max(0, memberDebtsTotal - member.investmentAmount);
+        }
+
+        // Calculate number of benefiting members
+        const benefitingMembers = Math.min(constants.members_served_percentage * membersCount / 100, Math.round(availablePool * 100 / usedPool) / 100);
+
+        // Calculate total debt for the member
+        const debts = await Loans.find({ borrower_name: member.fullName, loan_status: "Ongoing" });
+        const totalDebt = debts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
+
+        //Consider amount lent to others
+        //const riskOfWorth = (usedPool / clubWorth) * req.user.investmentAmount; May not be necessary if not many members will be borrowing
+        // Calculate loan limit
+        const limit = Math.max(0, Math.min(member.investmentAmount * constants.loan_multiple - totalDebt, (member.investmentAmount + Math.max(0, (availablePool - usedPool)) / benefitingMembers) - totalDebt));//subtract risked money from investmentAmount
+        //console.log(benefitingMembers, constants.members_served_percentage * membersCount / 100, Math.round(availablePool * 100 / usedPool) / 100, availablePool, usedPool);
+        return limit;
+    } catch (error) {
+        console.error("Error occurred while calculating loan limit:", error);
+        // Return a default value or handle errors more gracefully
+        return 0;
+    }
+}
+        
 
 //UPDATED_POINTS_MARKET_ARRAY
 async function updateMarket() {
@@ -2196,7 +2320,7 @@ async function updateMarket() {
 }
 
 //UPDATE_CASH_LOCATIONS
-async function updateLocations(amount, recipient_location, other_location, date = Today) {
+async function updateLocations(amount, recipient_location, other_location, admin, date = Today) {
     try {
         const clubdata = await ClubData.findOne();
 
@@ -2216,7 +2340,7 @@ async function updateLocations(amount, recipient_location, other_location, date 
                 "recipient_location_name": recipient_location,
                 "transaction_date": date,
                 "transaction_amount": amount,
-                "recorded_by": "Blaise",
+                "recorded_by": admin.fullName,
                 "other_location_name": foundLocation.location_name,
                 "category": foundLocation.category,
                 "balance_before": foundLocation.location_amount
