@@ -59,7 +59,6 @@ const Discount = require('./Models/discounts');
 const Users = require('./auth/models/UserModel');
 const Codes =  require('./Models/codes');
 const Initiatives =  require('./Models/discount_initiatives');
-const LogModel = require('./auth/models/LogModel')
 
 //auth imports
 const {requireAuth, requireAdmin} = require('./auth/middleware')
@@ -263,11 +262,6 @@ app.post('/get-discount', async (req, res) => {
 //Auntenticated Routes below (Logged in members)
 app.use(requireAuth)
 
-//Logger
-app.post('/log', async (req, res)=>{
-    const log = await LogModel.create({page: req.body.page, user: req.user.fullName})
-})
-
 
 //#constants
 //CONSTANTS FOR BACKEND
@@ -278,14 +272,38 @@ const thisMonth = new Date().toLocaleString('default', { month: 'long' });
 
 //Home_page_fetch
 app.get('/homepage-data', async (req, res) => {
-    
+
+    // Helper function for date formatting
+    const formatDate = (dateString) => {
+        const date = new Date(dateString);
+        return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+    };
+
+    // Helper function for processing arrays
+    const processArray = (array, processDataFunc, noDataValue = 'No Data Available') => 
+        Array.isArray(array) && array.length > 0 ? processDataFunc(array) : noDataValue;
+
+try {
     const constants = await Constants.findOne();
+    const currentYear = new Date().getFullYear().toString();   
+    var club = await Users.find({});
+    const clubWorth = club.reduce((total, member) => total + member.investmentAmount, 0);
     const clubDeposits = await Deposit.find({});
+    const clubEarnings = await Earnings.find({});
+    const clubUnitsRecords = await InvestmentUnits.find({ });
+    const clubDepositsArray = processArray(clubDeposits, (cd) => getTotalSumsAndSort(cd, 'deposit_date', 'deposit_amount'));
+    const clubEarningsArray = processArray(clubEarnings, (ce) => getTotalSumsAndSort(ce, 'date_of_earning', 'earnings_amount'));
+
+    const clubUnits = processArray(clubUnitsRecords, (u) => getTotalSumsAndSort(u, 'year', 'units'));
+    const sortedClubDepositYears = clubDepositsArray !== 'No Data Available' ? Object.entries(clubDepositsArray.yearsSums).sort((a, b) => b[0] - a[0]) : 'No Data Available';
+    const sortedClubEarningsYears = clubEarningsArray !== 'No Data Available' ? Object.entries(clubEarningsArray.yearsSums).sort((a, b) => b[0] - a[0]) : 'No Data Available';
+    var club_Deposits = club_deposits();
+    var club_Earnings = club_earnings();
 
     if (req.user.fullName === "Anabelle Joan") {
         const one_point_value = ((constants.max_lending_rate - constants.min_lending_rate) * req.user.investmentAmount * 2* 25) / (500 * 100 * 12);
         const pointsWorth = Math.round(one_point_value * req.user.points);
-        const clubDepositsArray = getTotalSumsAndSort(clubDeposits, 'deposit_date', 'deposit_amount');
+
         let memberDashboardData = {
             user: req.user,
             summary: {
@@ -354,8 +372,8 @@ app.get('/homepage-data', async (req, res) => {
                 "total": 0,
                 "values": []
             }],
-            clubDeposits: club_deposits(),
-            clubEarnings: club_earnings(),
+            clubDeposits: club_Deposits,//await club_deposits(),
+            clubEarnings: club_Earnings,//await club_earnings(),
             discounts: [        {
                 "year": "2024",
                 "total": 2050,
@@ -372,19 +390,8 @@ app.get('/homepage-data', async (req, res) => {
         return res.json(memberDashboardData);
     }
 
-    // Helper function for date formatting
-    const formatDate = (dateString) => {
-        const date = new Date(dateString);
-        return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
-    };
-
-    // Helper function for processing arrays
-    const processArray = (array, processDataFunc, noDataValue = 'No Data Available') => 
-        Array.isArray(array) && array.length > 0 ? processDataFunc(array) : noDataValue;
-
-    try {
+    
         // Fetch data from the database
-        var club = await Users.find({});
         const memberDeposits = await Deposit.find({ depositor_name: req.user.fullName });
         const debts = await Loans.find({ borrower_name: req.user.fullName, loan_status: "Ongoing" });
         const debtHistory = await Loans.find({ borrower_name: req.user.fullName});
@@ -392,20 +399,13 @@ app.get('/homepage-data', async (req, res) => {
         const earnings = await Earnings.find({ beneficiary_name: req.user.fullName });
         const points = await PointsSale.find({ name: req.user.fullName, type: "Sell"});
         const units = await InvestmentUnits.find({ name: req.user.fullName });
-        const clubUnitsRecords = await InvestmentUnits.find({ });
-        const clubEarnings = await Earnings.find({});
         const currentUnits = (await getTotalAmountAndUnits(req.user)).totalUnits;
-        const currentYear = new Date().getFullYear().toString();
         var actualInvestmentTotal = 0;
 
         // Process and calculate various metrics
-        const clubWorth = processArray(club, (c) => c.reduce((total, member) => total + member.investmentAmount, 0));
-        const clubUnits = processArray(clubUnitsRecords, (u) => getTotalSumsAndSort(u, 'year', 'units'));
         const depositsArray = processArray(memberDeposits, (md) => getTotalSumsAndSort(md, 'deposit_date', 'deposit_amount'));
         const earningsArray = processArray(earnings, (e) => getTotalSumsAndSort(e, 'date_of_earning', 'earnings_amount'));
         const debtRecords = processArray(debtHistory, (dh) => getTotalSumsAndSort(dh, 'loan_date', 'loan_amount'));
-        const clubDepositsArray = processArray(clubDeposits, (cd) => getTotalSumsAndSort(cd, 'deposit_date', 'deposit_amount'));
-        const clubEarningsArray = processArray(clubEarnings, (ce) => getTotalSumsAndSort(ce, 'date_of_earning', 'earnings_amount'));
         const pointsArray = processArray(points, (p) => getTotalSumsAndSort(p, 'transaction_date', 'points_involved'));
         const discountArray = processArray(discounts, (u) => getTotalSumsAndSort(u, 'date', 'discount_amount'));
         const memberYears = req.user ? Math.round((getDaysDifference(req.user.membershipDate) / 365) * 10) / 10 : 'No Data Available';
@@ -424,8 +424,6 @@ app.get('/homepage-data', async (req, res) => {
         const sortedDepositYears = depositsArray !== 'No Data Available' ? Object.entries(depositsArray.yearsSums).sort((a, b) => b[0] - a[0]) : 'No Data Available';
         const sortedEarningsYears = earningsArray !== 'No Data Available' ? Object.entries(earningsArray.yearsSums).sort((a, b) => b[0] - a[0]) : 'No Data Available';
         const sortedPoints = pointsArray !== 'No Data Available' ? Object.entries(pointsArray.yearsSums).sort((a, b) => b[0] - a[0]) : 'No Data Available';
-        const sortedClubDepositYears = clubDepositsArray !== 'No Data Available' ? Object.entries(clubDepositsArray.yearsSums).sort((a, b) => b[0] - a[0]) : 'No Data Available';
-        const sortedClubEarningsYears = clubEarningsArray !== 'No Data Available' ? Object.entries(clubEarningsArray.yearsSums).sort((a, b) => b[0] - a[0]) : 'No Data Available';
         const sorteddiscountArray = discounts ? Object.entries(discountArray.yearsSums ?? {}).sort((a, b) => b[0] - a[0]) : 'No Data Available';
         const maxLimit = await getLoanLimit(req.user);
 
@@ -433,9 +431,10 @@ app.get('/homepage-data', async (req, res) => {
         let usedPool = 0;
         const allDebts = await Loans.find({ loan_status: "Ongoing" });
         for (const clubMember of club) {
+            const member = await Users.findOne({ fullName: clubMember.fullName });
             const memberDebts = allDebts.filter(loan => loan.borrower_name === clubMember.fullName);
             const memberDebtsTotal = memberDebts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
-            usedPool += Math.max(0, memberDebtsTotal - req.user.investmentAmount);
+            usedPool += Math.max(0, memberDebtsTotal - member.investmentAmount);
         }
         //const maxLimit = await getLoanLimit(req.user) - ((req.user.investmentAmount / clubWorth) * usedPool);
         const riskPercentageOfWorth = usedPool / clubWorth;
@@ -443,8 +442,6 @@ app.get('/homepage-data', async (req, res) => {
         var memberDepositsRecords = [];
         var memberEarningsRecords = earningsArray !== 'No Data Available' ? [] : [{year: Today.getFullYear(), total: 0, roi: 0, values: []}];
         var memberDebtRecords = [];
-        var club_Deposits = club_deposits();
-        var club_Earnings = club_earnings();
         var memberDiscountRecords = []; 
         var pointsRecords = pointsArray !== 'No Data Available' ? [] : [{year: Today.getFullYear(), total: 0, values: []}];
 
@@ -537,7 +534,7 @@ app.get('/homepage-data', async (req, res) => {
         }
 
         // Process and structure club deposits records
-        function club_deposits(){        
+     function club_deposits(){        
         var clubDepositsRecords = [];
             if (clubDepositsArray !== 'No Data Available') {
                 sortedClubDepositYears.forEach(([year, record]) => {
@@ -560,7 +557,7 @@ app.get('/homepage-data', async (req, res) => {
         }
 
         // Process and structure club earnings records
-        function club_earnings(){
+         function club_earnings(){
             var clubEarningsRecords = [];
             if (clubEarningsArray !== 'No Data Available' && clubUnits !== 'No Data Available') {
                 sortedClubEarningsYears.forEach(([year1, record]) => {
@@ -1483,7 +1480,7 @@ async function handlePointsSale(loansdata) {
                 "type": "Sell"
             });
 
-            await addDeposit(member, deposit, Today, 'Points', req.body.sources[0].location);
+            await addDeposit(member, deposit, Today, 'Points', req.body.sources[0].location, req.user);
 
             Earnings.create({
                 "beneficiary_name": item.seller_name,
@@ -1806,6 +1803,11 @@ app.post('/make-loan-payment', async (req, res) => {
             return res.json({ msg: 'Loan not found' });
         }
 
+        if (new Date(loan_finding.loan_date).getTime() > new Date(req.body.payment_date).getTime()) {
+            return res.json({ msg: 'Payment date not correct!' });
+        }
+        
+
         let principal_left = loan_finding.principal_left - req.body.payment_amount;
         let loan_duration = loan_finding.loan_duration;
         const last_payment_period = getDaysDifference(loan_finding.last_payment_date, req.body.payment_date);
@@ -1838,7 +1840,7 @@ app.post('/make-loan-payment', async (req, res) => {
             interest_amount = high_rate_amount - (loan_finding.points_spent * one_point_value);
             let msg1 = "";
             if (new_deposit >= 5000){
-            await addDeposit(member, new_deposit, req.body.payment_date, "Savings", req.body.payment_location);
+            await addDeposit(member, new_deposit, req.body.payment_date, "Savings", req.body.payment_location, req.user);
             msg1 = `A Deposit of ${new_deposit} was recorded. It was excess Payment.`;
             }
             msg = msg1 + `The Loan is now Ended.`;
@@ -1858,7 +1860,7 @@ app.post('/make-loan-payment', async (req, res) => {
         for (const item of discount_earnings) {
             const member = await Users.findOne({ fullName: item.seller_name });
 
-            await addDeposit(member, item.earnings_amount, req.body.payment_date, 'Points', req.body.payment_location);
+            await addDeposit(member, item.earnings_amount, req.body.payment_date, 'Points', req.body.payment_location, req.user);
 
             Earnings.create({
                 "beneficiary_name": item.seller_name,
@@ -1949,12 +1951,13 @@ app.post('/initiate-request', async (req, res) => {
                 return res.json({ msg, no: 1 });
             } else {
                 const rateInterest =  req.body.interest_rate * req.body.loan_duration * (req.body.loan_amount - member.investmentAmount) / 1200 + low_rate * req.body.loan_duration * (member.investmentAmount) / 1200;
+                //const pointsConsumed = req.body.loan_amount <= member.investmentAmount ? 0 : Math.round((high_rate_amount - rateInterest)/point_worth);
                 const pointsConsumed = Math.round((high_rate_amount - rateInterest)/point_worth);
-    
-                if (pointsConsumed <= member.points && pointsConsumed >= 0 && req.body.interest_rate > possibleRate) {
+                
+                if (pointsConsumed <= member.points && pointsConsumed >= 0 && req.body.interest_rate >= possibleRate) {
                     const msg = `${pointsConsumed} Points are Consumed. Proceed`;
                     return res.json({ msg, no: 2 });
-                } else if (pointsConsumed <= member.points && pointsConsumed <= 0 && req.body.interest_rate > possibleRate) {
+                } else if (pointsConsumed <= member.points && pointsConsumed <= 0 && req.body.interest_rate >= possibleRate) {
                     const msg = '0 Points are Consumed. Proceed';
                     return res.json({ msg, no: 0 });
                 } else if (req.body.interest_rate < possibleRate) {
@@ -2026,7 +2029,7 @@ app.post('/deposit', async (req, res) => {
         }
 
         const member = await Users.findOne({_id : req.body.depositor_name_id});
-        const msg = await addDeposit(member, req.body.deposit_amount, req.body.deposit_date, 'Savings', req.body.deposit_location);
+        const msg = await addDeposit(member, req.body.deposit_amount, req.body.deposit_date, 'Savings', req.body.deposit_location, req.user);
 
 res.json({ msg: msg });   
     } catch (error) {
@@ -2080,12 +2083,12 @@ function getDaysDifference(earlierDate, laterDate = new Date()) {
 }
 
 //DEPOSIT_FUNCTION
-async function addDeposit(member, depositAmount, depositDate, source, depositLocation) {
+async function addDeposit(member, depositAmount, depositDate, source, depositLocation, user) {
     try {
 
         // Record deposit
         await Deposit.create({
-            "recorded_by": 'Mwebe Blaise Adrian',
+            "recorded_by": user.fullName,
             "deposit_amount": depositAmount,
             "deposit_date": depositDate,
             "depositor_name": member.fullName,
@@ -2254,7 +2257,7 @@ async function getLoanLimit(member) {
         // Fetch all users
         const club = await Users.find({});
 
-        // Calculate total number of members (excluding the club Fund)
+        // Calculate total number of members (excluding the club Fund and example)
         const membersCount = club.length - 2;
 
         // Calculate total club worth
@@ -2267,9 +2270,10 @@ async function getLoanLimit(member) {
         let usedPool = 0;
         const allDebts = await Loans.find({ loan_status: "Ongoing" });
         for (const clubMember of club) {
+            const memberData = await Users.findOne({ fullName: clubMember.fullName });
             const memberDebts = allDebts.filter(loan => loan.borrower_name === clubMember.fullName);
             const memberDebtsTotal = memberDebts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
-            usedPool += Math.max(0, memberDebtsTotal - member.investmentAmount);
+            usedPool += Math.max(0, memberDebtsTotal - memberData.investmentAmount);
         }
 
         // Calculate number of benefiting members
@@ -2283,7 +2287,7 @@ async function getLoanLimit(member) {
         //const riskOfWorth = (usedPool / clubWorth) * req.user.investmentAmount; May not be necessary if not many members will be borrowing
         // Calculate loan limit
         const limit = Math.max(0, Math.min(member.investmentAmount * constants.loan_multiple - totalDebt, (member.investmentAmount + Math.max(0, (availablePool - usedPool)) / benefitingMembers) - totalDebt));//subtract risked money from investmentAmount
-        //console.log(benefitingMembers, constants.members_served_percentage * membersCount / 100, Math.round(availablePool * 100 / usedPool) / 100, availablePool, usedPool);
+        
         return limit;
     } catch (error) {
         console.error("Error occurred while calculating loan limit:", error);
