@@ -1916,7 +1916,7 @@ app.post('/initiate-request', async (req, res) => {
         }
 
         const member = await Users.findOne({_id: req.body.borrower_name_id});
-        const loan_limit = await getLoanLimit(member);
+        const loan_limit = await getLoanAmount(member);//getLoanAmount getLoanLimit
 
         if (req.body.loan_amount > loan_limit) {
             return res.json({ msg: `The Loan Limit of ${Math.round(loan_limit).toLocaleString('en-US')}, has been exceeded!`, no: 0 });
@@ -2251,7 +2251,7 @@ async function getValueOfPoints(points, user) {
 }
 
 //GET_LOAN_LIMIT
-async function getLoanLimit(member) {
+/*async function getLoanLimit(member) {
     try { 
         const constants = await Constants.findOne();     
         // Fetch all users
@@ -2264,30 +2264,140 @@ async function getLoanLimit(member) {
         const clubWorth = club.reduce((total, user) => total + user.investmentAmount, 0);
 
         // Calculate available pool
-        const availablePool = Math.max(0, constants.loan_risk * (clubWorth - member.investmentAmount) / 100);//include CF Contribution
+        const availablePool = constants.loan_risk * (clubWorth / 100);//include CF Contribution
 
-        // Calculate used pool
-        let usedPool = 0;
-        const allDebts = await Loans.find({ loan_status: "Ongoing" });
-        for (const clubMember of club) {
-            const memberData = await Users.findOne({ fullName: clubMember.fullName });
-            const memberDebts = allDebts.filter(loan => loan.borrower_name === clubMember.fullName);
-            const memberDebtsTotal = memberDebts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
-            usedPool += Math.max(0, memberDebtsTotal - memberData.investmentAmount);
-        }
 
         // Calculate number of benefiting members
-        const benefitingMembers = Math.min(constants.members_served_percentage * membersCount / 100, Math.round(availablePool * 100 / usedPool) / 100);
+        const benefitingMembers = constants.members_served_percentage * membersCount / 100;
 
         // Calculate total debt for the member
         const debts = await Loans.find({ borrower_name: member.fullName, loan_status: "Ongoing" });
         const totalDebt = debts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
 
+        
+        const limit = Math.min(member.investmentAmount * constants.loan_multiple - totalDebt, (((100 - constants.loan_risk)/100)  * member.investmentAmount + (availablePool / benefitingMembers) - totalDebt));//subtract risked money from investmentAmount
+        console.log((availablePool / benefitingMembers), limit);
+        return limit;
+    } catch (error) {
+        console.error("Error occurred while calculating loan limit:", error);
+        // Return a default value or handle errors more gracefully
+        return 0;
+    }
+}
+*/
+//GET ACCEPTABLE LOAN AMOUNT
+async function getLoanAmount(member) {
+    try { 
+        const constants = await Constants.findOne();     
+        // Fetch all users
+        const club = await Users.find({});
+
+        // Calculate total number of members (excluding the club Fund and example)
+        const membersCount = club.length - 2;
+
+        // Calculate total club worth
+        const clubWorth = club.reduce((total, user) => total + user.investmentAmount, 0);
+
+        // Calculate number of benefiting members
+        const benefitingMembers = constants.members_served_percentage * membersCount / 100;
+
+        // Calculate total debt for the member
+        const allDebts = await Loans.find({ loan_status: "Ongoing" });
+        const debts = await Loans.find({ borrower_name: member.fullName, loan_status: "Ongoing" });
+        const totalDebt = debts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
+        const allDebt = allDebts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
+
+        // Calculate available pool
+        const availablePool = constants.loan_risk * (clubWorth - allDebt - member.investmentAmount) / 100;//include CF Contribution //Consider amount lent to others
+
+        // Calculate loan limit
+        const limit = Math.min(member.investmentAmount * constants.loan_multiple - totalDebt, (member.investmentAmount + (availablePool/ benefitingMembers) - totalDebt));//subtract risked money from investmentAmount
+        
+        console.log((availablePool / benefitingMembers), limit);
+        return limit;
+    } catch (error) {
+        console.error("Error occurred while calculating loan limit:", error);
+        // Return a default value or handle errors more gracefully
+        return 0;
+    }
+}
+         
+/*async function getLoanAmount(member) {
+    try { 
+        const constants = await Constants.findOne();     
+        // Fetch all users
+        const club = await Users.find({});
+
+        // Calculate total number of members (excluding the club Fund and example)
+        const membersCount = club.length - 2;
+
+        // Calculate total club worth
+        const clubWorth = club.reduce((total, user) => total + user.investmentAmount, 0);
+
+        // Calculate available pool
+        const availablePool = constants.loan_risk * (clubWorth / 100);//include CF Contribution
+
+        // Calculate used pool and benefiting member
+        let usedPool = 0;
+        let benefiters = 0;
+        const allDebts = await Loans.find({ loan_status: "Ongoing" });
+        for (const clubMember of club) {
+            const memberData = await Users.findOne({ fullName: clubMember.fullName });
+            const memberDebts = allDebts.filter(loan => loan.borrower_name === clubMember.fullName);
+            const memberDebtsTotal = memberDebts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
+            const usedPortion = Math.max(0, memberDebtsTotal - memberData.investmentAmount);
+            benefiters = usedPortion > 0 ? benefiters + 1 : benefiters;
+            usedPool += usedPortion;
+        }
+
+        // Calculate number of benefiting members
+        const benefitingMembers = constants.members_served_percentage * membersCount / 100;
+
+        // Calculate total debt for the member
+        const debts = await Loans.find({ borrower_name: member.fullName, loan_status: "Ongoing" });
+        const totalDebt = debts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
+        const allDebt = allDebts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
+
         //Consider amount lent to others
         //const riskOfWorth = (usedPool / clubWorth) * req.user.investmentAmount; May not be necessary if not many members will be borrowing
         // Calculate loan limit
-        const limit = Math.max(0, Math.min(member.investmentAmount * constants.loan_multiple - totalDebt, (member.investmentAmount + Math.max(0, (availablePool - usedPool)) / benefitingMembers) - totalDebt));//subtract risked money from investmentAmount
+        const limit = benefiters < benefitingMembers ? Math.min(member.investmentAmount * constants.loan_multiple - totalDebt, (((100 - constants.loan_risk)/100)  * member.investmentAmount + (availablePool / benefitingMembers) - totalDebt)) : member.investmentAmount - (usedPool / (clubWorth + usedPool - allDebt)) * member.investmentAmount;//subtract risked money from investmentAmount
         
+        console.log(benefiters, benefitingMembers, usedPool, availablePool, limit);
+        return limit;
+    } catch (error) {
+        console.error("Error occurred while calculating loan limit:", error);
+        // Return a default value or handle errors more gracefully
+        return 0;
+    }
+}*/
+async function getLoanLimit(member) {
+    try { 
+        const constants = await Constants.findOne();     
+        // Fetch all users
+        const club = await Users.find({});
+
+        // Calculate total number of members (excluding the club Fund and example)
+        const membersCount = club.length - 2;
+
+        // Calculate total club worth
+        const clubWorth = club.reduce((total, user) => total + user.investmentAmount, 0);
+
+        // Calculate number of benefiting members
+        const benefitingMembers = constants.members_served_percentage * membersCount / 100;
+
+        // Calculate total debt for the member
+        const allDebts = await Loans.find({ loan_status: "Ongoing" });
+        const debts = await Loans.find({ borrower_name: member.fullName, loan_status: "Ongoing" });
+        const totalDebt = debts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
+        const allDebt = allDebts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
+
+        // Calculate available pool
+        const availablePool = constants.loan_risk * (clubWorth - member.investmentAmount) / 100;
+        // Calculate loan limit
+        const limit = Math.min(member.investmentAmount * constants.loan_multiple - totalDebt, (member.investmentAmount + (availablePool/ benefitingMembers) - totalDebt));//subtract risked money from investmentAmount
+        
+        console.log((availablePool / benefitingMembers), limit);
         return limit;
     } catch (error) {
         console.error("Error occurred while calculating loan limit:", error);
