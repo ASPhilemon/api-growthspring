@@ -76,7 +76,7 @@ app.use(cors({origin: ["https://growthspringers.com", "https://www.growthspringe
 // Use the express.json() middleware to parse JSON data
 app.use(express.json());
 app.use(cookieParser())
-app.get('deploy-test', (req, res)=>{
+app.get('/deploy-test', (req, res)=>{
     res.send("<h1>This is super cooool</h1>")
 })
 
