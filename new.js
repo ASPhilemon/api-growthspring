@@ -2538,8 +2538,4 @@ function groupAndSortEntries(entriesArray, sortByProperty) {
   
     return newArray;
   }
-//   test 3
-//test 4
-const fj = 7888
-//kkkkkkk
-//SUPER COOOOOOOOOOOOOOOOOOOOOOOOOOOOOL
+
