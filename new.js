@@ -76,9 +76,6 @@ app.use(cors({origin: ["https://growthspringers.com", "https://www.growthspringe
 // Use the express.json() middleware to parse JSON data
 app.use(express.json());
 app.use(cookieParser())
-app.get('/deploy-test', (req, res)=>{
-    res.send("<h1>This is super cooool</h1>")
-})
 
 //connect to mongoDB
 const dbURI = process.env.dbURI || 'mongodb+srv://blaise1:blaise119976@cluster0.nmt34.mongodb.net/GrowthSpringNew?retryWrites=true&w=majority';
@@ -2541,4 +2538,3 @@ function groupAndSortEntries(entriesArray, sortByProperty) {
   
     return newArray;
   }
-//uug
