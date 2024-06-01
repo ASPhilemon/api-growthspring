@@ -366,7 +366,22 @@ try {
                     ]
                 ]
             }],
-            loans: [],
+            loans: [{
+                "loanId": "65577040207f25b1fd2034ba",
+                "issueDate": "13/7/2023",
+                "loanAmount": 800000,
+                "amountLeft": 0,
+                "agreedLoanDuration": "2 months",
+                "annualInterestRate": 15,
+                "pointsSpent": 96,
+                "status": "Ended",
+                "paymentHistory": [
+                    [
+                        "30/9/2023",
+                        820000
+                    ]
+                ]
+            }],
             points: [        {
                 "year": 2024,
                 "total": 0,
@@ -430,6 +445,7 @@ try {
         // Calculate used pool
         let usedPool = 0;
         const allDebts = await Loans.find({ loan_status: "Ongoing" });
+        const allDebt = allDebts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
         for (const clubMember of club) {
             const member = await Users.findOne({ fullName: clubMember.fullName });
             const memberDebts = allDebts.filter(loan => loan.borrower_name === clubMember.fullName);
@@ -437,7 +453,7 @@ try {
             usedPool += Math.max(0, memberDebtsTotal - member.investmentAmount);
         }
         //const maxLimit = await getLoanLimit(req.user) - ((req.user.investmentAmount / clubWorth) * usedPool);
-        const riskPercentageOfWorth = usedPool / clubWorth;
+        const riskPercentageOfWorth = totalDebt >= req.user.investmentAmount ? 0 : (usedPool / (clubWorth + usedPool - allDebt));//usedPool / clubWorth;
         const riskOfWorth = riskPercentageOfWorth * req.user.investmentAmount;
         var memberDepositsRecords = [];
         var memberEarningsRecords = earningsArray !== 'No Data Available' ? [] : [{year: Today.getFullYear(), total: 0, roi: 0, values: []}];
@@ -515,14 +531,14 @@ try {
                         formatDate(paymentRecord.payment_date),
                         Math.round(paymentRecord.payment_amount)
                     ]);
-
+                    let laterDate = record.loan_status == "Ended" ? record.last_payment_date : Today;
                     let yearObject = {
                         loanId: record._id,
                         issueDate: formatDate(record.loan_date),
                         loanAmount: record.loan_amount,
-                        amountLeft: Math.round(record.loan_amount + record.interest_amount - record.discount - record.payments.reduce((total, loan) => total + loan.payment_amount, 0)),
-                        agreedLoanDuration: record.loan_duration + ' months',
-                        annualInterestRate: record.loan_rate,
+                        amountLeft: Math.max(0, Math.round(record.loan_amount + record.interest_amount - record.discount - record.payments.reduce((total, loan) => total + loan.payment_amount, 0))),
+                        agreedLoanDuration: Math.round(record.loan_duration) + ' months (' + getDaysDifference(record.loan_date, laterDate) + ' Days Elasped)',
+                        annualInterestRate: record.loan_rate + '%',
                         pointsSpent: Math.round(record.points_spent),
                         status: record.loan_status,
                         paymentHistory: paymentHistory
@@ -1812,22 +1828,25 @@ app.post('/make-loan-payment', async (req, res) => {
         let loan_duration = loan_finding.loan_duration;
         const last_payment_period = getDaysDifference(loan_finding.last_payment_date, req.body.payment_date);
         let loan_units = loan_finding.loan_units + loan_finding.principal_left * last_payment_period;
-        const loan_period = loan_units/(loan_finding.loan_amount * 30);
-        console.log(loan_period);
+        const loan_period = loan_units % (loan_finding.loan_amount * 30) < 0.24 ? Math.trunc(loan_units / (loan_finding.loan_amount * 30)) : Math.ceil(loan_units / (loan_finding.loan_amount * 30));//allowance of 7 day conidered.
+        //loan_days = (!loan_days || loan_days < 30) ? 30 : Math.ceil(loan_days / 30) * 30;
         const high_rate = Math.max(20, (constants.min_monthly_rate + (((constants.max_lending_rate/12) - constants.min_monthly_rate)/11) * (loan_period - 1)) * 12);
         const low_rate = Math.max(12, (constants.min_monthly_rate + (((constants.min_lending_rate/12) - constants.min_monthly_rate)/11) * (loan_period - 1)) * 12);
         const low_rate_amount = low_rate * loan_period * (loan_finding.loan_amount) / 1200;
-        const high_rate_amount = loan_finding.loan_rate == low_rate? low_rate_amount : high_rate * loan_period * (loan_finding.loan_amount - loan_finding.worth_at_loan) / 1200 + low_rate * loan_period * (loan_finding.worth_at_loan) / 1200;        
+        const high_rate_amount = (loan_finding.loan_rate == low_rate || loan_finding.loan_amount <= loan_finding.worth_at_loan) ? low_rate_amount : high_rate * loan_period * (loan_finding.loan_amount - loan_finding.worth_at_loan) / 1200 + low_rate * loan_period * (loan_finding.worth_at_loan) / 1200;        
         const one_point_value = ((constants.max_lending_rate - constants.min_lending_rate) * 2 * 25 * loan_finding.worth_at_loan) / (100 * 12 * 500);
         let interest_amount = (principal_left + loan_finding.interest_amount) <= 0 ? high_rate_amount - (loan_finding.points_spent * one_point_value) : loan_finding.interest_amount;// considering scenarios where the loan period exceeds agreed duration
-        let actualRate = interest_amount * 100 * 12 /(loan_finding * loan_period);
-        let transfer_amount = (principal_left + interest_amount) <= 0 ? loan_finding.principal_left : req.body.payment_amount;
+        let actualRate = interest_amount * 100 * 12 /(loan_finding.loan_amount * loan_period);
+        let transfer_amount = req.body.payment_amount;
+        
+        console.log(last_payment_period, loan_period, low_rate, low_rate_amount);
+        //let transfer_amount = (principal_left + interest_amount) <= 0 ? loan_finding.principal_left : req.body.payment_amount;
 
         
-        const clubdata = await ClubData.findOne();
-        const foundLocation = clubdata.cashLocations.find(location => location.location_name == req.body.payment_location);
+        //const clubdata = await ClubData.findOne();
+        //const foundLocation = clubdata.cashLocations.find(location => location.location_name == req.body.payment_location);
 
-        await updateLocations(transfer_amount, foundLocation.location_name, "Long-Term Loans", req.user, req.body.payment_date);
+        await updateLocations(req.body.payment_amount, req.body.payment_location, "Long-Term Loans", req.user, req.body.payment_date);
 
         let msg = '';
         let loan_status = loan_finding.loan_status;
@@ -1845,11 +1864,11 @@ app.post('/make-loan-payment', async (req, res) => {
             }
             msg = msg1 + `The Loan is now Ended.`;
 
-            await ClubData.updateOne(
+            /*await ClubData.updateOne(
                 {},
                 { $inc: { "cashLocations.$[elem].location_amount": (interest_amount - 0.75 * 0.5 * loan_finding.points_worth_bought) } },
                 { arrayFilters: [{ "elem.location_name": req.body.payment_location }] }
-            );
+            );*/
 
            // await calculateLoanDays(loan_finding.loan_date, req.body.payment_date, interest_amount);
 
@@ -2286,7 +2305,7 @@ async function getValueOfPoints(points, user) {
 }
 */
 //GET ACCEPTABLE LOAN AMOUNT
-async function getLoanAmount(member) {
+/*async function getLoanAmount(member) {
     try { 
         const constants = await Constants.findOne();     
         // Fetch all users
@@ -2320,9 +2339,9 @@ async function getLoanAmount(member) {
         // Return a default value or handle errors more gracefully
         return 0;
     }
-}
+}*/
          
-/*async function getLoanAmount(member) {
+async function getLoanAmount(member) {
     try { 
         const constants = await Constants.findOne();     
         // Fetch all users
@@ -2333,9 +2352,6 @@ async function getLoanAmount(member) {
 
         // Calculate total club worth
         const clubWorth = club.reduce((total, user) => total + user.investmentAmount, 0);
-
-        // Calculate available pool
-        const availablePool = constants.loan_risk * (clubWorth / 100);//include CF Contribution
 
         // Calculate used pool and benefiting member
         let usedPool = 0;
@@ -2360,17 +2376,20 @@ async function getLoanAmount(member) {
 
         //Consider amount lent to others
         //const riskOfWorth = (usedPool / clubWorth) * req.user.investmentAmount; May not be necessary if not many members will be borrowing
-        // Calculate loan limit
-        const limit = benefiters < benefitingMembers ? Math.min(member.investmentAmount * constants.loan_multiple - totalDebt, (((100 - constants.loan_risk)/100)  * member.investmentAmount + (availablePool / benefitingMembers) - totalDebt)) : member.investmentAmount - (usedPool / (clubWorth + usedPool - allDebt)) * member.investmentAmount;//subtract risked money from investmentAmount
+        // Calculate available pool
+        const availablePool = constants.loan_risk * (clubWorth - member.investmentAmount) / 100;
         
-        console.log(benefiters, benefitingMembers, usedPool, availablePool, limit);
+        // Calculate loan limit
+        const limit = benefiters < Math.round(benefitingMembers) ? Math.min(member.investmentAmount * constants.loan_multiple - totalDebt, (member.investmentAmount + (availablePool/ benefitingMembers) - totalDebt)) : member.investmentAmount - (usedPool / (clubWorth + usedPool - allDebt)) * member.investmentAmount;//subtract risked money from investmentAmount
+        
+        //console.log(benefiters, Math.round(benefitingMembers), usedPool, availablePool, limit, (member.investmentAmount - (usedPool / (clubWorth + usedPool - allDebt)) * member.investmentAmount));
         return limit;
     } catch (error) {
         console.error("Error occurred while calculating loan limit:", error);
         // Return a default value or handle errors more gracefully
         return 0;
     }
-}*/
+}
 async function getLoanLimit(member) {
     try { 
         const constants = await Constants.findOne();     
@@ -2437,9 +2456,9 @@ async function updateMarket() {
 async function updateLocations(amount, recipient_location, other_location, admin, date = Today) {
     try {
         const clubdata = await ClubData.findOne();
-
+         
         // Find the location in cashLocations
-        const foundLocation = clubdata.cashLocations.find(location => location.location_name == other_location);
+        const foundLocation = clubdata.cashLocations.find(location => location.location_name == recipient_location);
 
         if ( foundLocation) {
             // Update the specified location with the given amount
@@ -2538,5 +2557,5 @@ function groupAndSortEntries(entriesArray, sortByProperty) {
   
     return newArray;
   }
+  
 
-  //gty
