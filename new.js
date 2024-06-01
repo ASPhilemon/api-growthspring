@@ -351,7 +351,7 @@ try {
                 year:'2023',
                 total: 500000,
                 avgMonthyDeposit: 50000,
-                values:['21/04/2023', 500000, 'Savings']
+                values:['04/04/2023', 500000, 'Savings']
             }],
             payments: [{
                 "year": "2023",
