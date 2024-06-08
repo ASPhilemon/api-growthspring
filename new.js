@@ -660,7 +660,7 @@ try {
                 maxLoanLimit: Math.round(maxLimit),
                 points: Math.round(req.user.points),
                 pointsWorth: Math.round(pointsWorth),
-                pointWorth: 1000,//Math.round(one_point_value),
+                pointWorth: one_point_value,
             },
             memberDeposits: memberDepositsRecords,
             payments: memberEarningsRecords,
