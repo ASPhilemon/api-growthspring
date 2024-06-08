@@ -305,7 +305,7 @@ try {
     var club_Earnings = club_earnings();
 
     if (req.user.fullName === "Anabelle Joan") {
-        const one_point_value = constants.one_point_value;
+        const one_point_value = 1000;//constants.one_point_value;
         const pointsWorth = Math.round(one_point_value * req.user.points);
 
         let memberDashboardData = {
@@ -429,7 +429,7 @@ try {
         const discountArray = processArray(discounts, (u) => getTotalSumsAndSort(u, 'date', 'discount_amount'));
         const memberYears = req.user ? Math.round((getDaysDifference(req.user.membershipDate) / 365) * 10) / 10 : 'No Data Available';
         
-        const one_point_value = constants.one_point_value;
+        const one_point_value = 1000;//constants.one_point_value;
         const pointsWorth = Math.round(one_point_value * req.user.points);
         const totalDebt = debts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
         const possiblePoints = (req.user.points  / 25);
@@ -659,8 +659,8 @@ try {
                 bestRate: possibleRate + '%',
                 maxLoanLimit: Math.round(maxLimit),
                 points: Math.round(req.user.points),
-                pointsWorth: Math.round(req.user.points * 1000),
-                pointWorth: constants.one_point_value,
+                pointsWorth: Math.round(pointsWorth),
+                pointWorth: Math.round(one_point_value),
             },
             memberDeposits: memberDepositsRecords,
             payments: memberEarningsRecords,
