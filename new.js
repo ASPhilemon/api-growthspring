@@ -293,7 +293,11 @@ try {
     const clubUnitsRecords = await InvestmentUnits.find({ });
     const clubDepositsArray = processArray(clubDeposits, (cd) => getTotalSumsAndSort(cd, 'deposit_date', 'deposit_amount'));
     const clubEarningsArray = processArray(clubEarnings, (ce) => getTotalSumsAndSort(ce, 'date_of_earning', 'earnings_amount'));
-
+    /*club.forEach(uer => {
+        let pw = uer.points * 8 * 50 * uer.investmentAmount / (100000 * 12 * 500)+500;
+        console.log(uer.fullName, pw);
+    });*/
+    
     const clubUnits = processArray(clubUnitsRecords, (u) => getTotalSumsAndSort(u, 'year', 'units'));
     const sortedClubDepositYears = clubDepositsArray !== 'No Data Available' ? Object.entries(clubDepositsArray.yearsSums).sort((a, b) => b[0] - a[0]) : 'No Data Available';
     const sortedClubEarningsYears = clubEarningsArray !== 'No Data Available' ? Object.entries(clubEarningsArray.yearsSums).sort((a, b) => b[0] - a[0]) : 'No Data Available';
@@ -301,7 +305,7 @@ try {
     var club_Earnings = club_earnings();
 
     if (req.user.fullName === "Anabelle Joan") {
-        const one_point_value = ((constants.max_lending_rate - constants.min_lending_rate) * req.user.investmentAmount * 2* 25) / (500 * 100 * 12);
+        const one_point_value = constants.one_point_value;
         const pointsWorth = Math.round(one_point_value * req.user.points);
 
         let memberDashboardData = {
@@ -351,7 +355,7 @@ try {
                 year:'2023',
                 total: 500000,
                 avgMonthyDeposit: 50000,
-                values:[['04/04/2023', 500000, 'Savings']]
+                values:['21/04/2023', 500000, 'Savings']
             }],
             payments: [{
                 "year": "2023",
@@ -425,11 +429,11 @@ try {
         const discountArray = processArray(discounts, (u) => getTotalSumsAndSort(u, 'date', 'discount_amount'));
         const memberYears = req.user ? Math.round((getDaysDifference(req.user.membershipDate) / 365) * 10) / 10 : 'No Data Available';
         
-        const one_point_value = ((constants.max_lending_rate - constants.min_lending_rate) * req.user.investmentAmount * 2* 25) / (500 * 100 * 12);
+        const one_point_value = constants.one_point_value;
         const pointsWorth = Math.round(one_point_value * req.user.points);
         const totalDebt = debts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
         const possiblePoints = (req.user.points  / 25);
-        let possibleRate = Math.max(constants.min_lending_rate, Math.min(constants.max_lending_rate, Math.round(((20 - possiblePoints) * 0.4 + 12) * 100) / 100));
+        let possibleRate = 12;//Math.max(constants.min_lending_rate, Math.min(constants.max_lending_rate, Math.round(((20 - possiblePoints) * 0.4 + 12) * 100) / 100));
         
         const currentUnitsSum = units.reduce((total, unit) => total + unit.units, 0) + req.user.investmentAmount * getDaysDifference(req.user.investmentDate);
         const credits = Math.round(currentUnitsSum * 100/15000000)/100;
@@ -1408,37 +1412,16 @@ app.post('/approve-loan-request', async (req, res) => {
             }
         }
         
-
-        const points_payment = 0.75 * loansdata.points_worth_bought;
-        const rate_after_discount = parseFloat(((loansdata.interest_amount - loansdata.discount) * 100 * 12 / (loansdata.loan_amount * loansdata.loan_duration)).toFixed(2));
-
-        await updateMemberPoints(loansdata.borrower_name, -loansdata.points_spent);
-
-        const market = await PointsMkt.findOne({ seller_name: loansdata.borrower_name });
-        await updateMarketPoints(loansdata, market);
-
         await Loans.updateOne(
             { _id: req.body.loan_id },
             {
                 $set: {
                     "loan_status": "Ongoing",
-                    "rate_after_discount": rate_after_discount,
                     "loan_date": Today,
                     "approved_by": req.user.fullName
-                },
-                $inc: { principal_left: -(loansdata.discount + 0.5 * points_payment) }
+                }
             }
         );
-
-        await PointsSale.create({
-            "name": loansdata.borrower_name,
-            "transaction_date": Today,
-            "points_worth": 0,
-            "recorded_by": "Blaise",
-            "points_involved": loansdata.points_spent,
-            "reason": "Loan",
-            "type": "Sell"
-        });
 
         await ClubData.updateOne(
             { },
@@ -1446,75 +1429,7 @@ app.post('/approve-loan-request', async (req, res) => {
             { arrayFilters: [{ "elem.location_name": "Long-Term Loans" }] }
         );
 
-        if (loansdata.discount > 0) {
-            await handlePointsSale(loansdata, market);
-        }
-
         res.json({ msg: 'Loan Approved Successfuly' });
-
-        async function updateMemberPoints(memberName, points) {
-            await Users.updateOne({ fullName: memberName }, { $inc: { points } });
-        }
-
-        async function updateMarketPoints(loansdata, market) {
-            if (market && market.points_for_sale >= loansdata.points_spent) {
-                await PointsMkt.updateOne({ seller_name: loansdata.borrower_name }, { $inc: { points_for_sale: -loansdata.points_spent } });
-            } else if (market && market.points_for_sale < loansdata.points_spent) {
-                await PointsMkt.deleteOne({ seller_name: loansdata.borrower_name });
-            }
-        }
-
-        
-async function handlePointsSale(loansdata) {
-    try {
-        PointsSale.create({
-            "name": loansdata.borrower_name,
-            "transaction_date": Today,
-            "points_worth": points_payment,
-            "recorded_by": "Blaise",
-            "points_involved": 0,
-            "reason": "Loan",
-            "type": "Buy"
-        });
-
-        var full_market = await updateMarket();
-        const market_total = full_market.reduce((total, item) => total + item.points_worth, 0);
-
-        for (const item of full_market) {
-            const member = await Users.findOne({ fullName: item.seller_name });
-            const sale_amount = (item.points_worth / market_total) * points_payment;
-            const points_sold = (sale_amount / item.points_worth) * item.points_for_sale;
-            const deposit = 0.5 * sale_amount;
-
-            PointsSale.create({
-                "name": item.seller_name,
-                "transaction_date": Today,
-                "points_worth": sale_amount,
-                "recorded_by": loansdata._id,
-                "points_involved": points_sold,
-                "reason": "Sell",
-                "type": "Sell"
-            });
-
-            await addDeposit(member, deposit, Today, 'Points', req.body.sources[0].location, req.user);
-
-            Earnings.create({
-                "beneficiary_name": item.seller_name,
-                "date_of_earning": Today,
-                "destination": "Re-Invested",
-                "earnings_amount": deposit,
-                "source": "Points",
-                "status": "Sent"
-            });
-
-            await PointsMkt.updateOne({ seller_name: item.seller_name }, { $inc: { points_for_sale: -points_sold } });
-            await Users.updateOne({ fullName: item.seller_name }, { $inc: { points: -points_sold } });
-        }
-    } catch (error) {
-        console.error('Error handling points sale:', error);
-        throw error; // Propagate the error to the higher level
-    }
-}
 
     } catch (error) {
         console.error(error);
@@ -1819,9 +1734,116 @@ app.post('/make-loan-payment', async (req, res) => {
             return res.json({ msg: 'Loan not found' });
         }
 
-        if (new Date(loan_finding.loan_date).getTime() > new Date(req.body.payment_date).getTime()) {
+        if (new Date(loan_finding.loan_date).getTime() > new Date(req.body.payment_date).getTime()) {//what about before another payment date?
             return res.json({ msg: 'Payment date not correct!' });
         }
+
+        let principal_left = loan_finding.principal_left - req.body.payment_amount;
+        let loan_duration = loan_finding.loan_duration;
+        let interest_amount = loan_finding.interest_amount;
+        const last_payment_period = getDaysDifference(loan_finding.last_payment_date, req.body.payment_date);
+        let loan_units = loan_finding.loan_units + loan_finding.principal_left * last_payment_period;
+        let current_loan_duration = getDaysDifference(loan_finding.loan_date, req.body.payment_date) % 30 < 0.24 ? Math.trunc(getDaysDifference(loan_finding.loan_date, req.body.payment_date) / 30): Math.ceil(getDaysDifference(loan_finding.loan_date, req.body.payment_date) / 30);
+        let running_rate = await loanRate(current_loan_duration);
+        let pending_amount_interest = running_rate * loan_finding.principal_left / 100;
+        let payment_interest_amount = 0       
+        let msg = '';
+        let loan_status = loan_finding.loan_status;
+
+        if (loan_finding.payments) {
+            loan_finding.payments.forEach(payment => {
+                let duration = getDaysDifference(loan_finding.loan_date, payment.payment_date) % 30 < 0.24 ? Math.trunc(getDaysDifference(loan_finding.loan_date, payment.payment_date) / 30): Math.ceil(getDaysDifference(loan_finding.loan_date, payment.payment_date) / 30);
+                //let rate = await loanRate(duration);
+                payment_interest = rate * payment.payment_amount / 100;
+                payment_interest_amount += payment_interest;
+            })
+        }
+
+        let totalInterestDue = pending_amount_interest + payment_interest_amount;
+
+        if (req.body.payment_amount < (loan_finding.principal_left + totalInterestDue)){
+            if (req.body.payment_amount >= loan_finding.principal_left){
+                principal_left = 0;
+                interest_amount = totalInterestDue + loan_finding.principal_left - req.body.payment_amount;
+            }
+        } else if (req.body.payment_amount > (loan_finding.principal_left + totalInterestDue)){
+            principal_left = 0;
+            interest_amount = totalInterestDue;
+            loan_status = "Ended";
+            const new_deposit = req.body.payment_amount - loan_finding.principal_left - interest_amount;
+            loan_duration = current_loan_duration;
+            let msg1 = "";
+            if (new_deposit >= 5000){
+            await addDeposit(member, new_deposit, req.body.payment_date, "Excess Loan Payment", req.body.payment_location, req.user);
+            msg1 = `A Deposit of ${new_deposit} was recorded. It was excess Payment.`;
+            }
+            msg = msg1 + `The Loan is now Ended.`;
+        } else if (req.body.payment_amount == (loan_finding.principal_left + totalInterestDue)){
+            principal_left = 0;
+            interest_amount = totalInterestDue;
+            loan_status = "Ended";
+            loan_duration = current_loan_duration;
+            msg = `The Loan is now Ended.`;
+        }
+        await updateLocations(req.body.payment_amount, req.body.payment_location, "Long-Term Loans", req.user, req.body.payment_date);
+        console.log(last_payment_period, loan_period, low_rate, low_rate_amount);
+        
+        const updatedLoan = {
+            principal_left,
+            interest_amount,
+            loan_units,
+            last_payment_date: req.body.payment_date,
+            loan_status,
+            loan_duration
+        };
+
+        // Add new payment object to the payments array
+        loan_finding.payments.push({
+            payment_date: req.body.payment_date,
+            payment_amount: req.body.payment_amount,
+            updated_by: req.user.fullName
+        });
+
+        // Assign the modified payments array to updatedLoan.payments
+        updatedLoan.payments = loan_finding.payments;
+
+
+        await Loans.updateOne({ _id: req.body.loan_id }, { $set: updatedLoan }).then(response => {
+            msg += ' Payment was successfully Recorded';
+            res.json({ msg });
+        });
+
+        /*if (new Date(req.body.payment_date).getTime() > new Date(loan_finding.loan_date.getTime() + (loan_finding.loan_duration * 30 * 24 * 60 * 60 * 1000))) {//(new Date(record.loan_date.getTime() + (record.loan_duration * 30 * 24 * 60 * 60 * 1000)))
+            let excess_months = getDaysDifference(loan_finding.last_payment_date, req.body.payment_date) % 30 < 0.24 ? Math.trunc(getDaysDifference(loan_finding.last_payment_date, req.body.payment_date) / 30) : Math.ceil(getDaysDifference(loan_finding.last_payment_date, req.body.payment_date) / 30);
+            let duration = Math.ceil(getDaysDifference(loan_finding.loan_date, loan_finding.last_payment_date) / 30);
+            let excess_interest = 0;
+            if (new Date(loan_finding.last_payment_date).getTime() < new Date(loan_finding.loan_date.getTime() + (loan_finding.loan_duration * 30 * 24 * 60 * 60 * 1000)) && loan_finding.payments.length != 0) {
+                let excess_interest_months = loan_finding.loan_duration - duration;
+                interest_amount = loan_finding.interest_amount + excess_interest_months * constants.other_monthly_rate * loan_finding.principal_left / 100;
+                if (duration >= 3) {
+                    excess_interest = excess_interest_months * constants.other_monthly_rate * loan_finding.principal_left / 100;
+                } else if (duration == 2 && loan_finding.loan_duration >= 3) {
+                    excess_interest = constants.second_monthly_rate * loan_finding.principal_left / 100 + Math.max(0, (excess_interest_months - 1)) * constants.other_monthly_rate * loan_finding.principal_left / 100;
+                } else if (duration == 1 && loan_finding.loan_duration >= 3) {
+                    excess_interest = constants.second_monthly_rate * 2 * loan_finding.principal_left / 100 + Math.max(0, (excess_interest_months - 2)) * (constants.other_monthly_rate) * loan_finding.principal_left / 100;
+                } else if (duration == 1 && loan_finding.loan_duration == 2) {
+                    excess_interest = constants.second_monthly_rate * loan_finding.principal_left / 100;
+                } else if (duration == 0) {
+                    excess_interest = loan_finding.interest_amount;
+                }
+            } 
+            
+            if (duration >= 3) {
+                interest_amount = loan_finding.interest_amount + excess_months * constants.other_monthly_rate * loan_finding.principal_left / 100;
+            } else if (duration == 2) {
+                interest_amount = loan_finding.interest_amount + Math.max(0, (duration + excess_months - 3)) * (constants.other_monthly_rate) * loan_finding.principal_left / 100 + constants.second_monthly_rate * loan_finding.principal_left / 100;
+            } else if (duration == 1) {
+                interest_amount = loan_finding.interest_amount + Math.max(0, (duration + excess_months - 3)) * (constants.other_monthly_rate) * loan_finding.principal_left / 100 + constants.second_monthly_rate * 2 * loan_finding.principal_left / 100;
+            } 
+            
+        } else {
+
+        }  
         
 
         let principal_left = loan_finding.principal_left - req.body.payment_amount;
@@ -1835,7 +1857,7 @@ app.post('/make-loan-payment', async (req, res) => {
         const low_rate_amount = low_rate * loan_period * (loan_finding.loan_amount) / 1200;
         const high_rate_amount = (loan_finding.loan_rate == low_rate || loan_finding.loan_amount <= loan_finding.worth_at_loan) ? low_rate_amount : high_rate * loan_period * (loan_finding.loan_amount - loan_finding.worth_at_loan) / 1200 + low_rate * loan_period * (loan_finding.worth_at_loan) / 1200;        
         const one_point_value = ((constants.max_lending_rate - constants.min_lending_rate) * 2 * 25 * loan_finding.worth_at_loan) / (100 * 12 * 500);
-        let interest_amount = (principal_left + loan_finding.interest_amount) <= 0 ? high_rate_amount - (loan_finding.points_spent * one_point_value) : loan_finding.interest_amount;// considering scenarios where the loan period exceeds agreed duration
+        //let interest_amount = (principal_left + loan_finding.interest_amount) <= 0 ? high_rate_amount - (loan_finding.points_spent * one_point_value) : loan_finding.interest_amount;// considering scenarios where the loan period exceeds agreed duration
         let actualRate = interest_amount * 100 * 12 /(loan_finding.loan_amount * loan_period);
         let transfer_amount = req.body.payment_amount;
         
@@ -1848,8 +1870,6 @@ app.post('/make-loan-payment', async (req, res) => {
 
         await updateLocations(req.body.payment_amount, req.body.payment_location, "Long-Term Loans", req.user, req.body.payment_date);
 
-        let msg = '';
-        let loan_status = loan_finding.loan_status;
 
         if ((principal_left + interest_amount) <= 0) {//if the last payment exceeds the principal and the interest
             const new_deposit = req.body.payment_amount - loan_finding.principal_left - interest_amount;
@@ -1868,7 +1888,7 @@ app.post('/make-loan-payment', async (req, res) => {
                 {},
                 { $inc: { "cashLocations.$[elem].location_amount": (interest_amount - 0.75 * 0.5 * loan_finding.points_worth_bought) } },
                 { arrayFilters: [{ "elem.location_name": req.body.payment_location }] }
-            );*/
+            );
 
            // await calculateLoanDays(loan_finding.loan_date, req.body.payment_date, interest_amount);
 
@@ -1921,6 +1941,114 @@ app.post('/make-loan-payment', async (req, res) => {
             msg += ' Payment was successfully Recorded';
             res.json({ msg });
         });
+
+        const points_payment = 0.75 * loansdata.points_worth_bought;
+        const rate_after_discount = parseFloat(((loansdata.interest_amount - loansdata.discount) * 100 * 12 / (loansdata.loan_amount * loansdata.loan_duration)).toFixed(2));
+
+        await updateMemberPoints(loansdata.borrower_name, -loansdata.points_spent);
+
+        const market = await PointsMkt.findOne({ seller_name: loansdata.borrower_name });
+        await updateMarketPoints(loansdata, market);
+
+        await Loans.updateOne(
+            { _id: req.body.loan_id },
+            {
+                $set: {
+                    "loan_status": "Ongoing",
+                    "rate_after_discount": rate_after_discount,
+                    "loan_date": Today,
+                    "approved_by": req.user.fullName
+                },
+                $inc: { principal_left: -(loansdata.discount + 0.5 * points_payment) }
+            }
+        );
+
+        await PointsSale.create({
+            "name": loansdata.borrower_name,
+            "transaction_date": Today,
+            "points_worth": 0,
+            "recorded_by": "Blaise",
+            "points_involved": loansdata.points_spent,
+            "reason": "Loan",
+            "type": "Sell"
+        });
+
+        await ClubData.updateOne(
+            { },
+            { $inc: { "cashLocations.$[elem].location_amount": loansdata.loan_amount } },
+            { arrayFilters: [{ "elem.location_name": "Long-Term Loans" }] }
+        );
+
+        if (loansdata.discount > 0) {
+            await handlePointsSale(loansdata, market);
+        }
+
+        res.json({ msg: 'Loan Approved Successfuly' });
+
+        async function updateMemberPoints(memberName, points) {
+            await Users.updateOne({ fullName: memberName }, { $inc: { points } });
+        }
+
+        async function updateMarketPoints(loansdata, market) {
+            if (market && market.points_for_sale >= loansdata.points_spent) {
+                await PointsMkt.updateOne({ seller_name: loansdata.borrower_name }, { $inc: { points_for_sale: -loansdata.points_spent } });
+            } else if (market && market.points_for_sale < loansdata.points_spent) {
+                await PointsMkt.deleteOne({ seller_name: loansdata.borrower_name });
+            }
+        }
+
+        
+async function handlePointsSale(loansdata) {//handle at loan payment
+    try {
+        PointsSale.create({
+            "name": loansdata.borrower_name,
+            "transaction_date": Today,
+            "points_worth": points_payment,
+            "recorded_by": "Blaise",
+            "points_involved": 0,
+            "reason": "Loan",
+            "type": "Buy"
+        });
+
+        var full_market = await updateMarket();
+        const market_total = full_market.reduce((total, item) => total + item.points_worth, 0);
+
+        for (const item of full_market) {
+            const member = await Users.findOne({ fullName: item.seller_name });
+            const sale_amount = (item.points_worth / market_total) * points_payment;
+            const points_sold = (sale_amount / item.points_worth) * item.points_for_sale;
+            const deposit = 0.5 * sale_amount;
+
+            PointsSale.create({
+                "name": item.seller_name,
+                "transaction_date": Today,
+                "points_worth": sale_amount,
+                "recorded_by": loansdata._id,
+                "points_involved": points_sold,
+                "reason": "Sell",
+                "type": "Sell"
+            });
+
+            await addDeposit(member, deposit, Today, 'Points', req.body.sources[0].location, req.user);
+
+            Earnings.create({
+                "beneficiary_name": item.seller_name,
+                "date_of_earning": Today,
+                "destination": "Re-Invested",
+                "earnings_amount": deposit,
+                "source": "Points",
+                "status": "Sent"
+            });
+
+            await PointsMkt.updateOne({ seller_name: item.seller_name }, { $inc: { points_for_sale: -points_sold } });
+            await Users.updateOne({ fullName: item.seller_name }, { $inc: { points: -points_sold } });
+        }
+    } catch (error) {
+        console.error('Error handling points sale:', error);
+        throw error; // Propagate the error to the higher level
+    }
+}
+*/
     } catch (error) {
         console.error(error);
         res.json({ msg: 'An error occurred' });
@@ -1937,12 +2065,29 @@ app.post('/initiate-request', async (req, res) => {
         const member = await Users.findOne({_id: req.body.borrower_name_id});
         const loan_limit = await getLoanAmount(member);//getLoanAmount getLoanLimit
 
-        if (req.body.loan_amount > loan_limit) {
-            return res.json({ msg: `The Loan Limit of ${Math.round(loan_limit).toLocaleString('en-US')}, has been exceeded!`, no: 0 });
-        }
-        
+        //if (req.body.loan_amount > loan_limit) {
+          //  return res.json({ msg: `The Loan Limit of ${Math.round(loan_limit).toLocaleString('en-US')}, has been exceeded!`, no: 0 });
+       //}
         const constants = await Constants.findOne();
-        const high_rate = Math.max(20, (constants.min_monthly_rate + (((constants.max_lending_rate/12) - constants.min_monthly_rate)/11) * (req.body.loan_duration - 1)) * 12);
+        let duration = req.body.loan_duration > 12 ? 12 : req.body.loan_duration;
+        const annual_interest_rate = constants.monthly_lending_rate * duration;// * (req.body.loan_amount) / 100;
+        let points_needed = Math.max(0, (annual_interest_rate - 12)) * req.body.loan_amount / 100000;
+        const actual_interest_rate = points_needed <= member.points ? Math.min(12, (constants.monthly_lending_rate * req.body.loan_duration)) : (constants.monthly_lending_rate * duration * req.body.loan_amount - member.points * constants.one_point_value) / req.body.loan_amount;
+        const actual_interest = actual_interest_rate * req.body.loan_amount * Math.min(1, Math.max(1, (req.body.loan_duration / 12))) / 100;
+        const points_spent = points_needed <= member.points ? points_needed : member.points;
+        if (req.body.request_status == 0) {//this status happens anytime the amount or member changes, but only after the duration has been entered
+            const msg = `Total Rate for the duration of ${req.body.loan_duration} Months is ${Math.round(actual_interest_rate * Math.min(1, Math.max(1, (req.body.loan_duration / 12))) * 100)/100}%, requiring interest payment of ${Math.round(actual_interest).toLocaleString('en-US')} and spending of ${Math.round(points_spent)} Points. You can pay in monthly installments of ${(Math.round(req.body.loan_amount / (1000 *req.body.loan_duration)) * 1000).toLocaleString('en-US')} or in larger amounts to pay even less interest.`;
+            return res.json({ msg, no: 1 });
+        } else if (req.body.request_status == 1) {//this status happens when the admin clicks on "submit request" button which only become active when every thing above has been entered
+            
+            if (!req.body.earliest_date || !req.body.latest_date) {
+                return res.json({ msg: 'There is an entry missing. Please fill in everything needed', no: 0 });
+            }
+
+            await Loans.create({"loan_duration": req.body.loan_duration, "loan_units": 0, "loan_rate": rate, "earliest_date": req.body.earliest_date, "latest_date": req.body.latest_date, "loan_status": "Initiation", "initiated_by": member.fullName, "approved_by": "", "worth_at_loan": member.investmentAmount, "loan_amount": req.body.loan_amount, "loan_date": "", "borrower_name": member.fullName, "points_spent": 0, "discount": 0, "points_worth_bought": 0, "rate_after_discount": rate, 'interest_amount': interest_amount, "principal_left": req.body.loan_amount, "last_payment_date": Today}).then();
+            res.json({ msg: 'Request Successful' });
+        }
+        /*const high_rate = Math.max(20, (constants.min_monthly_rate + (((constants.max_lending_rate/12) - constants.min_monthly_rate)/11) * (req.body.loan_duration - 1)) * 12);
         const low_rate = Math.max(12, (constants.min_monthly_rate + (((constants.min_lending_rate/12) - constants.min_monthly_rate)/11) * (req.body.loan_duration - 1)) * 12);
         const low_rate_amount = low_rate * req.body.loan_duration * (req.body.loan_amount) / 1200;
         const high_rate_amount = req.body.loan_amount <= member.investmentAmount? low_rate_amount : high_rate * req.body.loan_duration * (req.body.loan_amount - member.investmentAmount) / 1200 + low_rate * req.body.loan_duration * (member.investmentAmount) / 1200;        
@@ -1953,6 +2098,8 @@ app.post('/initiate-request', async (req, res) => {
         let possibleRate = interest_amount * 100 * 12 /(req.body.loan_amount * req.body.loan_duration);
 
         if (req.body.request_status == 0) {//this status happens anytime the amount or member changes, but only after the duration has been entered
+            const msg1 = `Best Annual Rate is ${Math.round(possibleRate * 100)/100}%, ${Math.round(possibleRate * 100/12)/100}% monthly, requiring interest payment of ${Math.round(interest_amount).toLocaleString('en-US')}, and spending of ${Math.round(actualPointsConsumed)} points.`;
+            return res.json({ msg, no: 1 });
             if (req.body.interest_rate === '') {
                 const msg1 = `Best Annual Rate is ${Math.round(possibleRate * 100)/100}%, ${Math.round(possibleRate * 100/12)/100}% monthly, requiring interest payment of ${Math.round(interest_amount).toLocaleString('en-US')}, and spending of ${Math.round(actualPointsConsumed)} points.`;
                 const savings = Math.round(high_rate_amount - interest_amount).toLocaleString('en-US');
@@ -2014,7 +2161,7 @@ app.post('/initiate-request', async (req, res) => {
                 const interest_amount = req.body.interest_rate * req.body.loan_duration * req.body.loan_amount / 1200;
                 await Loans.create({"loan_duration": req.body.loan_duration, "loan_units": 0, "loan_rate": req.body.interest_rate, "earliest_date": req.body.earliest_date, "latest_date": req.body.latest_date, "loan_status": "Initiation", "initiated_by": member.fullName, "approved_by": "", "worth_at_loan": member.investmentAmount, "loan_amount": req.body.loan_amount, "loan_date": "", "borrower_name": member.fullName, "points_spent": pointsConsumed, "discount": 0, "points_worth_bought": 0, "rate_after_discount": req.body.interest_rate, 'interest_amount': interest_amount, "principal_left": req.body.loan_amount, "last_payment_date": Today}).then();
                 res.json({ msg: 'Request Successful' });
-        }     
+        }  */   
     } catch (error) {
         console.error(error);
         res.json({ msg: 'An error occurred', no: 0 });
@@ -2119,7 +2266,7 @@ async function addDeposit(member, depositAmount, depositDate, source, depositLoc
         await Users.updateOne(
             { _id: member._id },
             {
-                $inc: { investmentAmount: depositAmount }
+                $inc: { investmentAmount: depositAmount, points: new_points }
             }
         );
 
@@ -2258,7 +2405,7 @@ async function getProfitAndDuration(object, end_date = new Date()) {
 async function getValueOfPoints(points, user) {
     try {
         const constants = await Constants.findOne();
-        const one_point_value = ((constants.max_lending_rate - constants.min_lending_rate) * 2 * 25 * user.investmentAmount) / (100 * 12 * 500);
+        const one_point_value = constants.one_point_value;
         const points_worth = points * one_point_value;
         
         return points_worth;
@@ -2558,4 +2705,18 @@ function groupAndSortEntries(entriesArray, sortByProperty) {
     return newArray;
   }
   
-
+  //GET LOAN RATE
+  async function loanRate(loanDuration) {
+  const constants = await Constants.findOne();
+  let rate = 0;
+  if (loanDuration == 1) {
+      rate  = constants.min_monthly_rate / 100;
+  } else if (loanDuration == 2) {
+      rate  = constants.min_monthly_rate / 100 + constants.second_monthly_rate / 100;
+  } else if (loanDuration == 3) {
+      rate  = constants.min_monthly_rate / 100 + constants.second_monthly_rate * 2 / 100;
+  } else {
+      rate  = constants.min_monthly_rate / 100 + constants.second_monthly_rate * 2 / 100 + constants.other_monthly_rate * (loanDuration - 3) / 100;
+  }
+  return rate
+}
