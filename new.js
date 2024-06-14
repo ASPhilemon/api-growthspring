@@ -457,7 +457,7 @@ try {
             usedPool += Math.max(0, memberDebtsTotal - member.investmentAmount);
         }
         //const maxLimit = await getLoanLimit(req.user) - ((req.user.investmentAmount / clubWorth) * usedPool);
-        const riskPercentageOfWorth = totalDebt >= req.user.investmentAmount ? 0 : (usedPool / (clubWorth + usedPool - allDebt));//usedPool / clubWorth;
+        const riskPercentageOfWorth = totalDebt >= req.user.investmentAmount ? 0 : (usedPool / (clubWorth + usedPool - allDebt)) - totalDebt / clubWorth;//usedPool / clubWorth 
         const riskOfWorth = riskPercentageOfWorth * req.user.investmentAmount;
         var memberDepositsRecords = [];
         var memberEarningsRecords = earningsArray !== 'No Data Available' ? [] : [{year: Today.getFullYear(), total: 0, roi: 0, values: []}];
