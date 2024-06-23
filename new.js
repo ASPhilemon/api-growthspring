@@ -69,7 +69,7 @@ require('dotenv').config()
 //express app
 const app = express();
 
-app.use(cors({origin: ["https://growthspringers.com", "https://www.growthspringers.com", "https://admin.growthspringers.com"] , credentials: true}))
+app.use(cors({origin: true , credentials: true}))
 
 //["https://growthspringers.com", "https://www.growthspringers.com", "https://admin.growthspringers.com"]
 
