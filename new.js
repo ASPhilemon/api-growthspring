@@ -22,6 +22,7 @@
 //make_discount_payment
 
 //Loan_Rate_and_request_initiation
+//Delete_Request 
 //Buy_Discount
 //Add_non_club_money
 //Approve_loan_requests
@@ -1433,7 +1434,7 @@ app.post('/approve-loan-request', async (req, res) => {
 
     } catch (error) {
         console.error(error);
-        res.status(500).json({ msg: 'An error occurred during loan approval' });
+        res.status(400).json({ msg: 'An error occurred during loan approval' });
     }
 });
 
@@ -1718,10 +1719,27 @@ function getLastDayOfMonth(date) {
 });
 */
 
+//Delete_Request 
+app.post('/delete-loan-request', async (req, res) => {
+    try {
+        if (req.body.loan_id) {
+            // Delete loan request using the loan_id
+            await Loans.deleteOne({ _id: req.body.loan_id });  
+            res.json({ msg: "Request Deleted" });
+        } else {
+            // Respond with an error if loan_id is not provided
+            res.status(400).json({ msg: "loan_id is required" });
+        }
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ msg: `An error occurred: ${error.message}` });
+    }
+});
+
 
 //Make_Loan_Payments Consider if payments extend beyond the agreed date, 
 app.post('/make-loan-payment', async (req, res) => {
-    console.log(5)
+
     try {
         if (!req.body.payment_amount || !req.body.payment_date) {
             return res.json({ msg: 'Required information is missing. Please provide all information needed.' });
@@ -1787,7 +1805,7 @@ app.post('/make-loan-payment', async (req, res) => {
             msg = `The Loan is now Ended.`;
         }
         await updateLocations(req.body.payment_amount, req.body.payment_location, "Long-Term Loans", req.user, req.body.payment_date);
-        console.log(last_payment_period, loan_period, low_rate, low_rate_amount);
+        //console.log(last_payment_period, loan_period, low_rate, low_rate_amount);
         
         const updatedLoan = {
             principal_left,
@@ -2071,14 +2089,16 @@ app.post('/initiate-request', async (req, res) => {
           //  return res.status(400).json({ msg: `The Loan Limit of ${Math.round(loan_limit).toLocaleString('en-US')}, has been exceeded!`, no: 0 });
        //}
         const constants = await Constants.findOne();
-        let duration = req.body.loan_duration > 12 ? 12 : req.body.loan_duration;
-        const annual_interest_rate = constants.monthly_lending_rate * duration;// * (req.body.loan_amount) / 100;
-        let points_needed = Math.max(0, (annual_interest_rate - 12)) * req.body.loan_amount / 100000;
-        const actual_interest_rate = points_needed <= member.points ? Math.min(12, (constants.monthly_lending_rate * req.body.loan_duration)) : (constants.monthly_lending_rate * duration * req.body.loan_amount - member.points * constants.one_point_value) / req.body.loan_amount;
-        const actual_interest = actual_interest_rate * req.body.loan_amount * Math.min(1, Math.max(1, (req.body.loan_duration / 12))) / 100;
+        //let duration = req.body.loan_duration > 12 ? 12 : req.body.loan_duration;
+        let duration = req.body.loan_duration;
+        const total_rate = constants.monthly_lending_rate * duration;// * (req.body.loan_amount) / 100;
+        let points_needed = (duration / 12) < 1.5 ? Math.max(0, (total_rate - 12)) * req.body.loan_amount / 100000 :  12 * req.body.loan_amount / 100000 + (duration - 18) * constants.monthly_lending_rate * req.body.loan_amount / 100000;
+        const actual_interest_rate = points_needed <= member.points ? Math.min(12, (constants.monthly_lending_rate * req.body.loan_duration)) : (constants.monthly_lending_rate * duration * req.body.loan_amount - member.points * 1000) / req.body.loan_amount;//constants.one_point_value
         const points_spent = points_needed <= member.points ? points_needed : member.points;
+        const actual_interest =  total_rate * req.body.loan_amount / 100 - points_spent * 1000;
+        //console.log(points_spent, total_rate, req.body.loan_amount, points_needed);
         if (req.body.request_status == 0) {//this status happens anytime the amount or member changes, but only after the duration has been entered
-            const msg = `Total Rate for the duration of ${req.body.loan_duration} Months is ${Math.round(actual_interest_rate * Math.min(1, Math.max(1, (req.body.loan_duration / 12))) * 100)/100}%, requiring interest payment of ${Math.round(actual_interest).toLocaleString('en-US')} and spending of ${Math.round(points_spent)} Points. You can pay in monthly installments of ${(Math.round(req.body.loan_amount / (1000 *req.body.loan_duration)) * 1000).toLocaleString('en-US')} or in larger amounts to pay even less interest.`;
+        const msg = `Total Rate for the duration of ${req.body.loan_duration} Months is ${actual_interest * 100 / req.body.loan_amount}%, requiring interest payment of ${actual_interest.toLocaleString('en-US')} and spending of ${Math.round(points_spent)} Points worth ${Math.round(points_spent * 1000)}/=. You can pay in monthly installments of ${(Math.round(req.body.loan_amount / (1000 * req.body.loan_duration)) * 1000).toLocaleString('en-US')} or in larger amounts to pay even less interest.`;
             return res.json({ msg, no: 1 });
         } else if (req.body.request_status == 1) {//this status happens when the admin clicks on "submit request" button which only become active when every thing above has been entered
             
@@ -2086,7 +2106,7 @@ app.post('/initiate-request', async (req, res) => {
                 return res.status(400).json({ msg: 'There is an entry missing. Please fill in everything needed', no: 0 });
             }
 
-            await Loans.create({"loan_duration": req.body.loan_duration, "loan_units": 0, "loan_rate": rate, "earliest_date": req.body.earliest_date, "latest_date": req.body.latest_date, "loan_status": "Initiation", "initiated_by": member.fullName, "approved_by": "", "worth_at_loan": member.investmentAmount, "loan_amount": req.body.loan_amount, "loan_date": "", "borrower_name": member.fullName, "points_spent": 0, "discount": 0, "points_worth_bought": 0, "rate_after_discount": rate, 'interest_amount': interest_amount, "principal_left": req.body.loan_amount, "last_payment_date": Today}).then();
+            await Loans.create({"loan_duration": req.body.loan_duration, "loan_units": 0, "loan_rate": total_rate, "earliest_date": req.body.earliest_date, "latest_date": req.body.latest_date, "loan_status": "Initiation", "initiated_by": member.fullName, "approved_by": "", "worth_at_loan": member.investmentAmount, "loan_amount": req.body.loan_amount, "loan_date": "", "borrower_name": member.fullName, "points_spent": 0, "discount": 0, "points_worth_bought": 0, "rate_after_discount": total_rate, 'interest_amount': actual_interest, "principal_left": req.body.loan_amount, "last_payment_date": Today}).then();
             res.json({ msg: 'Request Successful' });
         }
         /*const high_rate = Math.max(20, (constants.min_monthly_rate + (((constants.max_lending_rate/12) - constants.min_monthly_rate)/11) * (req.body.loan_duration - 1)) * 12);
