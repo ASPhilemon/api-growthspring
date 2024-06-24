@@ -1736,7 +1736,7 @@ app.post('/make-loan-payment', async (req, res) => {
         }
 
         if (new Date(loan_finding.loan_date).getTime() > new Date(req.body.payment_date).getTime()) {//what about before another payment date?
-            return res.json({ msg: 'Payment date not correct!' });
+            return res.status(400).json({ msg: "Payment date not correct!" });
         }
 
         let principal_left = loan_finding.principal_left - req.body.payment_amount;
