@@ -1773,7 +1773,7 @@ app.post('/make-loan-payment', async (req, res) => {
             loan_finding.payments.forEach(payment => {
                 let duration = getDaysDifference(loan_finding.loan_date, payment.payment_date) % 30 < 0.24 ? Math.trunc(getDaysDifference(loan_finding.loan_date, payment.payment_date) / 30): Math.ceil(getDaysDifference(loan_finding.loan_date, payment.payment_date) / 30);
                 //let rate = await loanRate(duration);
-                payment_interest = rate * payment.payment_amount / 100;
+                payment_interest = constants.monthly_lending_rate * duration * payment.payment_amount / 100;
                 payment_interest_amount += payment_interest;
             })
         }
@@ -1829,7 +1829,7 @@ app.post('/make-loan-payment', async (req, res) => {
 
         await Loans.updateOne({ _id: req.body.loan_id }, { $set: updatedLoan }).then(response => {
             msg += ' Payment was successfully Recorded';
-            res.json({ msg });
+            res.json({ msg, loan_status: "Ended" });
         });
 
         /*if (new Date(req.body.payment_date).getTime() > new Date(loan_finding.loan_date.getTime() + (loan_finding.loan_duration * 30 * 24 * 60 * 60 * 1000))) {//(new Date(record.loan_date.getTime() + (record.loan_duration * 30 * 24 * 60 * 60 * 1000)))
@@ -2730,15 +2730,7 @@ function groupAndSortEntries(entriesArray, sortByProperty) {
   //GET LOAN RATE
   async function loanRate(loanDuration) {
   const constants = await Constants.findOne();
-  let rate = 0;
-  if (loanDuration == 1) {
-      rate  = constants.min_monthly_rate / 100;
-  } else if (loanDuration == 2) {
-      rate  = constants.min_monthly_rate / 100 + constants.second_monthly_rate / 100;
-  } else if (loanDuration == 3) {
-      rate  = constants.min_monthly_rate / 100 + constants.second_monthly_rate * 2 / 100;
-  } else {
-      rate  = constants.min_monthly_rate / 100 + constants.second_monthly_rate * 2 / 100 + constants.other_monthly_rate * (loanDuration - 3) / 100;
-  }
+  let rate = constants.monthly_lending_rate * loanDuration / 100;
+
   return rate
 }
