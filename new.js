@@ -1829,7 +1829,7 @@ app.post('/make-loan-payment', async (req, res) => {
 
         await Loans.updateOne({ _id: req.body.loan_id }, { $set: updatedLoan }).then(response => {
             msg += ' Payment was successfully Recorded';
-            res.json({ msg, loan_status: "Ended" });
+            res.json({ msg, loan_status: loan_status });
         });
 
         /*if (new Date(req.body.payment_date).getTime() > new Date(loan_finding.loan_date.getTime() + (loan_finding.loan_duration * 30 * 24 * 60 * 60 * 1000))) {//(new Date(record.loan_date.getTime() + (record.loan_duration * 30 * 24 * 60 * 60 * 1000)))
