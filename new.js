@@ -58,6 +58,7 @@ const CashHistory = require('./Models/cashTransactionsHistory');
 const InvestmentUnits = require('./Models/investment_units');
 const Discount = require('./Models/discounts');
 const Users = require('./auth/models/UserModel');
+const CashLocations = require('./Models/cashlocations');
 const Codes =  require('./Models/codes');
 const Initiatives =  require('./Models/discount_initiatives');
 
@@ -1401,15 +1402,18 @@ app.post('/approve-loan-request', async (req, res) => {
             return res.json({ msg: 'The sources selected do not match the loan Amount'});
         }
 
-        const clubdata = await ClubData.findOne();
+        const cashLocations = await CashLocations.find();
 
         for (const source of req.body.sources) {
-            const foundLocation = clubdata.cashLocations.find(location => location.location_name == source.location);
+            const foundLocation = cashLocations.find(location => location.name == source.location);
         
-            if (foundLocation && foundLocation.location_amount >= source.amount) {
-                await updateLocations(-source.amount, "Long-Term Loans", foundLocation.location_name, req.user);
+            if (foundLocation && foundLocation.amount >= source.amount) {
+                await CashLocations.updateOne(
+                    {name: foundLocation.name },
+                    { $inc: { "amount": -source.amount } }
+                );
             } else {
-                return res.json({ msg: `There is not enough money in '${foundLocation.location_name}'` });
+                return res.json({ msg: `There is not enough money in '${foundLocation.name}'` });
             }
         }
         
@@ -1422,12 +1426,6 @@ app.post('/approve-loan-request', async (req, res) => {
                     "approved_by": req.user.fullName
                 }
             }
-        );
-
-        await ClubData.updateOne(
-            { },
-            { $inc: { "cashLocations.$[elem].location_amount": loansdata.loan_amount } },
-            { arrayFilters: [{ "elem.location_name": "Long-Term Loans" }] }
         );
 
         res.json({ msg: 'Loan Approved Successfuly' });
@@ -1804,8 +1802,11 @@ app.post('/make-loan-payment', async (req, res) => {
             loan_duration = current_loan_duration;
             msg = `The Loan is now Ended.`;
         }
-        await updateLocations(req.body.payment_amount, req.body.payment_location, "Long-Term Loans", req.user, req.body.payment_date);
-        //console.log(last_payment_period, loan_period, low_rate, low_rate_amount);
+
+        await CashLocations.updateOne(
+            {name: req.body.payment_amount },
+            { $inc: { "amount": req.body.payment_amount } }
+            );
         
         const updatedLoan = {
             principal_left,
@@ -2078,16 +2079,16 @@ async function handlePointsSale(loansdata) {//handle at loan payment
 
 app.post('/initiate-request', async (req, res) => {
     try {
-        if (!req.body.loan_amount || !req.body.loan_duration) {
+        if (!req.body.loan_amount || !req.body.loan_duration || !req.body.earliest_date || !req.body.latest_date) {
             return res.status(400).json({ msg: 'There is an entry missing. Please fill in everything needed', no: 0 });
         }
 
         const member = await Users.findOne({_id: req.body.borrower_name_id});
         const loan_limit = await getLoanAmount(member);//getLoanAmount getLoanLimit
 
-        //if (req.body.loan_amount > loan_limit) {
-          //  return res.status(400).json({ msg: `The Loan Limit of ${Math.round(loan_limit).toLocaleString('en-US')}, has been exceeded!`, no: 0 });
-       //}
+        if (req.body.loan_amount > loan_limit) {
+            return res.status(400).json({ msg: `The Loan Limit of ${Math.round(loan_limit).toLocaleString('en-US')}, has been exceeded!`, no: 0 });
+       }
         const constants = await Constants.findOne();
         //let duration = req.body.loan_duration > 12 ? 12 : req.body.loan_duration;
         let duration = req.body.loan_duration;
@@ -2097,18 +2098,11 @@ app.post('/initiate-request', async (req, res) => {
         const points_spent = points_needed <= member.points ? points_needed : member.points;
         const actual_interest =  total_rate * req.body.loan_amount / 100 - points_spent * 1000;
         //console.log(points_spent, total_rate, req.body.loan_amount, points_needed);
-        if (req.body.request_status == 0) {//this status happens anytime the amount or member changes, but only after the duration has been entered
-        const msg = `Total Rate for the duration of ${req.body.loan_duration} Months is ${actual_interest * 100 / req.body.loan_amount}%, requiring interest payment of ${actual_interest.toLocaleString('en-US')} and spending of ${Math.round(points_spent)} Points worth ${Math.round(points_spent * 1000)}/=. You can pay in monthly installments of ${(Math.round(req.body.loan_amount / (1000 * req.body.loan_duration)) * 1000).toLocaleString('en-US')} or in larger amounts to pay even less interest.`;
-            return res.json({ msg, no: 1 });
-        } else if (req.body.request_status == 1) {//this status happens when the admin clicks on "submit request" button which only become active when every thing above has been entered
+        const msg = `Request Successful. Total Rate for the duration of ${req.body.loan_duration} Months is ${actual_interest * 100 / req.body.loan_amount}%, requiring interest payment of ${actual_interest.toLocaleString('en-US')} and spending of ${Math.round(points_spent)} Points worth ${Math.round(points_spent * 1000)}/=. You can pay in monthly installments of ${(Math.round(req.body.loan_amount / (1000 * req.body.loan_duration)) * 1000).toLocaleString('en-US')} or in larger amounts to pay even less interest.`;
             
-            if (!req.body.earliest_date || !req.body.latest_date) {
-                return res.status(400).json({ msg: 'There is an entry missing. Please fill in everything needed', no: 0 });
-            }
-
             await Loans.create({"loan_duration": req.body.loan_duration, "loan_units": 0, "loan_rate": total_rate, "earliest_date": req.body.earliest_date, "latest_date": req.body.latest_date, "loan_status": "Initiation", "initiated_by": member.fullName, "approved_by": "", "worth_at_loan": member.investmentAmount, "loan_amount": req.body.loan_amount, "loan_date": "", "borrower_name": member.fullName, "points_spent": 0, "discount": 0, "points_worth_bought": 0, "rate_after_discount": total_rate, 'interest_amount': actual_interest, "principal_left": req.body.loan_amount, "last_payment_date": Today}).then();
-            res.json({ msg: 'Request Successful' });
-        }
+            res.json({ msg: msg });
+
         /*const high_rate = Math.max(20, (constants.min_monthly_rate + (((constants.max_lending_rate/12) - constants.min_monthly_rate)/11) * (req.body.loan_duration - 1)) * 12);
         const low_rate = Math.max(12, (constants.min_monthly_rate + (((constants.min_lending_rate/12) - constants.min_monthly_rate)/11) * (req.body.loan_duration - 1)) * 12);
         const low_rate_amount = low_rate * req.body.loan_duration * (req.body.loan_amount) / 1200;
