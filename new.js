@@ -1389,7 +1389,7 @@ app.post('/investment_payment', async (req, res) => {
 app.post('/approve-loan-request', async (req, res) => {
     try {
         if (!req.body.sources) {
-            return res.json({ msg: 'The sources are not selected'});
+            return res.status(400).json({ msg: 'The sources are not selected'});
         }
         req.body.sources.forEach(item => {
             item.amount = parseInt(item.amount);
@@ -1399,7 +1399,7 @@ app.post('/approve-loan-request', async (req, res) => {
         const loansdata = await Loans.findOne({ _id: req.body.loan_id });
 
         if ( sources_total != loansdata.loan_amount) {//
-            return res.json({ msg: 'The sources selected do not match the loan Amount'});
+            return res.status(400).json({ msg: 'The sources selected do not match the loan Amount'});
         }
 
         const cashLocations = await CashLocations.find();
