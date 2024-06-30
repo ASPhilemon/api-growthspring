@@ -1760,16 +1760,17 @@ app.post('/make-loan-payment', async (req, res) => {
         let interest_amount = loan_finding.interest_amount;
         const last_payment_period = getDaysDifference(loan_finding.last_payment_date, req.body.payment_date);
         let loan_units = loan_finding.loan_units + loan_finding.principal_left * last_payment_period;
-        let current_loan_duration = getDaysDifference(loan_finding.loan_date, req.body.payment_date) % 30 < 0.24 ? Math.trunc(getDaysDifference(loan_finding.loan_date, req.body.payment_date) / 30): Math.ceil(getDaysDifference(loan_finding.loan_date, req.body.payment_date) / 30);
+        let remainder = getDaysDifference(loan_finding.loan_date, req.body.payment_date) % 30;
+        let current_loan_duration = remainder / 30 < 0.24 ? Math.trunc(remainder / 30): Math.ceil(remainder / 30);
         let running_rate = await loanRate(current_loan_duration);
         let pending_amount_interest = running_rate * loan_finding.principal_left / 100;
-        let payment_interest_amount = 0       
+        let payment_interest_amount = 0;       
         let msg = '';
         let loan_status = loan_finding.loan_status;
-
+        //console.log(remainder, running_rate, pending_amount_interest);
         if (loan_finding.payments) {
             loan_finding.payments.forEach(payment => {
-                let duration = getDaysDifference(loan_finding.loan_date, payment.payment_date) % 30 < 0.24 ? Math.trunc(getDaysDifference(loan_finding.loan_date, payment.payment_date) / 30): Math.ceil(getDaysDifference(loan_finding.loan_date, payment.payment_date) / 30);
+                let duration = (getDaysDifference(loan_finding.loan_date, payment.payment_date) % 30) / 30 < 0.24 ? Math.trunc(getDaysDifference(loan_finding.loan_date, payment.payment_date) / 30): Math.ceil(getDaysDifference(loan_finding.loan_date, payment.payment_date) / 30);
                 //let rate = await loanRate(duration);
                 payment_interest = constants.monthly_lending_rate * duration * payment.payment_amount / 100;
                 payment_interest_amount += payment_interest;
@@ -2097,10 +2098,11 @@ app.post('/initiate-request', async (req, res) => {
         const actual_interest_rate = points_needed <= member.points ? Math.min(12, (constants.monthly_lending_rate * req.body.loan_duration)) : (constants.monthly_lending_rate * duration * req.body.loan_amount - member.points * 1000) / req.body.loan_amount;//constants.one_point_value
         const points_spent = points_needed <= member.points ? points_needed : member.points;
         const actual_interest =  total_rate * req.body.loan_amount / 100 - points_spent * 1000;
+        let installment_amount = Math.round(req.body.loan_amount / (1000 * req.body.loan_duration)) * 1000;
         //console.log(points_spent, total_rate, req.body.loan_amount, points_needed);
-        const msg = `Request Successful. Total Rate for the duration of ${req.body.loan_duration} Months is ${actual_interest * 100 / req.body.loan_amount}%, requiring interest payment of ${actual_interest.toLocaleString('en-US')} and spending of ${Math.round(points_spent)} Points worth ${Math.round(points_spent * 1000)}/=. You can pay in monthly installments of ${(Math.round(req.body.loan_amount / (1000 * req.body.loan_duration)) * 1000).toLocaleString('en-US')} or in larger amounts to pay even less interest.`;
+        const msg = `Request Successful. Total Rate for the duration of ${req.body.loan_duration} Months is ${actual_interest * 100 / req.body.loan_amount}%, requiring interest payment of ${actual_interest.toLocaleString('en-US')} and spending of ${Math.round(points_spent)} Points worth ${Math.round(points_spent * 1000)}/=. You can pay in monthly installments of ${installment_amount.toLocaleString('en-US')} or in larger amounts to pay even less interest.`;
             
-            await Loans.create({"loan_duration": req.body.loan_duration, "loan_units": 0, "loan_rate": total_rate, "earliest_date": req.body.earliest_date, "latest_date": req.body.latest_date, "loan_status": "Initiation", "initiated_by": member.fullName, "approved_by": "", "worth_at_loan": member.investmentAmount, "loan_amount": req.body.loan_amount, "loan_date": "", "borrower_name": member.fullName, "points_spent": 0, "discount": 0, "points_worth_bought": 0, "rate_after_discount": total_rate, 'interest_amount': actual_interest, "principal_left": req.body.loan_amount, "last_payment_date": Today}).then();
+            await Loans.create({"loan_duration": req.body.loan_duration, "loan_units": 0, "loan_rate": total_rate, "earliest_date": req.body.earliest_date, "latest_date": req.body.latest_date, "loan_status": "Pending Approval", "installment_amount": ,"initiated_by": req.user.fullName, "approved_by": "", "worth_at_loan": member.investmentAmount, "loan_amount": req.body.loan_amount, "loan_date": "", "borrower_name": member.fullName, "points_spent": points_spent, "discount": 0, "points_worth_bought": 0, "rate_after_discount": total_rate, 'interest_amount': actual_interest, "principal_left": req.body.loan_amount, "last_payment_date": Today}).then();
             res.json({ msg: msg });
 
         /*const high_rate = Math.max(20, (constants.min_monthly_rate + (((constants.max_lending_rate/12) - constants.min_monthly_rate)/11) * (req.body.loan_duration - 1)) * 12);
@@ -2724,7 +2726,7 @@ function groupAndSortEntries(entriesArray, sortByProperty) {
   //GET LOAN RATE
   async function loanRate(loanDuration) {
   const constants = await Constants.findOne();
-  let rate = constants.monthly_lending_rate * loanDuration / 100;
+  let rate = constants.monthly_lending_rate * loanDuration;
 
   return rate
 }
