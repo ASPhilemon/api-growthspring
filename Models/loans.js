@@ -20,8 +20,10 @@ const loansSchema = new Schema({
     rate_after_discount: Number,
     discount: Number,
     points_worth_bought: Number,
+    points_accrued: Number,
+    interest_accrued: Number,
     interest_amount: Number,
-    loan_units: Number,
+    installment_amount: Number,
     payments: [{
         payment_date: Date,
         payment_amount: Number,
