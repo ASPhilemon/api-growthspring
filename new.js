@@ -535,6 +535,8 @@ try {
         if (debtRecords !== 'No Data Available') {
             Object.entries(debtRecords.recordsByYear).forEach(([year, records]) => {
                 records.forEach(record => {
+                    
+                if (record.loan_status == "Ongoing" || record.loan_status == "Ended") {
                     let paymentHistory = record.payments.map(paymentRecord => [
                         formatDate(paymentRecord.payment_date),
                         Math.round(paymentRecord.payment_amount)
@@ -545,22 +547,25 @@ try {
                         if (record.loan_status == "Ongoing") {
                             let remainder = getDaysDifference(record.loan_date, Today);
                             let current_loan_duration = Math.ceil(remainder / 30);
-                            let running_rate = constants.monthly_lending_rate * current_loan_duration;
+                            let point_days = Math.max(0, Math.min(12, current_loan_duration) - 6) + Math.max(18, current_loan_duration) - 18;
+                            let running_rate = constants.monthly_lending_rate * (current_loan_duration - point_days);
                             let pending_amount_interest = running_rate * record.principal_left / 100;
                             let payment_interest_amount = 0;
+                            let points = constants.monthly_lending_rate * point_days * record.principal_left / 100000;
 
                             if (record.payments) {
                                 record.payments.forEach(payment => {
                                     let duration = (getDaysDifference(record.loan_date, payment.payment_date) % 30) / 30 < 0.24 ? Math.trunc(getDaysDifference(record.loan_date, payment.payment_date) / 30): Math.ceil(getDaysDifference(record.loan_date, payment.payment_date) / 30);
-                                    let payment_interest = constants.monthly_lending_rate * duration * payment.payment_amount / 100;
+                                    let point_day = Math.max(0, Math.min(12, duration) - 6) + Math.max(18, duration) - 18;         
+                                    let payment_interest = constants.monthly_lending_rate * (duration - point_day) * payment.payment_amount / 100;
+                                    points += constants.monthly_lending_rate * point_day * payment.payment_amount / 100000;
                                     payment_interest_amount += payment_interest;
                                 })
                             }
 
-                            let interest = pending_amount_interest + payment_interest_amount;
-                            points_accrued = interest > 0.12 * record.loan_amount ? (interest - 0.12 * record.loan_amount) / 1000 : 0;
-                            interest_accrued = interest > 0.12 * record.loan_amount && req.user.points > points_accrued ? 0.12 * record.loan_amount : interest;
-                            
+                            interest_accrued = pending_amount_interest + payment_interest_amount;
+                            points_accrued = points;
+                            //console.log(current_loan_duration, interest_accrued, point_days, points);
                          
                     }
                     
@@ -575,13 +580,16 @@ try {
                         pointsSpent: Math.round(record.points_spent),
                         interest_accrued: interest_accrued,
                         points_accrued: points_accrued,
-                        status: record.loan_status,
+                        loan_status: record.loan_status,
                         paymentHistory: paymentHistory
                     };
 
                     memberDebtRecords.push(yearObject);
+                }
                 });
+            
             });
+          
         }
     }
         // Process and structure club deposits records
@@ -1457,6 +1465,11 @@ app.post('/approve-loan-request', async (req, res) => {
             }
         );
 
+        await Users.updateOne(
+            {fullName: loan_finding.borrower_name },
+            { $inc: { "points": - loansdata.points_spent} }
+            );
+
         res.json({ msg: 'Loan Approved Successfuly' });
 
     } catch (error) {
@@ -1785,13 +1798,29 @@ app.post('/make-loan-payment', async (req, res) => {
         }
 
         let principal_left = loan_finding.principal_left - req.body.payment_amount;
+        let points_balance = 0;
+        let points_spent = loan_finding.points_spent;
         let loan_duration = loan_finding.loan_duration;
         const last_payment_period = getDaysDifference(loan_finding.last_payment_date, req.body.payment_date);
         let loan_units = loan_finding.loan_units + loan_finding.principal_left * last_payment_period;
         let remainder = getDaysDifference(loan_finding.loan_date, req.body.payment_date) % 30;
-        let current_loan_duration = remainder / 30 < 0.24 ? Math.trunc(remainder / 30): Math.ceil(remainder / 30);
-        let running_rate = await loanRate(current_loan_duration);
-        let payment_interest_amount = await paymentInterest(loan_finding);       
+        let current_loan_duration = remainder / 30 < 0.24 ? Math.trunc(remainder / 30): Math.ceil(remainder / 30);    
+        let point_days = Math.max(0, Math.min(12, current_loan_duration) - 6) + Math.max(18, current_loan_duration) - 18;
+        let running_rate = constants.monthly_lending_rate * (current_loan_duration - point_days);
+        let pending_amount_interest = running_rate * record.principal_left / 100;
+        let points = constants.monthly_lending_rate * point_days * record.principal_left / 100000;
+        let payment_interest_amount = 0;  
+ 
+        if (loan_finding.payments) {
+            loan_finding.payments.forEach(payment => {
+                let duration = (getDaysDifference(loan_finding.loan_date, payment.payment_date) % 30) / 30 < 0.24 ? Math.trunc(getDaysDifference(loan_finding.loan_date, payment.payment_date) / 30): Math.ceil(getDaysDifference(loan_finding.loan_date, payment.payment_date) / 30);
+                let point_day = Math.max(0, Math.min(12, duration) - 6) + Math.max(18, duration) - 18;         
+                let payment_interest = constants.monthly_lending_rate * (duration - point_day) * payment.payment_amount / 100;
+                points += constants.monthly_lending_rate * point_day * payment.payment_amount / 100000;
+                payment_interest_amount += payment_interest;
+            })
+        }
+
         let msg = '';
         let loan_status = loan_finding.loan_status;
         //console.log(remainder, running_rate, pending_amount_interest);
@@ -1808,6 +1837,8 @@ app.post('/make-loan-payment', async (req, res) => {
             principal_left = 0;
             interest_amount = totalInterestDue;
             loan_status = "Ended";
+            points_spent = points;
+            points_balance = loan_finding.points_spent - points;
             const new_deposit = req.body.payment_amount - loan_finding.principal_left - interest_amount;
             loan_duration = current_loan_duration;
             let msg1 = "";
@@ -1821,6 +1852,8 @@ app.post('/make-loan-payment', async (req, res) => {
             interest_amount = totalInterestDue;
             loan_status = "Ended";
             loan_duration = current_loan_duration;
+            points_spent = points;
+            points_balance = loan_finding.points_spent - points;
             msg = `The Loan is now Ended.`;
         }
 
@@ -1835,7 +1868,8 @@ app.post('/make-loan-payment', async (req, res) => {
             loan_units,
             last_payment_date: req.body.payment_date,
             loan_status,
-            loan_duration
+            loan_duration,
+            points_spent
         };
 
         // Add new payment object to the payments array
@@ -1853,6 +1887,11 @@ app.post('/make-loan-payment', async (req, res) => {
             msg += ' Payment was successfully Recorded';
             res.json({ msg, loan_status: loan_status });
         });
+
+        await Users.updateOne(
+            {fullName: loan_finding.borrower_name },
+            { $inc: { "points": points_balance} }
+            );
 
         /*if (new Date(req.body.payment_date).getTime() > new Date(loan_finding.loan_date.getTime() + (loan_finding.loan_duration * 30 * 24 * 60 * 60 * 1000))) {//(new Date(record.loan_date.getTime() + (record.loan_duration * 30 * 24 * 60 * 60 * 1000)))
             let excess_months = getDaysDifference(loan_finding.last_payment_date, req.body.payment_date) % 30 < 0.24 ? Math.trunc(getDaysDifference(loan_finding.last_payment_date, req.body.payment_date) / 30) : Math.ceil(getDaysDifference(loan_finding.last_payment_date, req.body.payment_date) / 30);
@@ -2115,7 +2154,7 @@ app.post('/initiate-request', async (req, res) => {
         let duration = req.body.loan_duration;
         const total_rate = constants.monthly_lending_rate * duration;// * (req.body.loan_amount) / 100;
         let points_needed = (duration / 12) < 1.5 ? Math.max(0, (total_rate - 12)) * req.body.loan_amount / 100000 :  12 * req.body.loan_amount / 100000 + (duration - 18) * constants.monthly_lending_rate * req.body.loan_amount / 100000;
-        const actual_interest_rate = points_needed <= member.points ? Math.min(12, (constants.monthly_lending_rate * req.body.loan_duration)) : (constants.monthly_lending_rate * duration * req.body.loan_amount - member.points * 1000) / req.body.loan_amount;//constants.one_point_value
+        //const actual_interest_rate = points_needed <= member.points ? Math.min(12, (constants.monthly_lending_rate * req.body.loan_duration)) : (constants.monthly_lending_rate * duration * req.body.loan_amount - member.points * 1000) / req.body.loan_amount;//constants.one_point_value
         const points_spent = points_needed <= member.points ? points_needed : member.points;
         const actual_interest =  total_rate * req.body.loan_amount / 100 - points_spent * 1000;
         let installment_amount = Math.round(req.body.loan_amount / (1000 * req.body.loan_duration)) * 1000;
@@ -2545,7 +2584,7 @@ async function getLoanAmount(member) {
         for (const clubMember of club) {
             const memberData = await Users.findOne({ fullName: clubMember.fullName });
             const memberDebts = allDebts.filter(loan => loan.borrower_name === clubMember.fullName);
-            const memberDebtsTotal = memberDebts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
+            const memberDebtsTotal = memberDebts.reduce((total, loan) => total + loan.principal_left, 0);
             const usedPortion = Math.max(0, memberDebtsTotal - memberData.investmentAmount);
             benefiters = usedPortion > 0 ? benefiters + 1 : benefiters;
             usedPool += usedPortion;
@@ -2556,8 +2595,8 @@ async function getLoanAmount(member) {
 
         // Calculate total debt for the member
         const debts = await Loans.find({ borrower_name: member.fullName, loan_status: "Ongoing" });
-        const totalDebt = debts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
-        const allDebt = allDebts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
+        const totalDebt = debts.reduce((total, loan) => total + loan.principal_left, 0);
+        const allDebt = allDebts.reduce((total, loan) => total + loan.principal_left, 0);
 
         //Consider amount lent to others
         //const riskOfWorth = (usedPool / clubWorth) * req.user.investmentAmount; May not be necessary if not many members will be borrowing
@@ -2599,7 +2638,7 @@ async function getLoanLimit(member) {
         // Calculate available pool
         const availablePool = constants.loan_risk * (clubWorth - member.investmentAmount) / 100;
         // Calculate loan limit
-        const limit = Math.min(member.investmentAmount * constants.loan_multiple - totalDebt, (member.investmentAmount + (availablePool/ benefitingMembers) - totalDebt));//subtract risked money from investmentAmount
+        const limit = Math.min(member.investmentAmount * constants.loan_multiple - totalDebt, (member.investmentAmount + (availablePool/ benefitingMembers) - totalDebt));
         
         console.log((availablePool / benefitingMembers), limit);
         return limit;
