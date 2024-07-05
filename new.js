@@ -42,8 +42,9 @@
 
 
 const express = require('express');
-const cors = require('cors')
-const cookieParser = require('cookie-parser')
+const cors = require('cors');
+const cookieParser = require('cookie-parser');
+const moment = require('moment-timezone');
 const mongoose = require('mongoose');
 const Deposit = require('./Models/deposits');
 const NonClub = require('./Models/nonClubmoney');
@@ -109,6 +110,16 @@ app.use(express.urlencoded({ extended: true }));
 
 //auth routes
 app.use('/auth', authRoutes)
+
+
+//#constants
+//CONSTANTS FOR BACKEND
+//Time (EAT)
+const Toda = moment().tz('Africa/Nairobi').format();
+const Today = new Date(Toda);
+//console.log(Today);
+const thisYear = new Date().getFullYear();
+const thisMonth = new Date().toLocaleString('default', { month: 'long' });
 
 // POST endpoint to get discount
 //make_discount_payment
@@ -265,11 +276,6 @@ app.post('/get-discount', async (req, res) => {
 app.use(requireAuth)
 
 
-//#constants
-//CONSTANTS FOR BACKEND
-const Today = new Date(Date.now());
-const thisYear = new Date().getFullYear();
-const thisMonth = new Date().toLocaleString('default', { month: 'long' });
 //COMFIRMATION BOXES FOR ALL SERIOUS BUTTONS
 
 //Home_page_fetch
@@ -574,7 +580,7 @@ try {
                         loanId: record._id,
                         issueDate: formatDate(record.loan_date),
                         loanAmount: record.loan_amount,
-                        amountLeft: Math.max(0, Math.round(record.loan_amount + record.interest_amount - record.discount - record.payments.reduce((total, loan) => total + loan.payment_amount, 0))),
+                        amountLeft: Math.max(0, Math.round(record.loan_amount - record.payments.reduce((total, loan) => total + loan.payment_amount, 0))),
                         agreedLoanDuration: Math.round(record.loan_duration) + ' months (' + getDaysDifference(record.loan_date, laterDate) + ' Days Elasped)',
                         annualInterestRate: record.loan_rate + '%',
                         pointsSpent: Math.round(record.points_spent),
@@ -1443,14 +1449,14 @@ app.post('/approve-loan-request', async (req, res) => {
 
         for (const source of req.body.sources) {
             const foundLocation = cashLocations.find(location => location.name == source.location);
-        
+        console.log(foundLocation);
             if (foundLocation && foundLocation.amount >= source.amount) {
                 await CashLocations.updateOne(
                     {name: foundLocation.name },
                     { $inc: { "amount": -source.amount } }
                 );
             } else {
-                return res.json({ msg: `There is not enough money in '${foundLocation.name}'` });
+                return res.status(400).json({ msg: `There is not enough money in '${foundLocation.name}'` });
             }
         }
         
@@ -1467,14 +1473,14 @@ app.post('/approve-loan-request', async (req, res) => {
 
         await Users.updateOne(
             {fullName: loan_finding.borrower_name },
-            { $inc: { "points": - loansdata.points_spent} }
+            { $inc: { "points": -loansdata.points_spent} }
             );
 
         res.json({ msg: 'Loan Approved Successfuly' });
 
     } catch (error) {
         console.error(error);
-        res.status(400).json({ msg: 'An error occurred during loan approval' });
+        res.status(400).json({ msg: 'error' });//'An error occurred during loan approval'
     }
 });
 
