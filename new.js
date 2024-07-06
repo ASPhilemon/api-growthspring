@@ -1480,7 +1480,7 @@ app.post('/approve-loan-request', async (req, res) => {
 
     } catch (error) {
         console.error(error);
-        res.status(400).json({ msg: 'error' });//'An error occurred during loan approval'
+        res.status(400).json({ msg: `error: ${error}` });//'An error occurred during loan approval'
     }
 });
 
