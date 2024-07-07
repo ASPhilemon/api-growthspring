@@ -1449,7 +1449,7 @@ app.post('/approve-loan-request', async (req, res) => {
 
         for (const source of req.body.sources) {
             const foundLocation = cashLocations.find(location => location.name == source.location);
-        console.log(foundLocation);
+        //console.log(foundLocation);
             if (foundLocation && foundLocation.amount >= source.amount) {
                 await CashLocations.updateOne(
                     {name: foundLocation.name },
@@ -1472,7 +1472,7 @@ app.post('/approve-loan-request', async (req, res) => {
         );
 
         await Users.updateOne(
-            {fullName: loan_finding.borrower_name },
+            {fullName: loansdata .borrower_name },
             { $inc: { "points": -loansdata.points_spent} }
             );
 
@@ -1480,7 +1480,7 @@ app.post('/approve-loan-request', async (req, res) => {
 
     } catch (error) {
         console.error(error);
-        res.status(400).json({ msg: `error: ${error}` });//'An error occurred during loan approval'
+        res.status(400).json({ msg: 'An error occurred during loan approval' });//
     }
 });
 
