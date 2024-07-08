@@ -280,6 +280,7 @@ app.use(requireAuth)
 //Logger
 app.post('/log', async (req, res)=>{
     const log = await LogModel.create({page: req.body.page, user: req.user.fullName})
+    return res.json({success: true})
 })
 
 
