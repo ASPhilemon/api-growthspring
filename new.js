@@ -62,6 +62,7 @@ const Users = require('./auth/models/UserModel');
 const CashLocations = require('./Models/cashlocations');
 const Codes =  require('./Models/codes');
 const Initiatives =  require('./Models/discount_initiatives');
+const LogModel = require('./auth/models/LogModel');
 
 //auth imports
 const {requireAuth, requireAdmin} = require('./auth/middleware')
@@ -274,6 +275,12 @@ app.post('/get-discount', async (req, res) => {
 
 //Auntenticated Routes below (Logged in members)
 app.use(requireAuth)
+
+
+//Logger
+app.post('/log', async (req, res)=>{
+    const log = await LogModel.create({page: req.body.page, user: req.user.fullName})
+})
 
 
 //COMFIRMATION BOXES FOR ALL SERIOUS BUTTONS
