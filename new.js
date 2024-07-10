@@ -2643,7 +2643,7 @@ app.post('/initiate-request', async (req, res) => {
         let [
             member,
             constants
-          ] = await Promise.all([memberPromise, loan_limitPromise, constantsPromise]);
+          ] = await Promise.all([memberPromise, constantsPromise]);
           
         const loan_limit = getLoanAmount(member);
 
