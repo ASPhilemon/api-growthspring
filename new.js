@@ -2662,7 +2662,7 @@ app.post('/initiate-request', async (req, res) => {
         //const msg = `Request Successful. Total Rate for the duration of ${req.body.loan_duration} Months is ${actual_interest * 100 / req.body.loan_amount}%, requiring interest payment of ${actual_interest.toLocaleString('en-US')} and spending of ${Math.round(points_spent)} Points worth ${Math.round(points_spent * 1000)}/=. You can pay in monthly installments of ${installment_amount.toLocaleString('en-US')} or in larger amounts to pay even less interest.`;
             
             await Loans.create({"loan_duration": req.body.loan_duration, "loan_units": 0, "interest_accrued": 0, "points_accrued": 0, "loan_rate": total_rate, "earliest_date": req.body.earliest_date, "latest_date": req.body.latest_date, "loan_status": "Pending Approval", "installment_amount": installment_amount,"initiated_by": req.user.fullName, "approved_by": "", "worth_at_loan": member.investmentAmount, "loan_amount": req.body.loan_amount, "loan_date": "", "borrower_name": member.fullName, "points_spent": points_spent, "discount": 0, "points_worth_bought": 0, "rate_after_discount": total_rate, 'interest_amount': actual_interest, "principal_left": req.body.loan_amount, "last_payment_date": Today}).then();
-            res.json({ msg: msg });
+            res.json({ msg: 'msg' });
 
         /*const high_rate = Math.max(20, (constants.min_monthly_rate + (((constants.max_lending_rate/12) - constants.min_monthly_rate)/11) * (req.body.loan_duration - 1)) * 12);
         const low_rate = Math.max(12, (constants.min_monthly_rate + (((constants.min_lending_rate/12) - constants.min_monthly_rate)/11) * (req.body.loan_duration - 1)) * 12);
