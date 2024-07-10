@@ -2638,14 +2638,14 @@ app.post('/initiate-request', async (req, res) => {
             return res.status(400).json({ msg: 'There is an entry missing. Please fill in everything needed', no: 0 });
         }
 
-        const memberPromise = Users.findOne({_id: req.body.borrower_name_id});
-        const loan_limitPromise = getLoanAmount(member);//getLoanAmount getLoanLimit
+        const memberPromise = Users.findOne({_id: req.body.borrower_name_id});//getLoanAmount getLoanLimit
         const constantsPromise = Constants.findOne();
         let [
             member,
-            loan_limit,
             constants
           ] = await Promise.all([memberPromise, loan_limitPromise, constantsPromise]);
+          
+        const loan_limit = getLoanAmount(member);
 
         if (req.body.loan_amount > loan_limit) {
             return res.status(400).json({ msg: `The Loan Limit of ${Math.round(loan_limit).toLocaleString('en-US')}, has been exceeded!`, no: 0 });
