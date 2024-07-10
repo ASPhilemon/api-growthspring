@@ -436,6 +436,7 @@ try {
         const units = await InvestmentUnits.find({ name: req.user.fullName });
         const currentUnits = (await getTotalAmountAndUnits(req.user)).totalUnits;
         var actualInvestmentTotal = 0;
+        
 
         // Process and calculate various metrics
         const depositsArray = processArray(memberDeposits, (md) => getTotalSumsAndSort(md, 'deposit_date', 'deposit_amount'));
@@ -763,6 +764,7 @@ app.get('/homepage-data-opt', async (req, res) => {
     const maxLimitPromise =  getLoanLimit(req.user);
     const allDebtsPromise =  Loans.find({ loan_status: "Ongoing" });
     const memberPromise = Users.findOne({ fullName: req.user.fullName });
+    const loan_limitPromise = getLoanAmount(req.user);
   
     let [
       constants,
@@ -780,12 +782,13 @@ app.get('/homepage-data-opt', async (req, res) => {
       currentUnits,
       maxLimit,
       allDebts,
-      member
+      member,
+      loan_limit
     ] = await Promise.all([
       constantsPromise, clubPromise, clubDepositsPromise, clubEarningsPromise,
       clubUnitsRecordsPromise, memberDepositsPromise, debtsPromise, debtHistoryPromise,
       discountsPromise, earningsPromise, pointsPromise, unitsPromise,
-      currentUnitsPromise, maxLimitPromise, allDebtsPromise, memberPromise
+      currentUnitsPromise, maxLimitPromise, allDebtsPromise, memberPromise, loan_limitPromise
       ])
   
     currentUnits = currentUnits.totalUnits
@@ -1188,6 +1191,7 @@ app.get('/homepage-data-opt', async (req, res) => {
                 yourDebt: totalDebt,
                 bestRate: possibleRate + '%',
                 maxLoanLimit: Math.round(maxLimit),
+                LoanLimit: Math.round(loan_limit),
                 points: Math.round(req.user.points),
                 pointsWorth: Math.round(pointsWorth),
                 pointWorth: Math.round(one_point_value),
@@ -2634,13 +2638,18 @@ app.post('/initiate-request', async (req, res) => {
             return res.status(400).json({ msg: 'There is an entry missing. Please fill in everything needed', no: 0 });
         }
 
-        const member = await Users.findOne({_id: req.body.borrower_name_id});
-        const loan_limit = await getLoanAmount(member);//getLoanAmount getLoanLimit
+        const memberPromise = Users.findOne({_id: req.body.borrower_name_id});
+        const loan_limitPromise = getLoanAmount(member);//getLoanAmount getLoanLimit
+        const constantsPromise = Constants.findOne();
+        let [
+            member,
+            loan_limit,
+            constants
+          ] = await Promise.all([memberPromise, loan_limitPromise, constantsPromise]);
 
         if (req.body.loan_amount > loan_limit) {
             return res.status(400).json({ msg: `The Loan Limit of ${Math.round(loan_limit).toLocaleString('en-US')}, has been exceeded!`, no: 0 });
        }
-        const constants = await Constants.findOne();
         //let duration = req.body.loan_duration > 12 ? 12 : req.body.loan_duration;
         let duration = req.body.loan_duration;
         const total_rate = constants.monthly_lending_rate * duration;// * (req.body.loan_amount) / 100;
@@ -2650,7 +2659,7 @@ app.post('/initiate-request', async (req, res) => {
         const actual_interest =  total_rate * req.body.loan_amount / 100 - points_spent * 1000;
         let installment_amount = Math.round(req.body.loan_amount / (1000 * req.body.loan_duration)) * 1000;
         //console.log(installment_amount, points_spent, total_rate, req.body.loan_amount, points_needed);
-        const msg = `Request Successful. Total Rate for the duration of ${req.body.loan_duration} Months is ${actual_interest * 100 / req.body.loan_amount}%, requiring interest payment of ${actual_interest.toLocaleString('en-US')} and spending of ${Math.round(points_spent)} Points worth ${Math.round(points_spent * 1000)}/=. You can pay in monthly installments of ${installment_amount.toLocaleString('en-US')} or in larger amounts to pay even less interest.`;
+        //const msg = `Request Successful. Total Rate for the duration of ${req.body.loan_duration} Months is ${actual_interest * 100 / req.body.loan_amount}%, requiring interest payment of ${actual_interest.toLocaleString('en-US')} and spending of ${Math.round(points_spent)} Points worth ${Math.round(points_spent * 1000)}/=. You can pay in monthly installments of ${installment_amount.toLocaleString('en-US')} or in larger amounts to pay even less interest.`;
             
             await Loans.create({"loan_duration": req.body.loan_duration, "loan_units": 0, "interest_accrued": 0, "points_accrued": 0, "loan_rate": total_rate, "earliest_date": req.body.earliest_date, "latest_date": req.body.latest_date, "loan_status": "Pending Approval", "installment_amount": installment_amount,"initiated_by": req.user.fullName, "approved_by": "", "worth_at_loan": member.investmentAmount, "loan_amount": req.body.loan_amount, "loan_date": "", "borrower_name": member.fullName, "points_spent": points_spent, "discount": 0, "points_worth_bought": 0, "rate_after_discount": total_rate, 'interest_amount': actual_interest, "principal_left": req.body.loan_amount, "last_payment_date": Today}).then();
             res.json({ msg: msg });
