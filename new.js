@@ -286,7 +286,7 @@ app.post('/log', async (req, res)=>{
 
 //COMFIRMATION BOXES FOR ALL SERIOUS BUTTONS
 
-//Home_page_fetch
+/*
 app.get('/homepage-data', async (req, res) => {
 
     // Helper function for date formatting
@@ -312,7 +312,7 @@ try {
     /*club.forEach(uer => {
         let pw = uer.points * 8 * 50 * uer.investmentAmount / (100000 * 12 * 500)+500;
         console.log(uer.fullName, pw);
-    });*/
+    });
     
     const clubUnits = processArray(clubUnitsRecords, (u) => getTotalSumsAndSort(u, 'year', 'units'));
     const sortedClubDepositYears = clubDepositsArray !== 'No Data Available' ? Object.entries(clubDepositsArray.yearsSums).sort((a, b) => b[0] - a[0]) : 'No Data Available';
@@ -732,7 +732,7 @@ try {
         return res.status(500).json({ msg: 'An error occurred' });
     }
      
-});
+});*/
 
 //Home_page_fetch optimized
 app.get('/homepage-data-opt', async (req, res) => {
@@ -764,7 +764,7 @@ app.get('/homepage-data-opt', async (req, res) => {
     const maxLimitPromise =  getLoanLimit(req.user);
     const allDebtsPromise =  Loans.find({ loan_status: "Ongoing" });
     const memberPromise = Users.findOne({ fullName: req.user.fullName });
-    const loan_limitPromise = getLoanAmount(req.user);
+    const loan_limitPromise = getLoanAmount(req.user); 
   
     let [
       constants,
@@ -928,8 +928,8 @@ app.get('/homepage-data-opt', async (req, res) => {
         
         const one_point_value = 1000;//constants.one_point_value;
         const pointsWorth = Math.round(one_point_value * req.user.points);
-        const totalDebt = debts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
-        const possiblePoints = (req.user.points  / 25);
+        const totalDebt = debts.reduce((total, loan) => total + loan.principal_left, 0);
+        
         let possibleRate = 12;//Math.max(constants.min_lending_rate, Math.min(constants.max_lending_rate, Math.round(((20 - possiblePoints) * 0.4 + 12) * 100) / 100));
         
         const currentUnitsSum = units.reduce((total, unit) => total + unit.units, 0) + req.user.investmentAmount * getDaysDifference(req.user.investmentDate);
@@ -946,11 +946,11 @@ app.get('/homepage-data-opt', async (req, res) => {
         // Calculate used pool
         let usedPool = 0;
      
-        const allDebt = allDebts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
+        const allDebt = allDebts.reduce((total, loan) => total + loan.principal_left, 0);
         for (const clubMember of club) {
           
             const memberDebts = allDebts.filter(loan => loan.borrower_name === clubMember.fullName);
-            const memberDebtsTotal = memberDebts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
+            const memberDebtsTotal = memberDebts.reduce((total, loan) => total + loan.principal_left, 0);
             usedPool += Math.max(0, memberDebtsTotal - member.investmentAmount);
         }
         const riskPercentageOfWorth = totalDebt >= req.user.investmentAmount ? 0 : (usedPool / (clubWorth + usedPool - allDebt)) * (req.user.investmentAmount - totalDebt) / req.user.investmentAmount;//usedPool / clubWorth 
@@ -960,7 +960,7 @@ app.get('/homepage-data-opt', async (req, res) => {
         var memberDebtRecords = [];
         var memberDiscountRecords = []; 
         var pointsRecords = pointsArray !== 'No Data Available' ? [] : [{year: Today.getFullYear(), total: 0, values: []}];
-  
+        Console.log(usedPool, allDebt, clubWorth, riskPercentageOfWorth);
         // Process and structure member deposits records
         if (depositsArray !== 'No Data Available') {
             sortedDepositYears.forEach(([year, record]) => {
@@ -2645,7 +2645,7 @@ app.post('/initiate-request', async (req, res) => {
             constants
           ] = await Promise.all([memberPromise, constantsPromise]);
           
-        const loan_limit = getLoanAmount(member);
+        const loan_limit = await getLoanAmount(member);
 
         if (req.body.loan_amount > loan_limit) {
             return res.status(400).json({ msg: `The Loan Limit of ${Math.round(loan_limit).toLocaleString('en-US')}, has been exceeded!`, no: 0 });
