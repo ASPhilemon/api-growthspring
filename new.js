@@ -947,20 +947,22 @@ app.get('/homepage-data-opt', async (req, res) => {
         let usedPool = 0;
      
         const allDebt = allDebts.reduce((total, loan) => total + loan.principal_left, 0);
+        
         for (const clubMember of club) {
           
             const memberDebts = allDebts.filter(loan => loan.borrower_name === clubMember.fullName);
             const memberDebtsTotal = memberDebts.reduce((total, loan) => total + loan.principal_left, 0);
-            usedPool += Math.max(0, memberDebtsTotal - member.investmentAmount);
+            usedPool += Math.max(0, memberDebtsTotal - clubMember.investmentAmount);
         }
-        const riskPercentageOfWorth = totalDebt >= req.user.investmentAmount ? 0 : (usedPool / (clubWorth + usedPool - allDebt)) * (req.user.investmentAmount - totalDebt) / req.user.investmentAmount;//usedPool / clubWorth 
+        const ratio = (usedPool / (clubWorth + usedPool - allDebt));
+        const riskPercentageOfWorth = totalDebt >= req.user.investmentAmount ? 0 : ratio * (req.user.investmentAmount - totalDebt) / req.user.investmentAmount;//usedPool / clubWorth 
         const riskOfWorth = riskPercentageOfWorth * req.user.investmentAmount;
         var memberDepositsRecords = [];
         var memberEarningsRecords = earningsArray !== 'No Data Available' ? [] : [{year: Today.getFullYear(), total: 0, roi: 0, values: []}];
         var memberDebtRecords = [];
         var memberDiscountRecords = []; 
         var pointsRecords = pointsArray !== 'No Data Available' ? [] : [{year: Today.getFullYear(), total: 0, values: []}];
-        console.log(usedPool, allDebt, clubWorth, riskPercentageOfWorth);
+        console.log(usedPool, allDebt, totalDebt, clubWorth, ratio, riskPercentageOfWorth);
         // Process and structure member deposits records
         if (depositsArray !== 'No Data Available') {
             sortedDepositYears.forEach(([year, record]) => {
@@ -3104,9 +3106,10 @@ async function getLoanAmount(member) {
         const availablePool = constants.loan_risk * (clubWorth - member.investmentAmount) / 100;
         
         // Calculate loan limit
-        const limit = benefiters < Math.round(benefitingMembers) ? Math.min(member.investmentAmount * constants.loan_multiple - totalDebt, (member.investmentAmount + (availablePool/ benefitingMembers) - totalDebt)) : member.investmentAmount - (usedPool / (clubWorth + usedPool - allDebt)) * member.investmentAmount;//subtract risked money from investmentAmount
+        let risk = (usedPool / (clubWorth + usedPool - allDebt)) * member.investmentAmount/member.investmentAmount;
+        const limit = benefiters < Math.round(benefitingMembers) && risk <= constants.loan_risk/100 ? Math.min(member.investmentAmount * constants.loan_multiple - totalDebt, (member.investmentAmount + (availablePool/ benefitingMembers) - totalDebt)) : Math.max(0, member.investmentAmount - (usedPool / (clubWorth + usedPool - allDebt)) * member.investmentAmount - totalDebt);//subtract risked money from investmentAmount
         
-        //console.log(benefiters, Math.round(benefitingMembers), usedPool, availablePool, limit, (member.investmentAmount - (usedPool / (clubWorth + usedPool - allDebt)) * member.investmentAmount));
+        console.log(risk, benefiters, Math.round(benefitingMembers), usedPool, availablePool, limit, (member.investmentAmount - (usedPool / (clubWorth + usedPool - allDebt)) * member.investmentAmount));
         return limit;
     } catch (error) {
         console.error("Error occurred while calculating loan limit:", error);
@@ -3132,7 +3135,7 @@ async function getLoanLimit(member) {
         // Calculate total debt for the member
         const allDebts = await Loans.find({ loan_status: "Ongoing" });
         const debts = await Loans.find({ borrower_name: member.fullName, loan_status: "Ongoing" });
-        const totalDebt = debts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
+        const totalDebt = debts.reduce((total, loan) => total + loan.principal_left, 0);
         const allDebt = allDebts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
 
         // Calculate available pool
