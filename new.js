@@ -960,7 +960,7 @@ app.get('/homepage-data-opt', async (req, res) => {
         var memberDebtRecords = [];
         var memberDiscountRecords = []; 
         var pointsRecords = pointsArray !== 'No Data Available' ? [] : [{year: Today.getFullYear(), total: 0, values: []}];
-        Console.log(usedPool, allDebt, clubWorth, riskPercentageOfWorth);
+        console.log(usedPool, allDebt, clubWorth, riskPercentageOfWorth);
         // Process and structure member deposits records
         if (depositsArray !== 'No Data Available') {
             sortedDepositYears.forEach(([year, record]) => {
