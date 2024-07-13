@@ -62,7 +62,7 @@ const Users = require('./auth/models/UserModel');
 const CashLocations = require('./Models/cashlocations');
 const Codes =  require('./Models/codes');
 const Initiatives =  require('./Models/discount_initiatives');
-//const LogModel = require('./auth/models/LogModel');
+const LogModel = require('./auth/models/LogModel');
 
 //auth imports
 const {requireAuth, requireAdmin} = require('./auth/middleware')
