@@ -62,7 +62,7 @@ const Users = require('./auth/models/UserModel');
 const CashLocations = require('./Models/cashlocations');
 const Codes =  require('./Models/codes');
 const Initiatives =  require('./Models/discount_initiatives');
-const LogModel = require('./auth/models/LogModel');
+//const LogModel = require('./auth/models/LogModel');
 
 //auth imports
 const {requireAuth, requireAdmin} = require('./auth/middleware')
@@ -2304,8 +2304,8 @@ app.post('/make-loan-payment', async (req, res) => {
         let current_loan_duration = remainder / 30 < 0.24 ? Math.trunc(remainder / 30): Math.ceil(remainder / 30);    
         let point_days = Math.max(0, Math.min(12, current_loan_duration) - 6) + Math.max(18, current_loan_duration) - 18;
         let running_rate = constants.monthly_lending_rate * (current_loan_duration - point_days);
-        let pending_amount_interest = running_rate * record.principal_left / 100;
-        let points = constants.monthly_lending_rate * point_days * record.principal_left / 100000;
+        let pending_amount_interest = running_rate * loan_finding.principal_left / 100;
+        let points = constants.monthly_lending_rate * point_days * loan_finding.principal_left / 100000;
         let payment_interest_amount = 0;  
  
         if (loan_finding.payments) {
