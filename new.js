@@ -117,22 +117,16 @@ app.use('/auth', authRoutes)
 //CONSTANTS FOR BACKEND
 //Time (EAT)
 
-let Toda = '';
-let Today = '';
-let thisYear = '';
-let thisMonth = '';
+// POST endpoint to get discount
+//make_discount_payment
+app.post('/get-discount', async (req, res) => {
 
-function date(){
 Toda = moment().tz('Africa/Nairobi').format();
 Today = new Date(Toda);
 //console.log(Today);
 thisYear = new Date().getFullYear();
 thisMonth = new Date().toLocaleString('default', { month: 'long' });
-}
-// POST endpoint to get discount
-//make_discount_payment
-app.post('/get-discount', async (req, res) => {
-    
+
     try {
         // Validate request body
         const { user_code, merchant_code, amount } = req.body;
@@ -743,7 +737,13 @@ try {
 
 //Home_page_fetch optimized
 app.get('/homepage-data-opt', async (req, res) => {
-    let date = date();
+
+Toda = moment().tz('Africa/Nairobi').format();
+Today = new Date(Toda);
+//console.log(Today);
+thisYear = new Date().getFullYear();
+thisMonth = new Date().toLocaleString('default', { month: 'long' });
+
     // Helper function for date formatting
     const formatDate = (dateString) => {
         const date = new Date(dateString);
@@ -1797,6 +1797,13 @@ app.get('/adminpage-data', async (req, res) => {
 
 //Create_new_account
 app.post('/create_account', async (req, res) => {
+    
+Toda = moment().tz('Africa/Nairobi').format();
+Today = new Date(Toda);
+//console.log(Today);
+thisYear = new Date().getFullYear();
+thisMonth = new Date().toLocaleString('default', { month: 'long' });
+
     try {
         if (!req.body.name || !req.body.email || !req.body.givenName || !req.body.password) {
             return res.json({ msg: 'Some Details are missing'});
@@ -1871,6 +1878,13 @@ app.post('/add_investment', async (req, res) => {
 //Declare_investment_payments
 app.post('/investment_payment', async (req, res) => {
     try {
+        
+Toda = moment().tz('Africa/Nairobi').format();
+Today = new Date(Toda);
+//console.log(Today);
+thisYear = new Date().getFullYear();
+thisMonth = new Date().toLocaleString('default', { month: 'long' });
+
         if (!req.body.investment_id || !req.body.payment_amount || !req.body.payment_date) {
             return res.json({ msg: 'Some details are missing' });
         }
@@ -1928,6 +1942,13 @@ app.post('/investment_payment', async (req, res) => {
 
 //Approve_loan_requests
 app.post('/approve-loan-request', async (req, res) => {
+    
+Toda = moment().tz('Africa/Nairobi').format();
+Today = new Date(Toda);
+//console.log(Today);
+thisYear = new Date().getFullYear();
+thisMonth = new Date().toLocaleString('default', { month: 'long' });
+
     try {
         if (!req.body.sources) {
             return res.status(400).json({ msg: 'The sources are not selected'});
@@ -1986,6 +2007,13 @@ app.post('/approve-loan-request', async (req, res) => {
 
 //Add_to_points_market
 app.post('/points_sale', async (req, res) => {
+    
+Toda = moment().tz('Africa/Nairobi').format();
+Today = new Date(Toda);
+//console.log(Today);
+thisYear = new Date().getFullYear();
+thisMonth = new Date().toLocaleString('default', { month: 'long' });
+
     try {
         if (!req.body.points_number) {
             return res.json({ msg: 'Points Not Entered'});
@@ -2283,6 +2311,13 @@ app.post('/delete-loan-request', async (req, res) => {
 
 //Make_Loan_Payments Consider if part of the interest is paid, the interest accrued that yaer has to be paid within that year 
 app.post('/make-loan-payment', async (req, res) => {
+    
+Toda = moment().tz('Africa/Nairobi').format();
+Today = new Date(Toda);
+//console.log(Today);
+thisYear = new Date().getFullYear();
+thisMonth = new Date().toLocaleString('default', { month: 'long' });
+
 
     try {
         if (!req.body.payment_amount || !req.body.payment_date) {
@@ -2642,6 +2677,13 @@ async function handlePointsSale(loansdata) {//handle at loan payment
 //Loan_Rate_and_request_initiation
 
 app.post('/initiate-request', async (req, res) => {
+    
+Toda = moment().tz('Africa/Nairobi').format();
+Today = new Date(Toda);
+//console.log(Today);
+thisYear = new Date().getFullYear();
+thisMonth = new Date().toLocaleString('default', { month: 'long' });
+
     try {
         if (!req.body.loan_amount || !req.body.loan_duration || !req.body.earliest_date || !req.body.latest_date) {
             return res.status(400).json({ msg: 'There is an entry missing. Please fill in everything needed', no: 0 });
