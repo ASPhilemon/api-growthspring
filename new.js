@@ -743,7 +743,7 @@ try {
 
 //Home_page_fetch optimized
 app.get('/homepage-data-opt', async (req, res) => {
-
+    let date = date();
     // Helper function for date formatting
     const formatDate = (dateString) => {
         const date = new Date(dateString);
