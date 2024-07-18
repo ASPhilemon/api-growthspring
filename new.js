@@ -1,7 +1,7 @@
 //Page_requests
 //Home_page_fetch
 //Admin_page_fetch
-//Constants //
+//Constants
 
 //Create_new_account
 //Add_money_Location
@@ -62,7 +62,7 @@ const Users = require('./auth/models/UserModel');
 const CashLocations = require('./Models/cashlocations');
 const Codes =  require('./Models/codes');
 const Initiatives =  require('./Models/discount_initiatives');
-const LogModel = require('./auth/models/LogModel');
+//const LogModel = require('./auth/models/LogModel');
 
 //auth imports
 const {requireAuth, requireAdmin} = require('./auth/middleware')
@@ -116,12 +116,19 @@ app.use('/auth', authRoutes)
 //#constants
 //CONSTANTS FOR BACKEND
 //Time (EAT)
-const Toda = moment().tz('Africa/Nairobi').format();
-const Today = new Date(Toda);
-//console.log(Today);
-const thisYear = new Date().getFullYear();
-const thisMonth = new Date().toLocaleString('default', { month: 'long' });
 
+let Toda = '';
+let Today = '';
+let thisYear = '';
+let thisMonth = '';
+
+function date(){
+Toda = moment().tz('Africa/Nairobi').format();
+Today = new Date(Toda);
+//console.log(Today);
+thisYear = new Date().getFullYear();
+thisMonth = new Date().toLocaleString('default', { month: 'long' });
+}
 // POST endpoint to get discount
 //make_discount_payment
 app.post('/get-discount', async (req, res) => {
@@ -962,7 +969,7 @@ app.get('/homepage-data-opt', async (req, res) => {
         var memberDebtRecords = [];
         var memberDiscountRecords = []; 
         var pointsRecords = pointsArray !== 'No Data Available' ? [] : [{year: Today.getFullYear(), total: 0, values: []}];
-        console.log(usedPool, allDebt, totalDebt, clubWorth, ratio, riskPercentageOfWorth);
+        //console.log(usedPool, allDebt, totalDebt, clubWorth, ratio, riskPercentageOfWorth);
         // Process and structure member deposits records
         if (depositsArray !== 'No Data Available') {
             sortedDepositYears.forEach(([year, record]) => {
@@ -2274,7 +2281,7 @@ app.post('/delete-loan-request', async (req, res) => {
 });
 
 
-//Make_Loan_Payments Consider if payments extend beyond the agreed date, 
+//Make_Loan_Payments Consider if part of the interest is paid, the interest accrued that yaer has to be paid within that year 
 app.post('/make-loan-payment', async (req, res) => {
 
     try {
