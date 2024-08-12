@@ -62,7 +62,7 @@ const Users = require('./auth/models/UserModel');
 const CashLocations = require('./Models/cashlocations');
 const Codes =  require('./Models/codes');
 const Initiatives =  require('./Models/discount_initiatives');
-//const LogModel = require('./auth/models/LogModel');
+const LogModel = require('./auth/models/LogModel');
 
 //auth imports
 const {requireAuth, requireAdmin} = require('./auth/middleware')
@@ -162,6 +162,7 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
             const currentUnitsSum = units.reduce((total, unit) => total + unit.units, 0) + user.investmentAmount * getDaysDifference(user.investmentDate);
             const credits = Math.round(currentUnitsSum * 100/15000000)/100;
             var discountPercentage = credits > constants.max_credits ? 100 : Math.round(credits * 100/constants.max_credits);
+            
             discountPercentage = Math.max(discountPercentage, constants.min_discount);
             return discountPercentage
         }
@@ -201,25 +202,36 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
 
         // Apply discount based on user code length
         if (user_code.length === 4) {
-            const code = await Codes.findOne({primary_code: req.body.user_code});
+            const code = await Codes.findOne({primary_code: user_code});
             if (!code) {
                 return res.json({ msg: `Invalid User Code: <span style="color: blue; font-weight: bold;">${user_code}</span>` });
             }
 
             if (merchant.category == "General") {
                 const user = await getUserByCode(code.secondary_codes_identifier);
-                const discount_rate = await getDiscountRate(user);
-                const discount_amount = Math.floor(merchant.percentage * discount_rate * amount / (500 * 10000)) * 500;
+                //const discount_rate = await getDiscountRate(user);
+                const tentative_discount_amount = Math.trunc(merchant.percentage * amount / (100000)) * 1000;
+                const discount_amount = tentative_discount_amount < user.points * 1000 ? tentative_discount_amount : user.points * 1000;
+                const points_spent = discount_amount / 1000;
+
                 await Discount.create(
                     {
                         source: merchant.initiative_name,
                         discount_amount: discount_amount,
-                        date: Today,
+                        date: new Date(),
                         beneficiary_name: code.primary_name,
-                        percentage: discount_rate,
+                        percentage: merchant.percentage,
                     }
                 );
-                debt = merchant.debt;
+
+                await Users.updateOne(
+                    { _id: user._id },
+                    {
+                        $inc: { points: -points_spent }
+                    }
+                );
+
+                debt = merchant.debt + merchant.club_contribution_percentage * amount / 100;
                 msg = generateMessageForGeneralMerchant(discount_amount, amount);
             }
         } else if (user_code.length === 5 || user_code.length === 6) {   
