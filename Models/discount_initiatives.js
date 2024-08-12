@@ -15,6 +15,7 @@ const initiativeSchema = new Schema({
     secondary_codes: Array,
     one_time_codes: Array,
     percentage: Number,
+    club_contribution_percentage: Number,
 })
 
 const Initiatives = mongoose.model('initiatives', initiativeSchema);
