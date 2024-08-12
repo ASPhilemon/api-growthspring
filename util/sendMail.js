@@ -7,6 +7,7 @@ function sendMail(
     recipientEmail, 
     emailSubject,
     emailTemplate,
+    replyTo,
     context
   }
 )
@@ -28,11 +29,11 @@ function sendMail(
   } )
   
   var mailOptions = {
-    from:"<alerts@growthspringers.com>",
+    from:`<${senderName}@growthspringers.com>`,
     to: recipientEmail,
     subject: emailSubject,
     html: emailBody,
-    replyTo: 'philemonariko@gmail.com'
+    replyTo: replyTo
   };
   
   transporter.sendMail(mailOptions, function(err){
