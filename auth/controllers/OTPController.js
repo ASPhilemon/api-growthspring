@@ -13,12 +13,13 @@ async function createOTP(req, res){
   
   //Send mail
   try{
-    let senderName = "GrowthSpring Club";
+    let senderName = "accounts";
     let recipientEmail = email
     let emailSubject = "OTP"
     let emailTemplate = __dirname + '/../' + '/views/otpView.ejs'
+    let replyTo = "philemonariko@gmail.com"
     let context = {otpCode}
-    sendMail({senderName, recipientEmail, emailSubject, emailTemplate, context})
+    sendMail({senderName, recipientEmail, emailSubject, emailTemplate, replyTo, context})
     res.status(200).json({mssg: "email sent"})
   } catch(err){
     res.status(400).json({error: err.message})
