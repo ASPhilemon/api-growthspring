@@ -62,7 +62,8 @@ const Users = require('./auth/models/UserModel');
 const CashLocations = require('./Models/cashlocations');
 const Codes =  require('./Models/codes');
 const Initiatives =  require('./Models/discount_initiatives');
-const LogModel = require('./auth/models/LogModel');
+const {sendMail} = require('./util/sendMail')
+//const LogModel = require('./auth/models/LogModel');
 
 //auth imports
 const {requireAuth, requireAdmin} = require('./auth/middleware')
@@ -179,7 +180,7 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
         // Function to generate message for general category merchant
         function generateMessageForGeneralMerchant(discount_amount, amount) {
             const cashToPay = amount - discount_amount;
-            return `You get a discount of <span style="color: gold; font-weight: bold;">UGX ${Math.round(discount_amount).toLocaleString('en-US')}</span>. You can Pay Cash of <span style="color: gold; font-weight: bold;">UGX ${Math.round(cashToPay).toLocaleString('en-US')}</span>`;
+            return `You get a discount of <span style="color: blue; font-weight: bold;">UGX ${Math.round(discount_amount).toLocaleString('en-US')}</span>. You can Pay Cash of <span style="color: blue; font-weight: bold;">UGX ${Math.round(cashToPay).toLocaleString('en-US')}</span>`;
         }
 
         // Function to apply discount for secondary or one-time code user
@@ -231,8 +232,35 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
                     }
                 );
 
-                debt = merchant.debt + merchant.club_contribution_percentage * amount / 100;
+                debt = merchant.debt + merchant.club_contribution_percentage * amount / 100; //Math.trunc(merchant.club_contribution_percentage * amount / 100000) * 1000;
+                let Debt = debt.toLocaleString('en-US');
+                let previousDebt = merchant.debt.toLocaleString('en-US');
                 msg = generateMessageForGeneralMerchant(discount_amount, amount);
+                const path = require('path');
+
+                // Send mail to merchant
+                let senderName = "accounts";
+                let recipientEmail = merchant.email;
+                let emailSubject = "Amount Due";
+                let emailTemplate = path.join(__dirname, './views/debtView.ejs');
+                let replyTo = "blaisemwebe@gmail.com";
+                let context = { Debt, previousDebt };
+                
+                sendMail({ senderName, recipientEmail, emailSubject, emailTemplate, replyTo, context });
+                
+                // Send mail to member
+                const email = user.email;
+                const merchant_name = merchant.initiative_name;
+                const discount = discount_amount.toLocaleString('en-US');
+                senderName = "accounts";  // Reusing the variable
+                recipientEmail = email;
+                emailSubject = "Points spent";
+                emailTemplate = path.join(__dirname, './views/discountpointsView.ejs');
+                replyTo = "blaisemwebe@gmail.com";
+                context = { discount, merchant_name, points_spent };  // Reusing the variable
+                
+                sendMail({ senderName, recipientEmail, emailSubject, emailTemplate, replyTo, context });
+                
             }
         } else if (user_code.length === 5 || user_code.length === 6) {   
             const checkCode1 = merchant.secondary_codes.find(codes => codes.code === req.body.user_code);
