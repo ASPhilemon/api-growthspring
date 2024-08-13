@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Outstanding Payment Due to You</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            color: #333;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #004d99;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        p {
+            margin-bottom: 20px;
+        }
+        .footer {
+            font-size: 12px;
+            color: #888;
+            text-align: center;
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Notice of Payment Due to You</h1>
+        <p>
+            Dear Valued Partner,
+        </p>
+        <p>
+            We are pleased to inform you that our current outstanding payment to you is <strong><%= Debt %></strong>/=. This is an increase from the previous amount of <strong><%= previousDebt %>/=</strong>.
+        </p>
+        <p>
+            Let us know when you need this payment processed, and we shall settle it promptly. Should you require further details or have any concerns, please feel free to reach out to our accounts team. We are here to support you.
+        </p>
+        <p>
+            We appreciate your continued partnership and look forward to maintaining our strong collaboration.
+        </p>
+        <p>
+            Warm regards,<br>
+            <strong>The GrowthSpring Team</strong>
+        </p>
+    </div>
+    <div class="footer">
+        <p>This is an automated message. Please do not reply to this email. If you have any questions, contact us at blaisemwebe@gmail.com</p>
+    </div>
+</body>
+</html>
