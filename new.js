@@ -242,7 +242,7 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
                 let senderName = "accounts";
                 let recipientEmail = merchant.email;
                 let emailSubject = "Amount Due";
-                let emailTemplate = path.join(__dirname, './views/debtView.ejs');
+                let emailTemplate = path.join(__dirname, './auth/views/debtView.ejs');
                 let replyTo = "blaisemwebe@gmail.com";
                 let context = { Debt, previousDebt };
                 
@@ -255,7 +255,7 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
                 senderName = "accounts";  // Reusing the variable
                 recipientEmail = email;
                 emailSubject = "Points spent";
-                emailTemplate = path.join(__dirname, './views/discountpointsView.ejs');
+                emailTemplate = path.join(__dirname, './auth/views/discountpointsView.ejs');
                 replyTo = "blaisemwebe@gmail.com";
                 context = { discount, merchant_name, points_spent };  // Reusing the variable
                 
