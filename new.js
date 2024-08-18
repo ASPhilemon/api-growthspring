@@ -91,7 +91,7 @@ mongoose.connect(dbURI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(async (result) => {
 
     try {
-      app.listen(4000);
+      app.listen(process.env.PORT || 4000);
       console.log('Connected to MongoDB');
     } catch (error) {
       console.error('Error retrieving documents:', error);
