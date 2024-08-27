@@ -46,6 +46,6 @@ function headerAuth(req){
   }
 }
 
-//kt
+//ktu
 
 module.exports = { requireAuth, requireAdmin }
