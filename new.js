@@ -69,8 +69,6 @@ const {sendMail} = require('./util/sendMail')
 const {requireAuth, requireAdmin} = require('./auth/middleware')
 const authRoutes = require('./auth/routes')
 
-require('dotenv').config()
-
 //express app
 const app = express();
 

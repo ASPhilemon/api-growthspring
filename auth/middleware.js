@@ -1,6 +1,5 @@
 const jwt = require('jsonwebtoken')
 const UserModel = require('./models/UserModel')
-require('dotenv').config()
 
 async function requireAuth(req, res, next) {
   const id = cookieAuth(req) || headerAuth(req)

@@ -3,7 +3,6 @@ const OTPModel = require('../models/OTPModel')
 const bcrypt = require('bcrypt')
 const crypto = require('crypto')
 const jwt = require('jsonwebtoken')
-require('dotenv').config()
 const {sendMail} = require('../../util/sendMail')
 
 function createToken (id, fullName){
