@@ -2721,7 +2721,7 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
 
         const constantsPromise = Constants.findOne();
         const clubPromise = Users.find()
-        const allDebtsPromise = Loans.find({borrower_name: req.user.fullName})
+        const allDebtsPromise = Loans.find({loan_status: "Ongoing"})
         let [
             constants,
             club,
@@ -2729,8 +2729,12 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
           ] = await Promise.all([ constantsPromise, clubPromise, allDebtsPromise]);
           
         const member = club.filter((user)=>user.fullName === req.user.fullName)
-        const debts = allDebts.filter((loan)=>loan.loan_status === "Ongoing")
+        console.log(member)
+        const debts = allDebts.filter((loan)=> loan.borrower_name === req.user.fullName)
+        console.log(allDebts)
+        console.log(debts)
         const loan_limit = getLoanAmount(member, constants, club, allDebts, debts);
+        console.log(loan_limit)
 
         if (req.body.loan_amount > loan_limit) {
             return res.status(400).json({ msg: `The Loan Limit of ${Math.round(loan_limit).toLocaleString('en-US')}, has been exceeded!`, no: 0 });
