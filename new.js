@@ -67,7 +67,8 @@ const {sendMail} = require('./util/sendMail')
 
 //auth imports
 const {requireAuth, requireAdmin} = require('./auth/middleware')
-const authRoutes = require('./auth/routes')
+const authRoutes = require('./auth/routes');
+const { equal } = require('assert');
 
 //express app
 const app = express();
@@ -798,18 +799,9 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
     const clubDepositsPromise =  Deposit.find({});
     const clubEarningsPromise =  Earnings.find({});
     const clubUnitsRecordsPromise =  InvestmentUnits.find({ });
-    const memberDepositsPromise = Deposit.find({ depositor_name: req.user.fullName });
-    const debtsPromise = Loans.find({ borrower_name: req.user.fullName, loan_status: "Ongoing" });
-    const debtHistoryPromise = Loans.find({ borrower_name: req.user.fullName});
     const discountsPromise = Discount.find({ beneficiary_name: req.user.fullName});
-    const earningsPromise = Earnings.find({ beneficiary_name: req.user.fullName });
     const pointsPromise = PointsSale.find({ name: req.user.fullName, type: "Sell"});
-    const unitsPromise = InvestmentUnits.find({ name: req.user.fullName });
-    let currentUnitsPromise = getTotalAmountAndUnits(req.user)
-    const maxLimitPromise =  getLoanLimit(req.user);
-    const allDebtsPromise =  Loans.find({ loan_status: "Ongoing" });
-    const memberPromise = Users.findOne({ fullName: req.user.fullName });
-    const loan_limitPromise = getLoanAmount(req.user); 
+    const allLoansPromise =  Loans.find({ });
   
     let [
       constants,
@@ -817,28 +809,28 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
       clubDeposits,
       clubEarnings,
       clubUnitsRecords,
-      memberDeposits,
-      debts,
-      debtHistory,
       discounts,
-      earnings,
       points,
-      units,
-      currentUnits,
-      maxLimit,
-      allDebts,
-      member,
-      loan_limit
+      allLoans,
     ] = await Promise.all([
       constantsPromise, clubPromise, clubDepositsPromise, clubEarningsPromise,
-      clubUnitsRecordsPromise, memberDepositsPromise, debtsPromise, debtHistoryPromise,
-      discountsPromise, earningsPromise, pointsPromise, unitsPromise,
-      currentUnitsPromise, maxLimitPromise, allDebtsPromise, memberPromise, loan_limitPromise
+      clubUnitsRecordsPromise, discountsPromise, pointsPromise, allLoansPromise
       ])
   
-    currentUnits = currentUnits.totalUnits
+    const member = club.filter((user)=>user.fullName  === req.user.fullName)
+    const memberDeposits = clubDeposits.filter((deposit)=>deposit.depositor_name === req.user.fullName)
+    const debts = allLoans.filter((loan)=>loan.borrower_name === req.user.fullName && loan.loan_status === "Ongoing")
+    const debtHistory = allLoans.filter((loan)=>loan.borrower_name === req.user.fullName)
+    const earnings = clubEarnings.filter((earning) => earning.beneficiary_name === req.user.fullName)
+    const units = clubUnitsRecords.filter((record)=> record.name === req.user.fullName)
+    const allDebts = allLoans.filter((loan)=> loan.loan_status === "Ongoing")
     
-  
+    let currentUnits = getTotalAmountAndUnits(member, memberDeposits)
+    currentUnits = currentUnits.totalUnits
+
+    const maxLimit =  getLoanLimit(member, constants, club, allDebts, debts);
+    const loan_limit = getLoanAmount(member, constants, club, allDebts, debts); 
+    
     const clubWorth = club.reduce((total, member) => total + member.investmentAmount, 0);
     const currentYear = new Date().getFullYear().toString();  
     const clubDepositsArray = processArray(clubDeposits, (cd) => getTotalSumsAndSort(cd, 'deposit_date', 'deposit_amount'));
@@ -2727,14 +2719,18 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
             return res.status(400).json({ msg: 'There is an entry missing. Please fill in everything needed', no: 0 });
         }
 
-        const memberPromise = Users.findOne({_id: req.body.borrower_name_id});//getLoanAmount getLoanLimit
         const constantsPromise = Constants.findOne();
+        const clubPromise = Users.find()
+        const allDebtsPromise = Loans.find({borrower_name: req.user.fullName})
         let [
-            member,
-            constants
-          ] = await Promise.all([memberPromise, constantsPromise]);
+            constants,
+            club,
+            allDebts
+          ] = await Promise.all([ constantsPromise, clubPromise, allDebtsPromise]);
           
-        const loan_limit = await getLoanAmount(member);
+        const member = club.filter((user)=>user.fullName === req.user.fullName)
+        const debts = allDebts.filter((loan)=>loan.loan_status === "Ongoing")
+        const loan_limit = getLoanAmount(member, constants, club, allDebts, debts);
 
         if (req.body.loan_amount > loan_limit) {
             return res.status(400).json({ msg: `The Loan Limit of ${Math.round(loan_limit).toLocaleString('en-US')}, has been exceeded!`, no: 0 });
@@ -3024,13 +3020,11 @@ function getTotalSumsAndSort(records, givenDate, ...fields) {
 }
 
 //ADD_DEPOSITS_TO_CUMMULATIVE_UNITS
-async function getTotalAmountAndUnits(member) {
+function getTotalAmountAndUnits(member, memberDeposits) {
     try {
 
         const startDate = new Date(member.investmentDate);
-        const query = { depositor_name: member.fullName, deposit_date: { $gte: startDate } };
-        const options = { sort: { deposit_date: 1 } };
-        const depositRecords = await Deposit.find(query, options);
+        const depositRecords = memberDeposits.filter((deposit)=> deposit.deposit_date >= startDate)
         let totalUnits = 0;
         let totalDeposits = 0;
         for (const deposit of depositRecords) {
@@ -3154,11 +3148,8 @@ async function getValueOfPoints(points, user) {
     }
 }*/
          
-async function getLoanAmount(member) {
+function getLoanAmount(member, constants, club, allDebts, debts) {
     try { 
-        const constants = await Constants.findOne();     
-        // Fetch all users
-        const club = await Users.find({});
 
         // Calculate total number of members (excluding the club Fund and example)
         const membersCount = club.length - 2;
@@ -3169,12 +3160,10 @@ async function getLoanAmount(member) {
         // Calculate used pool and benefiting member
         let usedPool = 0;
         let benefiters = 0;
-        const allDebts = await Loans.find({ loan_status: "Ongoing" });
-        for (const clubMember of club) {
-            const memberData = await Users.findOne({ fullName: clubMember.fullName });
-            const memberDebts = allDebts.filter(loan => loan.borrower_name === clubMember.fullName);
+        for (const member of club) {
+            const memberDebts = allDebts.filter(loan => loan.borrower_name === member.fullName);
             const memberDebtsTotal = memberDebts.reduce((total, loan) => total + loan.principal_left, 0);
-            const usedPortion = Math.max(0, memberDebtsTotal - memberData.investmentAmount);
+            const usedPortion = Math.max(0, memberDebtsTotal - member.investmentAmount);
             benefiters = usedPortion > 0 ? benefiters + 1 : benefiters;
             usedPool += usedPortion;
         }
@@ -3183,7 +3172,6 @@ async function getLoanAmount(member) {
         const benefitingMembers = constants.members_served_percentage * membersCount / 100;
 
         // Calculate total debt for the member
-        const debts = await Loans.find({ borrower_name: member.fullName, loan_status: "Ongoing" });
         const totalDebt = debts.reduce((total, loan) => total + loan.principal_left, 0);
         const allDebt = allDebts.reduce((total, loan) => total + loan.principal_left, 0);
 
@@ -3204,11 +3192,8 @@ async function getLoanAmount(member) {
         return 0;
     }
 }
-async function getLoanLimit(member) {
+function getLoanLimit(member, constants, club, allDebts, debts) {
     try { 
-        const constants = await Constants.findOne();     
-        // Fetch all users
-        const club = await Users.find({});
 
         // Calculate total number of members (excluding the club Fund and example)
         const membersCount = club.length - 2;
@@ -3220,10 +3205,8 @@ async function getLoanLimit(member) {
         const benefitingMembers = constants.members_served_percentage * membersCount / 100;
 
         // Calculate total debt for the member
-        const allDebts = await Loans.find({ loan_status: "Ongoing" });
-        const debts = await Loans.find({ borrower_name: member.fullName, loan_status: "Ongoing" });
         const totalDebt = debts.reduce((total, loan) => total + loan.principal_left, 0);
-        const allDebt = allDebts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
+        //const allDebt = allDebts.reduce((total, loan) => total + loan.principal_left + loan.interest_amount, 0);
 
         // Calculate available pool
         const availablePool = constants.loan_risk * (clubWorth - member.investmentAmount) / 100;
