@@ -817,7 +817,7 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
       clubUnitsRecordsPromise, discountsPromise, pointsPromise, allLoansPromise
       ])
   
-    const member = club.filter((user)=>user.fullName  === req.user.fullName)
+    const member = club.find((user)=>user.fullName  === req.user.fullName)
     const memberDeposits = clubDeposits.filter((deposit)=>deposit.depositor_name === req.user.fullName)
     const debts = allLoans.filter((loan)=>loan.borrower_name === req.user.fullName && loan.loan_status === "Ongoing")
     const debtHistory = allLoans.filter((loan)=>loan.borrower_name === req.user.fullName)
@@ -830,6 +830,7 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
 
     const maxLimit =  getLoanLimit(member, constants, club, allDebts, debts);
     const loan_limit = getLoanAmount(member, constants, club, allDebts, debts); 
+    console.log(`max limit : ${maxLimit}`, loan_limit)
     
     const clubWorth = club.reduce((total, member) => total + member.investmentAmount, 0);
     const currentYear = new Date().getFullYear().toString();  
@@ -3150,7 +3151,7 @@ async function getValueOfPoints(points, user) {
          
 function getLoanAmount(member, constants, club, allDebts, debts) {
     try { 
-
+     
         // Calculate total number of members (excluding the club Fund and example)
         const membersCount = club.length - 2;
 
@@ -3182,9 +3183,11 @@ function getLoanAmount(member, constants, club, allDebts, debts) {
         
         // Calculate loan limit
         let risk = (usedPool / (clubWorth + usedPool - allDebt)) * member.investmentAmount/member.investmentAmount;
+        console.log("test", risk, usedPool,clubWorth, allDebt, member.investmentAmount)
         const limit = benefiters < Math.round(benefitingMembers) && risk <= constants.loan_risk/100 ? Math.min(member.investmentAmount * constants.loan_multiple - totalDebt, (member.investmentAmount + (availablePool/ benefitingMembers) - totalDebt)) : Math.max(0, member.investmentAmount - (usedPool / (clubWorth + usedPool - allDebt)) * member.investmentAmount - totalDebt);//subtract risked money from investmentAmount
         
-        console.log(risk, benefiters, Math.round(benefitingMembers), usedPool, availablePool, limit, (member.investmentAmount - (usedPool / (clubWorth + usedPool - allDebt)) * member.investmentAmount));
+        //console.log("test", risk, benefiters, Math.round(benefitingMembers), usedPool, availablePool, limit, (member.investmentAmount - (usedPool / (clubWorth + usedPool - allDebt)) * member.investmentAmount));
+        console.log(`limit ${limit}`)
         return limit;
     } catch (error) {
         console.error("Error occurred while calculating loan limit:", error);
