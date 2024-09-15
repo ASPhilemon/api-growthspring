@@ -15,7 +15,7 @@ const userSchema = new Schema({
   },
   phoneContact: {
     type: String,
-    required: true
+    required: false
   },
   password: {
     type: String,
@@ -45,6 +45,7 @@ const userSchema = new Schema({
   isAdmin: Boolean,
   displayName: String,
   photoURL: String,
+  alerts: Boolean
 })
 
 userSchema.statics.createUser = async function({email, fullName, phoneContact, password}) {
