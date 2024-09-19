@@ -10,7 +10,8 @@ const upload = multer({ dest: 'uploads/'  
 
 Router.post('/upload-photo', upload.single('image'), async (req, res) => {
   const userId = req.user._id;
-  const fileName = `${userId}-${new Date().getTime()}.jpg`;
+  const currentTime = new Date().getTime()
+  const fileName = `${userId}-${currentTime}.jpg`;
   const filePath = path.join('public', 'img', fileName);
 
   // Replace existing file if necessary
@@ -19,7 +20,7 @@ Router.post('/upload-photo', upload.single('image'), async (req, res) => {
       console.log(err)
       return res.status(500).json({ msg: "Upload Failed" });
     }
-    req.user.photoURL = `img/${req.user._id}-${new Date().getTime()}.jpg`
+    req.user.photoURL = `img/${req.user._id}-${currentTime}.jpg`
     await req.user.save()
     return res.json({msg: "Upload Successful"})
   });
