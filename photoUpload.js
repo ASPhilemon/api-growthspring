@@ -9,6 +9,8 @@ const upload = multer({ dest: 'uploads/'  
  }); // Temporary storage for uploaded files
 
 Router.post('/upload-photo', upload.single('image'), async (req, res) => {
+  //send optimistic success response
+  res.json({msg: "Upload Successful"})
   const userId = req.user._id;
   const currentTime = new Date().getTime()
   const fileName = `${userId}-${currentTime}.jpg`;
@@ -18,29 +20,30 @@ Router.post('/upload-photo', upload.single('image'), async (req, res) => {
   fs.rename(req.file.path, filePath, async (err) => {
     if (err) {
       console.log(err)
-      return res.status(500).json({ msg: "Upload Failed" });
+      //return res.status(500).json({ msg: "Upload Failed" });
     }
     req.user.photoURL = `img/${req.user._id}-${currentTime}.jpg`
     await req.user.save()
-    return res.json({msg: "Upload Successful"})
   });
 
 });
 
 Router.delete('/delete-photo', async (req, res) => {
-
+  //send optimistic success response
+  res.json({msg: "Photo Update Successful"})
   const fileName = req.user.photoURL
   const filePath = path.join('public', fileName);
 
   fs.unlink(filePath, (err) => {
     if (err && err.code !== 'ENOENT') { // Ignore if file doesn't exist
-      return res.status(500).send('Error deleting image');
+      //return res.status(500).send('Error deleting image');
+      console.log(err, err.code)
     }
   });
   const user = req.user
   user.photoURL = ""
   await user.save()
-  return res.json({msg: "Photo Update Successful"})
+
 });
 
 module.exports =  Router
