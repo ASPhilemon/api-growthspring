@@ -65,7 +65,7 @@ const Initiatives =  require('./Models/discount_initiatives');
 const {sendMail} = require('./util/sendMail')
 const photoRouter = require("./photoUpload")
 const userRouter = require("./updateUser")
-//const LogModel = require('./auth/models/LogModel');
+const LogModel = require('./auth/models/LogModel');
 
 //auth imports
 const {requireAuth, requireAdmin} = require('./auth/middleware')
