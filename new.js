@@ -1256,6 +1256,9 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
      
   });
 
+app.use(photoRouter)
+app.use(userRouter)
+
 //Admin actions only below
 app.use(requireAdmin)
 
@@ -3385,5 +3388,3 @@ return payment_interest_amount
 }
 
 
-app.use(photoRouter)
-app.use(userRouter)
