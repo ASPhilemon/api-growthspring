@@ -1828,6 +1828,8 @@ app.get('/adminpage-data', async (req, res) => {
 
 
 
+
+
 //Ongoing Loans  How to handle the loss? Another section showing overdue loans? Just subtract the amount left from annual profits? Subtract the amount left at the end of the year?
 
 
