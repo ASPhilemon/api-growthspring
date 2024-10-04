@@ -110,6 +110,7 @@ app.set('view engine', 'ejs');
 //middleware
 app.use(express.static('public'));
 app.use(express.urlencoded({ extended: true }));
+app.get('/test', (req, res)=>res.send("Ariko Stephen Philemon"))
 
 //auth routes
 app.use('/auth', authRoutes)
