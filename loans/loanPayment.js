@@ -1,9 +1,9 @@
 
 const express = require('express'); 
 const moment = require('moment-timezone');
-const Loans = require('../Models/loans');
-const Users = require('../auth/models/UserModel');
-const Constants = require('../Models/constants');
+const Loans = require('../../../growthspring-backend-main/Models/loans');
+const Users = require('../../../growthspring-backend-main/auth/models/UserModel');
+const Constants = require('../../../growthspring-backend-main/Models/constants');
 const axios = require('axios');
 require('dotenv').config()
 
@@ -95,7 +95,6 @@ router.post('/make-loan-payment', async (req, res) => {
 
         // Total interest due combining pending interest and accumulated payment interest
         let totalInterestDue = pending_amount_interest + payment_interest_amount;
-        console.log(totalInterestDue);
         let interest_amount = loan_finding.interest_amount; //This is from the database, that assumed no intermitent payments
         let partInterest = 0; // Part of the payment is interest?
 
@@ -164,7 +163,6 @@ router.post('/make-loan-payment', async (req, res) => {
         
         // Add separate payment for first partial payment on interest
         if (partInterest > 0){
-            console.log(partInterest);
             loan_finding.payments.push({
                 payment_date: req.body.payment_date,
                 payment_amount: partInterest,
