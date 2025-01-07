@@ -831,8 +831,8 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
     let currentUnits = getTotalAmountAndUnits(member, memberDeposits)
     currentUnits = currentUnits.totalUnits
 
-    const maxLimit =  getLoanLimit(member, constants, club, allDebts, debts);
-    const loan_limit = getLoanAmount(member, constants, club, allDebts, debts); 
+    const maxLimit = Math.max(0, getLoanLimit(member, constants, club, allDebts, debts));
+    const loan_limit = Math.max(0, getLoanAmount(member, constants, club, allDebts, debts)); 
     console.log(`max limit : ${maxLimit}`, loan_limit)
     
     const clubWorth = club.reduce((total, member) => total + member.investmentAmount, 0);
