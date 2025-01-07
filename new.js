@@ -3192,7 +3192,7 @@ function getLoanAmount(member, constants, club, allDebts, debts) {
         // Calculate loan limit
         let risk = (usedPool / (clubWorth + usedPool - allDebt)) * member.investmentAmount/member.investmentAmount;
         console.log("test", risk, usedPool,clubWorth, allDebt, member.investmentAmount)
-        const limit = benefiters < Math.round(benefitingMembers) && risk <= constants.loan_risk/100 ? Math.min(member.investmentAmount * constants.loan_multiple - totalDebt, (member.investmentAmount + (availablePool/ benefitingMembers) - totalDebt)) : Math.max(0, member.investmentAmount - (usedPool / (clubWorth + usedPool - allDebt)) * member.investmentAmount - totalDebt);//subtract risked money from investmentAmount
+        const limit = 1.5 * member.investmentAmount - totalDebt;//benefiters < Math.round(benefitingMembers) && risk <= constants.loan_risk/100 ? Math.min(member.investmentAmount * constants.loan_multiple - totalDebt, (member.investmentAmount + (availablePool/ benefitingMembers) - totalDebt)) : Math.max(0, member.investmentAmount - (usedPool / (clubWorth + usedPool - allDebt)) * member.investmentAmount - totalDebt);//subtract risked money from investmentAmount
         
         //console.log("test", risk, benefiters, Math.round(benefitingMembers), usedPool, availablePool, limit, (member.investmentAmount - (usedPool / (clubWorth + usedPool - allDebt)) * member.investmentAmount));
         console.log(`limit ${limit}`)
@@ -3222,7 +3222,7 @@ function getLoanLimit(member, constants, club, allDebts, debts) {
         // Calculate available pool
         const availablePool = constants.loan_risk * (clubWorth - member.investmentAmount) / 100;
         // Calculate loan limit
-        const limit = Math.min(member.investmentAmount * constants.loan_multiple - totalDebt, (member.investmentAmount + (availablePool/ benefitingMembers) - totalDebt));
+        const limit = 1.5 * member.investmentAmount - totalDebt;//Math.min(member.investmentAmount * constants.loan_multiple - totalDebt, (member.investmentAmount + (availablePool/ benefitingMembers) - totalDebt));
         
         console.log((availablePool / benefitingMembers), limit);
         return limit;
