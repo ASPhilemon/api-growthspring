@@ -1082,6 +1082,8 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
                     let interest_accrued = 0;
                     let points_accrued =  0;
                         if (record.loan_status == "Ongoing") {
+                            const loanYear = record.loan_date.getFullYear();
+                            const thisYear = new Date().getFullYear();
                             let remainder = getDaysDifference(record.loan_date, Today);
                             let current_loan_duration = Math.ceil(remainder / 30);
                             let point_days = Math.max(0, Math.min(12, current_loan_duration) - 6) + Math.max(18, current_loan_duration) - 18;
@@ -1100,7 +1102,8 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
                                 })
                             }
   
-                            interest_accrued = pending_amount_interest + payment_interest_amount;
+                            interest_accrued = thisYear == loanYear ? pending_amount_interest: pending_amount_interest + payment_interest_amount;
+                            
                             points_accrued = points;
                             //console.log(current_loan_duration, interest_accrued, point_days, points);
                          
@@ -2375,7 +2378,9 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
             return res.status(400).json({ msg: "Payment date not correct!" });
         }
 
-        let principal_left = loan_finding.principal_left - req.body.payment_amount;
+
+        const loanYear = loan_finding.loan_date.getFullYear();
+        const thisYear = new Date().getFullYear();
         let points_balance = 0;
         let points_spent = loan_finding.points_spent;
         let loan_duration = loan_finding.loan_duration;
@@ -2386,8 +2391,9 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
         let point_days = Math.max(0, Math.min(12, current_loan_duration) - 6) + Math.max(18, current_loan_duration) - 18;
         let running_rate = constants.monthly_lending_rate * (current_loan_duration - point_days);
         let pending_amount_interest = running_rate * loan_finding.principal_left / 100;
+        let principal_left = loanYear == thisYear ? loan_finding.principal_left + pending_amount_interest - req.body.payment_amount : loan_finding.principal_left - req.body.payment_amount;
         let points = constants.monthly_lending_rate * point_days * loan_finding.principal_left / 100000;
-        let payment_interest_amount = 0;  
+        let payment_interest_amount = 0;   
  
         if (loan_finding.payments) {
             loan_finding.payments.forEach(payment => {
@@ -2403,7 +2409,8 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
         let loan_status = loan_finding.loan_status;
         //console.log(remainder, running_rate, pending_amount_interest);
 
-        let totalInterestDue = pending_amount_interest + payment_interest_amount;
+        let totalInterestDue = loanYear == thisYear ? pending_amount_interest : pending_amount_interest + payment_interest_amount;
+        
         let interest_amount = loan_finding.interest_amount;
 
         if (req.body.payment_amount < (loan_finding.principal_left + totalInterestDue)){
