@@ -1981,7 +1981,6 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
     }
 });
 
-
 //Approve_loan_requests
 app.post('/approve-loan-request', async (req, res) => {
     
@@ -2013,7 +2012,7 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
         //console.log(foundLocation);
             if (foundLocation && foundLocation.amount >= source.amount) {
                 await CashLocations.updateOne(
-                    {name: foundLocation.name },
+                    {name: foundLocation.name},
                     { $inc: { "amount": -source.amount } }
                 );
             } else {
@@ -2027,7 +2026,8 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
                 $set: {
                     "loan_status": "Ongoing",
                     "loan_date": Today,
-                    "approved_by": req.user.fullName
+                    "approved_by": req.user.fullName,
+                    "sources": req.body.sources
                 }
             }
         );
@@ -2458,11 +2458,13 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
         };
 
         // Add new payment object to the payments array
-        loan_finding.payments.push({
+       loan_finding.payments.push({
             payment_date: req.body.payment_date,
             payment_amount: req.body.payment_amount,
-            updated_by: req.user.fullName
+            updated_by: req.user.fullName,
+            payment_location: req.body.payment_location
         });
+
 
         // Assign the modified payments array to updatedLoan.payments
         updatedLoan.payments = loan_finding.payments;
