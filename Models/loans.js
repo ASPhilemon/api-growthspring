@@ -24,10 +24,12 @@ const loansSchema = new Schema({
     interest_accrued: Number,
     interest_amount: Number,
     installment_amount: Number,
+    sources: Array,
     payments: [{
         payment_date: Date,
         payment_amount: Number,
         updated_by: String,
+        payment_location: String
     }],
 })
 
