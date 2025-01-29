@@ -778,6 +778,8 @@ try {
 });*/
 
 //Home_page_fetch optimized
+
+//Home_page_fetch optimized
 app.get('/homepage-data-opt', async (req, res) => {
 
 Toda = moment().tz('Africa/Nairobi').format();
@@ -798,7 +800,7 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
   
   try {
     const constantsPromise = Constants.findOne();
-    var clubPromise = Users.find({});
+    var clubPromise = Users.find();
     const clubDepositsPromise =  Deposit.find({});
     const clubEarningsPromise =  Earnings.find({});
     const clubUnitsRecordsPromise =  InvestmentUnits.find({ });
@@ -823,6 +825,7 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
     const member = club.find((user)=>user.fullName  === req.user.fullName)
     const memberDeposits = clubDeposits.filter((deposit)=>deposit.depositor_name === req.user.fullName)
     const debts = allLoans.filter((loan)=>loan.borrower_name === req.user.fullName && loan.loan_status === "Ongoing")
+    const oldDebts = allLoans.filter((loan)=>loan.borrower_name === req.user.fullName && loan.loan_status === "Ended")
     const debtHistory = allLoans.filter((loan)=>loan.borrower_name === req.user.fullName)
     const earnings = clubEarnings.filter((earning) => earning.beneficiary_name === req.user.fullName)
     const units = clubUnitsRecords.filter((record)=> record.name === req.user.fullName)
@@ -831,9 +834,8 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
     let currentUnits = getTotalAmountAndUnits(member, memberDeposits)
     currentUnits = currentUnits.totalUnits
 
-    const maxLimit = Math.max(0, getLoanLimit(member, constants, club, allDebts, debts));
+    const maxLimit =  Math.max(0, getLoanLimit(member, constants, club, allDebts, debts));
     const loan_limit = Math.max(0, getLoanAmount(member, constants, club, allDebts, debts)); 
-    console.log(`max limit : ${maxLimit}`, loan_limit)
     
     const clubWorth = club.reduce((total, member) => total + member.investmentAmount, 0);
     const currentYear = new Date().getFullYear().toString();  
@@ -970,6 +972,7 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
         const one_point_value = 1000;//constants.one_point_value;
         const pointsWorth = Math.round(one_point_value * req.user.points);
         const totalDebt = debts.reduce((total, loan) => total + loan.principal_left, 0);
+        const totalOldDebt = oldDebts.reduce((total, loan) => total + loan.loan_amount, 0);
         
         let possibleRate = 12;//Math.max(constants.min_lending_rate, Math.min(constants.max_lending_rate, Math.round(((20 - possiblePoints) * 0.4 + 12) * 100) / 100));
         
@@ -998,6 +1001,40 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
         const ratio = (usedPool / (clubWorth + usedPool - allDebt));
         const riskPercentageOfWorth = totalDebt >= req.user.investmentAmount ? 0 : ratio * (req.user.investmentAmount - totalDebt) / req.user.investmentAmount;//usedPool / clubWorth 
         const riskOfWorth = riskPercentageOfWorth * req.user.investmentAmount;
+
+        
+        // Data Retrieval
+        const members = await Users.find();
+        const thisYear = new Date().getFullYear();
+        let allUnits = 0;
+        let people = [];
+
+        // Calculate Member Profits
+        for (const member of members) {
+            let totalUnits = 0;
+            let perc = 0;
+            let yearDeposits = 0;
+            const investmentDays = getDaysDifference(member.investmentDate);
+
+            // Fetch member's deposits for the current year
+            const allMemberDeposits = await Deposit.find({ depositor_name: member.fullName });
+            const depositRecords = allMemberDeposits.filter(deposit =>
+                new Date(deposit.deposit_date).getFullYear() == thisYear
+            );
+
+            for (const deposit of depositRecords) {
+                const depositUnits = deposit.deposit_amount * getDaysDifference(deposit.deposit_date);
+                totalUnits += depositUnits;
+                yearDeposits += deposit.deposit_amount;
+            }
+            totalUnits += investmentDays * (member.investmentAmount - yearDeposits);
+            allUnits += totalUnits;
+            people.push({name: member.fullName, units: totalUnits});
+        }
+        const person = people.find(item => item.name === req.user.fullName);
+        const perc = person.units/allUnits;
+        console.log(person, allUnits);
+
         var memberDepositsRecords = [];
         var memberEarningsRecords = earningsArray !== 'No Data Available' ? [] : [{year: Today.getFullYear(), total: 0, roi: 0, values: []}];
         var memberDebtRecords = [];
@@ -1103,7 +1140,7 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
                             }
   
                             interest_accrued = thisYear == loanYear ? pending_amount_interest: pending_amount_interest + payment_interest_amount;
-                            
+                            interest_accrued = interest_accrued  == 0 ? constants.monthly_lending_rate * record.principal_left / 100 : interest_accrued;
                             points_accrued = points;
                             //console.log(current_loan_duration, interest_accrued, point_days, points);
                          
@@ -1205,10 +1242,11 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
                     yourWorth: Math.round(req.user.investmentAmount),
                 },
                 payments: {
-                    avgYearlyReturn: Math.round(totalReturns * 100/memberYears)/100 + '% Over ' + Math.round(memberYears) + ' years',
+                    avgYearlyReturn: Math.round(totalReturns * 100/memberEarningsRecords.length)/100 + '% Over ' + memberEarningsRecords.length + ' years',
                 },
                 loans: {
                     currentDebt: Math.round(totalDebt),
+                    oldDebt: Math.round(totalOldDebt),
                 },
                 points: {
                     points: Math.round(req.user.points),
@@ -1229,13 +1267,14 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
                 members: club.length-2, 
                 thisYearDeposits:  clubDepositsArray.yearsSums[thisYear] ? clubDepositsArray.yearsSums[thisYear].deposit_amount : 0,
                 yourWorth: Math.round(req.user.investmentAmount),
-                risk: Math.round(riskPercentageOfWorth * 10000)/100 + '%',
+                profits: Math.round(perc * 10000)/100 + '%',
                 riskAmount: Math.round(riskOfWorth/1000) * 1000,
                 riskAmountOfSavings:Math.round(riskOfSavings/1000) * 1000,
                 riskPercentageOfSavings: Math.round(riskPercentageOfSavings * 10000)/100 + '%',
                 thisYearSavings: depositsArray.yearsSums?.[thisYear] ? depositsArray.yearsSums[thisYear].deposit_amount : 0,
                 yourDebt: totalDebt,
-                bestRate: possibleRate + '%',
+                oldDebt: totalOldDebt,
+                fromClub: Math.round(0.5 * req.user.investmentAmount), 
                 maxLoanLimit: Math.round(maxLimit),
                 LoanLimit: Math.round(loan_limit),
                 points: Math.round(req.user.points),
@@ -1259,7 +1298,6 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
     }
      
   });
-
 app.use(photoRouter)
 app.use(userRouter)
 
@@ -2410,6 +2448,7 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
         //console.log(remainder, running_rate, pending_amount_interest);
 
         let totalInterestDue = loanYear == thisYear ? pending_amount_interest : pending_amount_interest + payment_interest_amount;
+        totalInterestDue = totalInterestDue  == 0 ? constants.monthly_lending_rate * loan_finding.principal_left / 100 : totalInterestDue;
         
         let interest_amount = loan_finding.interest_amount;
 
