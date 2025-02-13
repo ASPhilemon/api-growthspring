@@ -28,7 +28,9 @@ async function notifyLoanPayment(loanPaymentParams) {
   const emailParams = {
     senderName: "growthspring",
     recipientEmail: user_email, 
-    emailSubject: "Loan Payment Confirmation",
+    emailSubject: loan_status == "Ongoing"?
+    "Loan Payment Confirmation":
+    "Loan Cleared",
     emailTemplate: loan_status == "Ongoing"?
       __dirname + "/views/loan-payment.ejs":
       __dirname + "/views/loan-cleared.ejs",

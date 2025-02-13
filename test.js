@@ -15,7 +15,7 @@ const loanPaymentParams = {
   amount_paid: 600000, 
   date: "Jan 4 2025", // date of loan payment in specified format
   outstanding_debt: 200000, // outstanding debt: principal left + interest
-  loan_status: "Ongoing", // status of loan after payment, Ongoing | Ended,
+  loan_status: "Ended", // status of loan after payment, Ongoing | Ended,
   user_email: "philemonariko@gmail.com",
   user_first_name: "Philemon" //first name of member
 }

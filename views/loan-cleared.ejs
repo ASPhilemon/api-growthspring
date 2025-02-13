@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Happy Birthday</title>
+  <title>Loan Application Successful</title>
   <style>
     *,
     *:before,
@@ -108,21 +108,24 @@
     </header>
 
     <div class='content'>
-      <p class='mb-4 fw-light'>Dear Admin Team,  </p>
-      <h3 class = "subject text-primary" >Tomorrow's Birthdays 🎂🎂</h3>
+      <p class='mb-4 fw-light'>Dear <%= user_first_name %> ,  </p>
+      <h3 class = "subject text-primary" >Loan Cleared</h3>
       <p class='mb-4'>
-        This is a reminder that the following members will be celebrating their birthdays tomorrow:
+        We acknowledge receipt of your loan payment of  <span style="font-weight: bold">UGX  <%= amount_paid.toLocaleString() %> </span> made on <span style="font-weight: bold"> <%= date %>. </span>
       </p>
-      <ul class="mb-4">
-        <% celebrants.forEach(celebrant => { %>
-          <li class="mb-1" style="font-weight: bold" > <span class="birthday-emoji">🎂 </span><%= celebrant.fullName %></li>
-        <% }); %>
-      </ul>
+      <p class="mb-4">
+        We are glad to inform you that your loan is now fully cleared to <span style="font-weight: bold" >zero balance.</span> 
+      </p>
+      <p>
+        Thank you for your prompt payment and continued commitment to the club.
+      </p>
+
       <p class='mb-5'>
-        Please remember to send them your best wishes and make their day extra special.
+        If you have any questions or require further details, please do not hesitate to reach out.
       </p>
-      <p class=''>Best wishes,</p>
-      <h3 class='text-primary'>Birthdays | GrowthSpring</h3>
+
+      <p>Greetings,</p>
+      <h3 class='text-primary'>Treasury Dept | GrowthSpring</h3>
     </div>
     <footer class="footer" >
       <img src = "https://api.growthspringers.com/img/logo2.png" alt="GrowthSpring Logo"/>
