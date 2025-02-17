@@ -2148,34 +2148,34 @@ app.post('/new-location', async (req, res) => {
 //Transfer_money_between_Locations
 app.post('/transfer-club-money', async (req, res) => {
     try {
-        if (!req.body.transfer_amount) {
-            return res.json({ msg: 'Amount not Entered'});
+        if (!req.body.amount) {
+            return res.json({ msg: 'Amount not entered' });
         }
-       
-        const clubdata = await ClubData.findOne();
-        const foundLocation = clubdata.cashLocations.find(location => location._id == req.body.recipient_location_id);
-        const foundLocation2 = clubdata.cashLocations.find(location => location._id == req.body.sending_location_id);
-        
-        if(foundLocation2.location_amount >= req.body.transfer_amount){
-            await updateLocations(-req.body.transfer_amount, foundLocation.location_name, foundLocation2.location_name, req.user);
-        } else {
-            return res.json({msg: `There is not enough money in '${foundLocation2.location_name}`});
-        }
-        
-        await ClubData.updateOne(
-            {},
-            { $inc: { "cashLocations.$[elem].location_amount": req.body.transfer_amount } },
-            { arrayFilters: [{ "elem.location_name": foundLocation.location_name }] }
-        ); 
 
-        res.json({ msg: 'Transfer Complete' });
+        const locations = await CashLocations.find({});
+        const foundLocation = locations.find(location => location.name === req.body.destination);
+        const foundLocation2 = locations.find(location => location.name === req.body.source);
+
+        if (!foundLocation2) {
+            return res.json({ msg: `Source location '${req.body.source}' not found` });
+        }
+
+        if (!foundLocation) {
+            return res.json({ msg: `Destination location '${req.body.destination}' not found` });
+        }
+
+        if (foundLocation2.amount >= req.body.amount) {
+            await updateLocations(req.body.amount, foundLocation.name, foundLocation2.name, req.body.movedBy, req.body.date);
+            res.json({ msg: 'Transfer Complete' });
+        } else {
+            return res.json({ msg: `There is not enough money in '${foundLocation2.name}'` });
+        }
 
     } catch (error) {
         console.error(error);
-        res.json({ msg: 'An error occurred'});
+        res.json({ msg: 'An error occurred' });
     }
 });
-
 
 //Buy_Discount 
 app.post('/buy-discount', async (req, res) => {
@@ -3309,39 +3309,36 @@ async function updateMarket() {
 }
 
 //UPDATE_CASH_LOCATIONS
-async function updateLocations(amount, recipient_location, other_location, admin, date = Today) {
+app.post('/transfer-club-money', async (req, res) => {
     try {
-        const clubdata = await ClubData.findOne();
-         
-        // Find the location in cashLocations
-        const foundLocation = clubdata.cashLocations.find(location => location.location_name == recipient_location);
-
-        if ( foundLocation) {
-            // Update the specified location with the given amount
-            await ClubData.updateOne(
-                {},
-                { $inc: { "cashLocations.$[elem].location_amount": amount } },
-                { arrayFilters: [{ "elem.location_name": foundLocation.location_name }] }
-            );
-
-            // Create CashHistory entry
-            await CashHistory.create({
-                "recipient_location_name": recipient_location,
-                "transaction_date": date,
-                "transaction_amount": amount,
-                "recorded_by": admin.fullName,
-                "other_location_name": foundLocation.location_name,
-                "category": foundLocation.category,
-                "balance_before": foundLocation.location_amount
-            });
-        } else {
-            console.error(`Location '${other_location}' not found in cashLocations.`);
+        if (!req.body.amount) {
+            return res.json({ msg: 'Amount not entered' });
         }
+
+        const locations = await CashLocations.find({});
+        const foundLocation = locations.find(location => location.name === req.body.destination);
+        const foundLocation2 = locations.find(location => location.name === req.body.source);
+
+        if (!foundLocation2) {
+            return res.json({ msg: `Source location '${req.body.source}' not found` });
+        }
+
+        if (!foundLocation) {
+            return res.json({ msg: `Destination location '${req.body.destination}' not found` });
+        }
+
+        if (foundLocation2.amount >= req.body.amount) {
+            await updateLocations(req.body.amount, foundLocation.name, foundLocation2.name, req.body.movedBy, req.body.date);
+            res.json({ msg: 'Transfer Complete' });
+        } else {
+            return res.json({ msg: `There is not enough money in '${foundLocation2.name}'` });
+        }
+
     } catch (error) {
-        console.error('Error updating locations:', error);
-        throw error; // Propagate the error to the higher level
+        console.error(error);
+        res.json({ msg: 'An error occurred' });
     }
-}
+});
 
 //ADD_PENDING_PROFITS
 async function calculateLoanDays(loanDate, currentDate, interest_amount) {
