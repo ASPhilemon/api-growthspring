@@ -2080,12 +2080,14 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
             );
         const borrowerInfo = await Users.findOne({fullName: loansdata.borrower_name});
       
+        const firstName = borrowerInfo.fullName.split(" ")[1];
+      
         const loanNewParams = {
           amount: loansdata.loan_amount,
           duration: loansdata.loan_duration, //length of loan in months
           installment: loansdata.installment_amount, //monthly installment
           user_email: borrowerInfo.email,
-          user_first_name: borrowerInfo.displayName //first name of member
+          user_first_name: firstName //first name of member
         }
         notifyLoanNew(loanNewParams);
         res.json({ msg: 'Loan Approved Successfuly' });
@@ -2531,10 +2533,22 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
             {fullName: loan_finding.borrower_name },
             { $inc: { "points": points_balance} }
             );
-        const interest = interest_amount == loan_finding.interest_amount ? totalInterestDue : interest_amount; 
+        const interest = interest_amount == loan_finding.interest_amount ? totalInterestDue : interest_amount;
+      
+          // Convert string to Date object (Month is 0-based in JS)
+          const [month, day, year] = req.body.payment_date.split("-").map(Number);
+          const dateObj = new Date(year, month - 1, day);
+          
+          // Format the date to "Jan 3 2025"
+          const formattedDate = dateObj.toLocaleDateString("en-US", { 
+            month: "short", 
+            day: "numeric", 
+            year: "numeric" 
+          });
+
         const loanPaymentParams = {
           amount_paid: req.body.payment_amount, 
-          date: req.body.payment_date, // date of loan payment in specified format
+          date: formattedDate, // date of loan payment in specified format
           outstanding_debt: principal_left + interest, // outstanding debt: principal left + interest
           loan_status: loan_status, // status of loan after payment, Ongoing | Ended,
           user_email: member.email,
