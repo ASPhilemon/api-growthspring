@@ -1036,7 +1036,7 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
         const perc = person.units/allUnits;
         //console.log(person, allUnits);
         const profitProjection = await getProfitRecords(club, constants);
-        const personalProfits = perc * profitProjection.totalIncome;
+        const personalProfits = 0.8 * perc * profitProjection.totalIncome;
 
         var memberDepositsRecords = [];
         var memberEarningsRecords = earningsArray !== 'No Data Available' ? [] : [{year: Today.getFullYear(), total: 0, roi: 0, values: []}];
