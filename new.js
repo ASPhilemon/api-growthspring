@@ -66,6 +66,7 @@ const {sendMail} = require('./util/sendMail')
 const photoRouter = require("./photoUpload")
 const userRouter = require("./updateUser")
 const LogModel = require('./auth/models/LogModel');
+const {notifyLoanNew, notifyLoanPayment} = require("./notify-loan.js")
 
 //auth imports
 const {requireAuth, requireAdmin} = require('./auth/middleware')
@@ -1033,7 +1034,9 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
         }
         const person = people.find(item => item.name === req.user.fullName);
         const perc = person.units/allUnits;
-        console.log(person, allUnits);
+        //console.log(person, allUnits);
+        const profitProjection = await getProfitRecords(club, constants);
+        const personalProfits = perc * profitProjection.totalIncome;
 
         var memberDepositsRecords = [];
         var memberEarningsRecords = earningsArray !== 'No Data Available' ? [] : [{year: Today.getFullYear(), total: 0, roi: 0, values: []}];
@@ -1268,6 +1271,7 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
                 thisYearDeposits:  clubDepositsArray.yearsSums[thisYear] ? clubDepositsArray.yearsSums[thisYear].deposit_amount : 0,
                 yourWorth: Math.round(req.user.investmentAmount),
                 profits: Math.round(perc * 10000)/100 + '%',
+                profitsProjection: Math.round(personalProfits),
                 riskAmount: Math.round(riskOfWorth/1000) * 1000,
                 riskAmountOfSavings:Math.round(riskOfSavings/1000) * 1000,
                 riskPercentageOfSavings: Math.round(riskPercentageOfSavings * 10000)/100 + '%',
@@ -2071,10 +2075,19 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
         );
 
         await Users.updateOne(
-            {fullName: loansdata .borrower_name },
+            {fullName: loansdata.borrower_name },
             { $inc: { "points": -loansdata.points_spent} }
             );
-
+        const borrowerInfo = await Users.findOne({fullName: loansdata.borrower_name});
+      
+        const loanNewParams = {
+          amount: loansdata.loan_amount,
+          duration: loansdata.loan_duration, //length of loan in months
+          installment: loansdata.installment_amount, //monthly installment
+          user_email: borrowerInfo.email,
+          user_first_name: borrowerInfo.displayName //first name of member
+        }
+        notifyLoanNew(loanNewParams);
         res.json({ msg: 'Loan Approved Successfuly' });
 
     } catch (error) {
@@ -2518,6 +2531,17 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
             {fullName: loan_finding.borrower_name },
             { $inc: { "points": points_balance} }
             );
+        const interest = interest_amount == loan_finding.interest_amount ? totalInterestDue : interest_amount; 
+        const loanPaymentParams = {
+          amount_paid: req.body.payment_amount, 
+          date: req.body.payment_date, // date of loan payment in specified format
+          outstanding_debt: principal_left + interest, // outstanding debt: principal left + interest
+          loan_status: loan_status, // status of loan after payment, Ongoing | Ended,
+          user_email: member.email,
+          user_first_name: member.displayName //first name of member
+        }
+        
+        notifyLoanPayment(loanPaymentParams);
 
         /*if (new Date(req.body.payment_date).getTime() > new Date(loan_finding.loan_date.getTime() + (loan_finding.loan_duration * 30 * 24 * 60 * 60 * 1000))) {//(new Date(record.loan_date.getTime() + (record.loan_duration * 30 * 24 * 60 * 60 * 1000)))
             let excess_months = getDaysDifference(loan_finding.last_payment_date, req.body.payment_date) % 30 < 0.24 ? Math.trunc(getDaysDifference(loan_finding.last_payment_date, req.body.payment_date) / 30) : Math.ceil(getDaysDifference(loan_finding.last_payment_date, req.body.payment_date) / 30);
@@ -3433,6 +3457,138 @@ if (loan_finding.payments) {
 }
 
 return payment_interest_amount
+}
+
+async function getProfitRecords(members, constants) {
+  const thisYear = new Date().getUTCFullYear();
+  const clubWorth = members.reduce((total, member) => total + member.investmentAmount, 0);
+  let allUnits = 0;
+  let people = [];
+  const profits = 0.8 * 2418164;
+  const allProfits = 0.8 * 5733449;
+  const nextProfits = allProfits - profits;
+
+  const someFutureDate = new Date("2025-01-01T00:00:00Z");
+
+  const thisYearLoans = await Loans.find({
+    $expr: {
+      $gt: ["$loan_date", someFutureDate],
+    },
+  });
+
+  let loanInterest = 0;
+  let loanUnits = 0;
+
+  thisYearLoans.forEach((loan) => {
+    if (loan.loan_status === "Ongoing") {
+      const loanYear = loan.loan_date.getFullYear();
+      let Today = new Date();
+      let remainder = getDaysDifference(loan.loan_date, Today);
+      let currentLoanDuration = Math.ceil(remainder / 30);
+      let pointDays = Math.max(0, Math.min(12, currentLoanDuration) - 6) + Math.max(18, currentLoanDuration) - 18;
+      let runningRate = constants.monthly_lending_rate * (currentLoanDuration - pointDays);
+      let pendingAmountInterest = (runningRate * loan.principal_left) / 100;
+      let paymentInterestAmount = 0;
+      let points = (constants.monthly_lending_rate * pointDays * loan.principal_left) / 100000;
+
+      if (loan.payments) {
+        loan.payments.forEach((payment) => {
+          let duration =
+            (getDaysDifference(loan.loan_date, payment.payment_date) % 30) / 30 < 0.24
+              ? Math.trunc(getDaysDifference(loan.loan_date, payment.payment_date) / 30)
+              : Math.ceil(getDaysDifference(loan.loan_date, payment.payment_date) / 30);
+          let pointDay = Math.max(0, Math.min(12, duration) - 6) + Math.max(18, duration) - 18;
+          let paymentInterest = (constants.monthly_lending_rate * (duration - pointDay) * payment.payment_amount) / 100;
+          points += (constants.monthly_lending_rate * pointDay * payment.payment_amount) / 100000;
+          paymentInterestAmount += paymentInterest;
+        });
+      }
+
+      let accruedInterest =
+        thisYear === loanYear ? pendingAmountInterest : pendingAmountInterest + paymentInterestAmount;
+      accruedInterest =
+        accruedInterest === 0 ? (constants.monthly_lending_rate * loan.principal_left) / 100 : accruedInterest;
+      let pointsAccrued = points;
+      const lastPaymentPeriod = getDaysDifference(loan.last_payment_date);
+      let loanUnitsValue = loan.loan_units + loan.principal_left * lastPaymentPeriod;
+
+      loanInterest += accruedInterest;
+      loanUnits += loanUnitsValue;
+    } else {
+      loanInterest += loan.interest_amount;
+      loanUnits += loan.loan_units;
+    }
+  });
+
+  // Calculate Member Profits
+  for (const member of members) {
+    let totalUnits = 0;
+    let perc = 0;
+    let yearDeposits = 0;
+    const investmentDays = getDaysDifference(member.investmentDate);
+
+    // Fetch member's deposits for the current year
+    const allMemberDeposits = await Deposit.find({ depositor_name: member.fullName });
+    const depositRecords = allMemberDeposits.filter(
+      (deposit) => new Date(deposit.deposit_date).getFullYear() === thisYear
+    );
+
+    for (const deposit of depositRecords) {
+      const depositUnits = deposit.deposit_amount * getDaysDifference(deposit.deposit_date);
+      totalUnits += depositUnits;
+      yearDeposits += deposit.deposit_amount;
+    }
+    totalUnits += investmentDays * (member.investmentAmount - yearDeposits);
+    allUnits += totalUnits;
+    perc = totalUnits / allUnits || 0;
+    people.push({ name: member.fullName, units: totalUnits });
+  }
+
+  const investment = (allUnits / 365) - 8000000; // Prevent division by zero
+  const fullTrustInterest = investment * 0.1;
+  let totalIncome = 0;
+  let trustIncome = 0;
+  let remainderUnits = 0;
+
+  for (const item of people) {
+    const perc = item.units / allUnits || 0;
+    const memberProfits = Math.round(perc * allProfits);
+
+    remainderUnits = allUnits - loanUnits;
+    trustIncome = ((remainderUnits * fullTrustInterest) / allUnits)|| 0;
+    totalIncome = trustIncome + loanInterest;
+
+    /*console.log({
+      member: item.name,
+      profits: memberProfits.toLocaleString(),
+      trustIncome: Math.round(trustIncome).toLocaleString(),
+      totalIncome: Math.round(totalIncome).toLocaleString(),
+    });*/
+  }
+  
+  const currentMonth = new Date().getMonth() + 1;
+  const sumOfMonths = sumOfDigitsInRange(currentMonth);
+  function sumOfDigitsInRange(n) {
+    let totalSum = 0;
+    
+    for (let i = 1; i <= (12-n); i++) {
+        totalSum += i;
+    }
+    
+    return totalSum;
+}
+
+  const unitIncome = Math.round((remainderUnits * fullTrustInterest/allUnits) + 600000 + 1200000);
+
+  const depositProjection = 2000000 * 0.01 * sumOfMonths;
+
+  return {
+    fullTrustInterest: Math.round(fullTrustInterest).toLocaleString() + 600000 + 1200000,
+    loanInterest: Math.round(loanInterest),
+    trustIncome: unitIncome,
+    totalIncome: Math.round(loanInterest + unitIncome),
+    totalIncomeWithDeposits: Math.round(loanInterest + depositProjection + unitIncome)
+  };
 }
 
 
