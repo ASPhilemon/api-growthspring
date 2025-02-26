@@ -3606,3 +3606,6 @@ async function getProfitRecords(members, constants) {
 }
 
 
+app.post("/transfer-points", (req, res)=>{
+  res.json({data: {}})
+})
