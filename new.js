@@ -3646,22 +3646,22 @@ app.post("/transfer-points", async (req, res) =>{
     await Users.updateOne(
         { fullName: req.body.beneficiary },
         {
-            $inc: { points: req.body.points }
+            $inc: { points: parseInt(req.body.points) }
         }
     );
     await Users.updateOne(
         { fullName: req.user.fullName },
         {
-            $inc: { points: -req.body.points }
+            $inc: { points: -parseInt(req.body.points) }
         }
     );
 
     await PointsSale.create({
         "name": req.user.fullName,
         "transaction_date": new Date(),
-        "points_worth": req.body.points * 1000,
+        "points_worth": parseInt(req.body.points) * 1000,
         "recorded_by": req.user.fullName,
-        "points_involved": req.body.points,
+        "points_involved": parseInt(req.body.points),
         "reason": req.body.reason,
         "type": "Spent"
     });
@@ -3669,9 +3669,9 @@ app.post("/transfer-points", async (req, res) =>{
     await PointsSale.create({
         "name": req.body.beneficiary,
         "transaction_date": new Date(),
-        "points_worth": req.body.points * 1000,
+        "points_worth": parseInt(req.body.points) * 1000,
         "recorded_by": req.body.beneficiary,
-        "points_involved": req.body.points,
+        "points_involved": parseInt(req.body.points),
         "reason": req.body.reason,
         "type": "Earned"
     });
