@@ -1246,7 +1246,7 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
   
                 if (record.type == 'Spent'){
                     pointsSpentRecords.push(yearObject);
-                } else {
+                } else if (record.type == 'Earned'){
                     pointsEarnedRecords.push(yearObject);
                 }
             });
@@ -1306,8 +1306,12 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
             payments: memberEarningsRecords,
             members: memberNames,
             loans: memberDebtRecords,
-            points: pointsSpentRecords == [] ? [{year: Today.getFullYear(), total: 0, values: []}] : pointsSpentRecords,
-            pointsEarned: pointsEarnedRecords == [] ? [{year: Today.getFullYear(), total: 0, values: []}] : pointsEarnedRecords,
+            points: pointsSpentRecords.length === 0 
+            ? [{ year: Today.getFullYear(), total: 0, values: [] }] 
+            : pointsSpentRecords,
+            pointsEarned: pointsEarnedRecords.length === 0 
+          ? [{ year: Today.getFullYear(), total: 0, values: [] }] 
+          : pointsEarnedRecords,
             clubDeposits: club_Deposits,
             clubEarnings: club_Earnings,
             discounts: memberDiscountRecords//new addition
