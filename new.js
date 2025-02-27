@@ -3677,3 +3677,49 @@ app.post("/transfer-points", async (req, res) =>{
     });
     res.json({data: {}})
   })
+app.post("/transfer-points", async (req, res) => {
+    try {
+        const { beneficiary, points, reason } = req.body.formData; // Extract from formData
+        const numericPoints = Number(points); // Convert points to a number
+
+        // Update beneficiary's points
+        await Users.updateOne(
+            { fullName: beneficiary },
+            { $inc: { points: numericPoints } }
+        );
+
+        // Deduct points from the sender (authenticated user)
+        await Users.updateOne(
+            { fullName: req.user.fullName },
+            { $inc: { points: -numericPoints } }
+        );
+
+        // Record the transaction for the sender (Spent)
+        await PointsSale.create({
+            name: req.user.fullName,
+            transaction_date: new Date(),
+            points_worth: numericPoints * 1000,
+            recorded_by: req.user.fullName,
+            points_involved: numericPoints,
+            reason,
+            type: "Spent"
+        });
+
+        // Record the transaction for the beneficiary (Earned)
+        await PointsSale.create({
+            name: beneficiary,
+            transaction_date: new Date(),
+            points_worth: numericPoints * 1000,
+            recorded_by: beneficiary,
+            points_involved: numericPoints,
+            reason,
+            type: "Earned"
+        });
+
+        res.json({ success: true, message: "Points transferred successfully" });
+
+    } catch (error) {
+        console.error("Error transferring points:", error);
+        res.status(500).json({ success: false, message: "Internal Server Error" });
+    }
+});
