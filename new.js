@@ -235,6 +235,16 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
                     }
                 );
 
+                await PointsSale.create({
+                    "name": code.primary_name,
+                    "transaction_date": new Date(),
+                    "points_worth": points_spent * 1000,
+                    "recorded_by": code.primary_name,
+                    "points_involved": points_spent,
+                    "reason": "Discounts",
+                    "type": "Spent"
+                });
+
                 debt = merchant.debt + merchant.club_contribution_percentage * amount / 100; //Math.trunc(merchant.club_contribution_percentage * amount / 100000) * 1000;
                 let Debt = debt.toLocaleString('en-US');
                 let previousDebt = merchant.debt.toLocaleString('en-US');
@@ -1009,11 +1019,13 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
         const thisYear = new Date().getFullYear();
         let allUnits = 0;
         let people = [];
+        let memberNames = [];
 
         // Calculate Member Profits
         for (const member of members) {
             let totalUnits = 0;
             let perc = 0;
+            memberNames.push(member.fullName);
             let yearDeposits = 0;
             const investmentDays = getDaysDifference(member.investmentDate);
 
@@ -1042,7 +1054,8 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
         var memberEarningsRecords = earningsArray !== 'No Data Available' ? [] : [{year: Today.getFullYear(), total: 0, roi: 0, values: []}];
         var memberDebtRecords = [];
         var memberDiscountRecords = []; 
-        var pointsRecords = pointsArray !== 'No Data Available' ? [] : [{year: Today.getFullYear(), total: 0, values: []}];
+        var pointsSpentRecords = [];
+        var pointsEarnedRecords = [];
         //console.log(usedPool, allDebt, totalDebt, clubWorth, ratio, riskPercentageOfWorth);
         // Process and structure member deposits records
         if (depositsArray !== 'No Data Available') {
@@ -1231,7 +1244,11 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
                     values: values
                 };
   
-                pointsRecords.push(yearObject);
+                if (pointsRecord.type == 'Spent'){
+                    pointsSpentRecords.push(yearObject);
+                } else {
+                    pointsEarnedRecords.push(yearObject);
+                }
             });
         }
   
@@ -1287,8 +1304,10 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
             },
             memberDeposits: memberDepositsRecords,
             payments: memberEarningsRecords,
+            members: memberNames,
             loans: memberDebtRecords,
-            points: pointsRecords,
+            points: pointsSpentRecords == [] ? [{year: Today.getFullYear(), total: 0, values: []}] : pointsSpentRecords,
+            pointsEarned: pointsEarnedRecords == [] ? [{year: Today.getFullYear(), total: 0, values: []}] : pointsEarnedRecords,
             clubDeposits: club_Deposits,
             clubEarnings: club_Earnings,
             discounts: memberDiscountRecords//new addition
@@ -2529,6 +2548,19 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
             res.json({ msg, loan_status: loan_status });
         });
 
+
+        if (points_spent == points){
+            await PointsSale.create({
+                "name": loan_finding.borrower_name,
+                "transaction_date": req.body.payment_date,
+                "points_worth": points * 1000,
+                "recorded_by": req.user.fullName,
+                "points_involved": points,
+                "reason": "Loan interest",
+                "type": "Spent"
+            });
+        }
+      
         await Users.updateOne(
             {fullName: loan_finding.borrower_name },
             { $inc: { "points": points_balance} }
@@ -3606,6 +3638,38 @@ async function getProfitRecords(members, constants) {
 }
 
 
-app.post("/transfer-points", (req, res)=>{
-  res.json({data: {}})
-})
+app.post("/transfer-points", async (req, res) =>{
+    await Users.updateOne(
+        { fullName: req.body.beneficiary },
+        {
+            $inc: { points: req.body.points }
+        }
+    );
+    await Users.updateOne(
+        { fullName: req.user.fullName },
+        {
+            $inc: { points: -req.body.points }
+        }
+    );
+
+    await PointsSale.create({
+        "name": req.user.fullName,
+        "transaction_date": new Date(),
+        "points_worth": req.body.points * 1000,
+        "recorded_by": req.user.fullName,
+        "points_involved": req.body.points,
+        "reason": req.body.reason,
+        "type": "Spent"
+    });
+
+    await PointsSale.create({
+        "name": req.body.beneficiary,
+        "transaction_date": new Date(),
+        "points_worth": req.body.points * 1000,
+        "recorded_by": req.body.beneficiary,
+        "points_involved": req.body.points,
+        "reason": req.body.reason,
+        "type": "Earned"
+    });
+    res.json({data: {}})
+  })
