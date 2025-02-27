@@ -1244,7 +1244,7 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
                     values: values
                 };
   
-                if (pointsRecord.type == 'Spent'){
+                if (record.type == 'Spent'){
                     pointsSpentRecords.push(yearObject);
                 } else {
                     pointsEarnedRecords.push(yearObject);
