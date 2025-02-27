@@ -3642,77 +3642,41 @@ async function getProfitRecords(members, constants) {
 }
 
 
-app.post("/transfer-points", async (req, res) =>{
-    await Users.updateOne(
-        { fullName: req.body.beneficiary },
-        {
-            $inc: { points: parseInt(req.body.points) }
-        }
-    );
-    await Users.updateOne(
-        { fullName: req.user.fullName },
-        {
-            $inc: { points: -parseInt(req.body.points) }
-        }
-    );
-
-    await PointsSale.create({
-        "name": req.user.fullName,
-        "transaction_date": new Date(),
-        "points_worth": parseInt(req.body.points) * 1000,
-        "recorded_by": req.user.fullName,
-        "points_involved": parseInt(req.body.points),
-        "reason": req.body.reason,
-        "type": "Spent"
-    });
-
-    await PointsSale.create({
-        "name": req.body.beneficiary,
-        "transaction_date": new Date(),
-        "points_worth": parseInt(req.body.points) * 1000,
-        "recorded_by": req.body.beneficiary,
-        "points_involved": parseInt(req.body.points),
-        "reason": req.body.reason,
-        "type": "Earned"
-    });
-    res.json({data: {}})
-  })
 app.post("/transfer-points", async (req, res) => {
     try {
-        const { beneficiary, points, reason } = req.body.formData; // Extract from formData
-        const numericPoints = Number(points); // Convert points to a number
+        const points = Number(req.body.points); // Convert points to a number
 
         // Update beneficiary's points
         await Users.updateOne(
-            { fullName: beneficiary },
-            { $inc: { points: numericPoints } }
+            { fullName: req.body.beneficiary },
+            { $inc: { points: points } }
         );
 
         // Deduct points from the sender (authenticated user)
         await Users.updateOne(
             { fullName: req.user.fullName },
-            { $inc: { points: -numericPoints } }
+            { $inc: { points: -points } }
         );
 
         // Record the transaction for the sender (Spent)
         await PointsSale.create({
             name: req.user.fullName,
             transaction_date: new Date(),
-            points_worth: numericPoints * 1000,
+            points_worth: points * 1000,
             recorded_by: req.user.fullName,
-            points_involved: numericPoints,
-            reason,
+            points_involved: points,
+            reason: req.body.reason,
             type: "Spent"
         });
 
         // Record the transaction for the beneficiary (Earned)
         await PointsSale.create({
-            name: beneficiary,
+            name: req.body.beneficiary,
             transaction_date: new Date(),
-            points_worth: numericPoints * 1000,
-            recorded_by: beneficiary,
-            points_involved: numericPoints,
-            reason,
+            points_worth: points * 1000,
+            recorded_by: req.body.beneficiary,
+            points_involved: points,
+            reason: req.body.reason,
             type: "Earned"
         });
 
