@@ -816,7 +816,8 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
     const clubEarningsPromise =  Earnings.find({});
     const clubUnitsRecordsPromise =  InvestmentUnits.find({ });
     const discountsPromise = Discount.find({ beneficiary_name: req.user.fullName});
-    const pointsPromise = PointsSale.find({ name: req.user.fullName, type: "Sell"});
+    const pointsSpentPromise = PointsSale.find({ name: req.user.fullName, type: 'Spent'});
+    const pointsEarnedPromise = PointsSale.find({ name: req.user.fullName, type: 'Earned'});
     const allLoansPromise =  Loans.find({ });
   
     let [
@@ -826,12 +827,14 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
       clubEarnings,
       clubUnitsRecords,
       discounts,
-      points,
+      pointsSpent,
+      pointsEarned,
       allLoans,
     ] = await Promise.all([
       constantsPromise, clubPromise, clubDepositsPromise, clubEarningsPromise,
-      clubUnitsRecordsPromise, discountsPromise, pointsPromise, allLoansPromise
+      clubUnitsRecordsPromise, discountsPromise, pointsSpentPromise, pointsEarnedPromise, allLoansPromise
       ])
+  
   
     const member = club.find((user)=>user.fullName  === req.user.fullName)
     const memberDeposits = clubDeposits.filter((deposit)=>deposit.depositor_name === req.user.fullName)
@@ -950,6 +953,11 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
                 "total": 0,
                 "values": []
             }],
+            pointsEarned: [        {
+                "year": 2024,
+                "total": 0,
+                "values": []
+            }],
             clubDeposits: club_Deposits,
             clubEarnings: club_Earnings,
             discounts: [        {
@@ -976,7 +984,8 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
         const depositsArray = processArray(memberDeposits, (md) => getTotalSumsAndSort(md, 'deposit_date', 'deposit_amount'));
         const earningsArray = processArray(earnings, (e) => getTotalSumsAndSort(e, 'date_of_earning', 'earnings_amount'));
         const debtRecords = processArray(debtHistory, (dh) => getTotalSumsAndSort(dh, 'loan_date', 'loan_amount'));
-        const pointsArray = processArray(points, (p) => getTotalSumsAndSort(p, 'transaction_date', 'points_involved'));
+        const pointsSpentArray = processArray(pointsSpent, (p) => getTotalSumsAndSort(p, 'transaction_date', 'points_involved'));
+        const pointsEarnedArray = processArray(pointsEarned, (p) => getTotalSumsAndSort(p, 'transaction_date', 'points_involved'));
         const discountArray = processArray(discounts, (u) => getTotalSumsAndSort(u, 'date', 'discount_amount'));
         const memberYears = req.user ? Math.round((getDaysDifference(req.user.membershipDate) / 365) * 10) / 10 : 'No Data Available';
         
@@ -994,7 +1003,8 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
   
         const sortedDepositYears = depositsArray !== 'No Data Available' ? Object.entries(depositsArray.yearsSums).sort((a, b) => b[0] - a[0]) : 'No Data Available';
         const sortedEarningsYears = earningsArray !== 'No Data Available' ? Object.entries(earningsArray.yearsSums).sort((a, b) => b[0] - a[0]) : 'No Data Available';
-        const sortedPoints = pointsArray !== 'No Data Available' ? Object.entries(pointsArray.yearsSums).sort((a, b) => b[0] - a[0]) : 'No Data Available';
+        const sortedSpentPoints = pointsSpentArray !== 'No Data Available' ? Object.entries(pointsSpentArray.yearsSums).sort((a, b) => b[0] - a[0]) : 'No Data Available';
+        const sortedEarnedPoints = pointsEarnedArray !== 'No Data Available' ? Object.entries(pointsEarnedArray.yearsSums).sort((a, b) => b[0] - a[0]) : 'No Data Available';
         const sorteddiscountArray = discounts ? Object.entries(discountArray.yearsSums ?? {}).sort((a, b) => b[0] - a[0]) : 'No Data Available';
        
   
@@ -1230,29 +1240,41 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
         }
   
         // Process and structure points records
-        if (pointsArray !== 'No Data Available') {
-            sortedPoints.forEach(([year, record]) => {
-                let values = pointsArray.recordsByYear[year].map(pointsRecord => [
+        if (pointsSpentArray !== 'No Data Available') {
+            sortedSpentPoints.forEach(([year, record]) => {
+                let values = pointsSpentArray.recordsByYear[year].map(pointsRecord => [
                     formatDate(pointsRecord.transaction_date),
                     Math.round(pointsRecord.points_involved),
                     pointsRecord.reason
                 ]);
-  
                 let yearObject = {
                     year: year,
                     total: Math.round(record.points_involved),
                     values: values
                 };
-  
-                if (record.type == 'Spent'){
+
                     pointsSpentRecords.push(yearObject);
-                } else if (record.type == 'Earned'){
-                    pointsEarnedRecords.push(yearObject);
-                }
             });
         }
-  
-  
+
+  // Process and structure points records
+  if (pointsEarnedArray !== 'No Data Available') {
+    sortedEarnedPoints.forEach(([year, record]) => {
+        let values = pointsEarnedArray.recordsByYear[year].map(pointsRecord => [
+            formatDate(pointsRecord.transaction_date),
+            Math.round(pointsRecord.points_involved),
+            pointsRecord.reason
+        ]);
+        let yearObject = {
+            year: year,
+            total: Math.round(record.points_involved),
+            values: values
+        };
+
+        pointsEarnedRecords.push(yearObject);
+    });
+}
+
         
         // Construct the JSON response
         let memberDashboardData = {
@@ -3642,41 +3664,77 @@ async function getProfitRecords(members, constants) {
 }
 
 
+app.post("/transfer-points", async (req, res) =>{
+    await Users.updateOne(
+        { fullName: req.body.beneficiary },
+        {
+            $inc: { points: parseInt(req.body.points) }
+        }
+    );
+    await Users.updateOne(
+        { fullName: req.user.fullName },
+        {
+            $inc: { points: -parseInt(req.body.points) }
+        }
+    );
+
+    await PointsSale.create({
+        "name": req.user.fullName,
+        "transaction_date": new Date(),
+        "points_worth": parseInt(req.body.points) * 1000,
+        "recorded_by": req.user.fullName,
+        "points_involved": parseInt(req.body.points),
+        "reason": req.body.reason,
+        "type": "Spent"
+    });
+
+    await PointsSale.create({
+        "name": req.body.beneficiary,
+        "transaction_date": new Date(),
+        "points_worth": parseInt(req.body.points) * 1000,
+        "recorded_by": req.body.beneficiary,
+        "points_involved": parseInt(req.body.points),
+        "reason": req.body.reason,
+        "type": "Earned"
+    });
+    res.json({data: {}})
+  })
 app.post("/transfer-points", async (req, res) => {
     try {
-        const points = Number(req.body.points); // Convert points to a number
+        const { beneficiary, points, reason } = req.body.formData; // Extract from formData
+        const numericPoints = Number(points); // Convert points to a number
 
         // Update beneficiary's points
         await Users.updateOne(
-            { fullName: req.body.beneficiary },
-            { $inc: { points: points } }
+            { fullName: beneficiary },
+            { $inc: { points: numericPoints } }
         );
 
         // Deduct points from the sender (authenticated user)
         await Users.updateOne(
             { fullName: req.user.fullName },
-            { $inc: { points: -points } }
+            { $inc: { points: -numericPoints } }
         );
 
         // Record the transaction for the sender (Spent)
         await PointsSale.create({
             name: req.user.fullName,
             transaction_date: new Date(),
-            points_worth: points * 1000,
+            points_worth: numericPoints * 1000,
             recorded_by: req.user.fullName,
-            points_involved: points,
-            reason: req.body.reason,
+            points_involved: numericPoints,
+            reason,
             type: "Spent"
         });
 
         // Record the transaction for the beneficiary (Earned)
         await PointsSale.create({
-            name: req.body.beneficiary,
+            name: beneficiary,
             transaction_date: new Date(),
-            points_worth: points * 1000,
-            recorded_by: req.body.beneficiary,
-            points_involved: points,
-            reason: req.body.reason,
+            points_worth: numericPoints * 1000,
+            recorded_by: beneficiary,
+            points_involved: numericPoints,
+            reason,
             type: "Earned"
         });
 
