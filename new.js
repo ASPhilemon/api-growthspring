@@ -121,6 +121,38 @@ app.use('/auth', authRoutes)
 //CONSTANTS FOR BACKEND
 //Time (EAT)
 
+//Transfer_money_between_Locations
+app.post('/transfer-club-money', async (req, res) => {
+    try {
+        if (!req.body.amount) {
+            return res.json({ msg: 'Amount not entered' });
+        }
+
+        const locations = await CashLocations.find({});
+        const foundLocation = locations.find(location => location.name === req.body.destination);
+        const foundLocation2 = locations.find(location => location.name === req.body.source);
+
+        if (!foundLocation2) {
+            return res.json({ msg: `Source location '${req.body.source}' not found` });
+        }
+
+        if (!foundLocation) {
+            return res.json({ msg: `Destination location '${req.body.destination}' not found` });
+        }
+
+        if (foundLocation2.amount >= req.body.amount) {
+            await updateLocations(req.body.amount, foundLocation.name, foundLocation2.name, req.body.movedBy, req.body.date);
+            res.json({ msg: 'Transfer Complete' });
+        } else {
+            return res.json({ msg: `There is not enough money in '${foundLocation2.name}'` });
+        }
+
+    } catch (error) {
+        console.error(error);
+        res.json({ msg: 'An error occurred' });
+    }
+});
+
 // POST endpoint to get discount
 //make_discount_payment
 app.post('/get-discount', async (req, res) => {
