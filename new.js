@@ -409,7 +409,8 @@ try {
     if (req.user.fullName === "Anabelle Joan") {
         const one_point_value = 1000;//constants.one_point_value;
         const pointsWorth = Math.round(one_point_value * req.user.points);
-
+let thisYear = new Date().getFullYear();
+        
         let memberDashboardData = {
             user: req.user,
             summary: {
@@ -421,6 +422,7 @@ try {
                 },
                 loans: {
                     currentDebt: 500000,
+                    oldDebt: 2400000,
                 },
                 points: {
                     points: Math.round(req.user.points),
@@ -442,17 +444,24 @@ try {
                 thisYearDeposits:  clubDepositsArray.yearsSums[thisYear] ? clubDepositsArray.yearsSums[thisYear].deposit_amount : 0,
                 yourWorth: 1000000,
                 risk: '20%',
+                profits: 5 + '%',
+                profitsProjection: 250000,
                 riskAmount: 200000,
                 riskAmountOfSavings:100000,
                 riskPercentageOfSavings: '%',
                 thisYearSavings: 120000,
                 yourDebt: 500000,
+                oldDebt: 2400000,
                 bestRate: '12%',
                 maxLoanLimit: 5000000,
                 points: Math.round(req.user.points),
                 pointsWorth: Math.round(pointsWorth),
                 pointWorth: Math.round(one_point_value),
+                fromClub: Math.round(0.5 * req.user.investmentAmount), 
+                maxLoanLimit: Math.round(maxLimit),
+                LoanLimit: 4500000,
             },
+        
             memberDeposits: [{
                 year:'2023',
                 total: 500000,
