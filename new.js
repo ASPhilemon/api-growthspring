@@ -965,7 +965,7 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
                 year:'2023',
                 total: 500000,
                 avgMonthyDeposit: 50000,
-                values:['21/04/2023', 500000, 'Savings']
+                values:[['21/04/2023', 500000, 'Savings']]
             }],
             payments: [{
                 "year": "2023",
@@ -1199,10 +1199,13 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
                             let current_loan_duration = Math.ceil(remainder / 30);
                             let point_days = Math.max(0, Math.min(12, current_loan_duration) - 6) + Math.max(18, current_loan_duration) - 18;
                             let running_rate = constants.monthly_lending_rate * (current_loan_duration - point_days);
-                            let pending_amount_interest = running_rate * record.principal_left / 100;
+                            let current_principal_duration = Math.ceil(getDaysDifference(record.last_payment_date, Today) / 30);
+                            //code below doesn't cater for points usage for latest loans
+                            let pending_amount_interest = loanYear == thisYear ? constants.monthly_lending_rate * current_principal_duration : running_rate * record.principal_left / 100;
                             let payment_interest_amount = 0;
                             let points = constants.monthly_lending_rate * point_days * record.principal_left / 100000;
-  
+                            let totalPayments = 0;
+
                             if (record.payments) {
                                 record.payments.forEach(payment => {
                                     let duration = (getDaysDifference(record.loan_date, payment.payment_date) % 30) / 30 < 0.24 ? Math.trunc(getDaysDifference(record.loan_date, payment.payment_date) / 30): Math.ceil(getDaysDifference(record.loan_date, payment.payment_date) / 30);
@@ -1210,10 +1213,11 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
                                     let payment_interest = constants.monthly_lending_rate * (duration - point_day) * payment.payment_amount / 100;
                                     points += constants.monthly_lending_rate * point_day * payment.payment_amount / 100000;
                                     payment_interest_amount += payment_interest;
+                                    totalPayments += payment.payment_amount;
                                 })
                             }
   
-                            interest_accrued = thisYear == loanYear ? pending_amount_interest: pending_amount_interest + payment_interest_amount;
+                            interest_accrued = loanYear == thisYear ? pending_amount_interest + (totalPayments + record.principal_left - record.loan_amount): pending_amount_interest + payment_interest_amount;
                             interest_accrued = interest_accrued  == 0 ? constants.monthly_lending_rate * record.principal_left / 100 : interest_accrued;
                             points_accrued = points;
                             //console.log(current_loan_duration, interest_accrued, point_days, points);
@@ -2503,12 +2507,14 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
         let loan_units = loan_finding.loan_units + loan_finding.principal_left * last_payment_period;
         let remainder = getDaysDifference(loan_finding.loan_date, req.body.payment_date) % 30;
         let current_loan_duration = remainder / 30 < 0.24 ? Math.trunc(getDaysDifference(loan_finding.loan_date, req.body.payment_date) / 30): Math.ceil(getDaysDifference(loan_finding.loan_date, req.body.payment_date) / 30);    
+        let current_principal_duration = last_payment_period / 30 < 0.24 ? Math.trunc(getDaysDifference(loan_finding.last_payment_date, req.body.payment_date) / 30): Math.ceil(getDaysDifference(loan_finding.last_payment_date, req.body.payment_date) / 30);    
         let point_days = Math.max(0, Math.min(12, current_loan_duration) - 6) + Math.max(18, current_loan_duration) - 18;
         let running_rate = constants.monthly_lending_rate * (current_loan_duration - point_days);
-        let pending_amount_interest = running_rate * loan_finding.principal_left / 100;
+        //code below doesn't cater for points usage for latest loans
+        let pending_amount_interest = loanYear == thisYear ? constants.monthly_lending_rate * current_principal_duration : running_rate * loan_finding.principal_left / 100;
         let principal_left = loanYear == thisYear ? loan_finding.principal_left + pending_amount_interest - req.body.payment_amount : loan_finding.principal_left - req.body.payment_amount;
         let points = constants.monthly_lending_rate * point_days * loan_finding.principal_left / 100000;
-        let payment_interest_amount = 0;   
+        let payment_interest_amount = 0;  
  
         if (loan_finding.payments) {
             loan_finding.payments.forEach(payment => {
@@ -2526,8 +2532,9 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
 
         let totalInterestDue = loanYear == thisYear ? pending_amount_interest : pending_amount_interest + payment_interest_amount;
         totalInterestDue = totalInterestDue  == 0 ? constants.monthly_lending_rate * loan_finding.principal_left / 100 : totalInterestDue;
-        
+        //console.log(totalInterestDue, running_rate)
         let interest_amount = loan_finding.interest_amount;
+
 
         if (req.body.payment_amount < (loan_finding.principal_left + totalInterestDue)){
             if (req.body.payment_amount >= loan_finding.principal_left){
