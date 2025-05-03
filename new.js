@@ -1195,11 +1195,13 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
                         if (record.loan_status == "Ongoing") {
                             const loanYear = record.loan_date.getFullYear();
                             const thisYear = new Date().getFullYear();
-                            let remainder = getDaysDifference(record.loan_date, Today);
-                            let current_loan_duration = Math.ceil(remainder / 30);
+                            
+                            let remainder = getDaysDifference(record.loan_date, new Date());
+                            let current_loan_duration = remainder % 30 < 0.24 ? Math.trunc(getDaysDifference(record.loan_date, new Date()) / 30): Math.ceil(getDaysDifference(record.loan_date, new Date()) / 30);
                             let point_days = Math.max(0, Math.min(12, current_loan_duration) - 6) + Math.max(18, current_loan_duration) - 18;
                             let running_rate = constants.monthly_lending_rate * (current_loan_duration - point_days);
-                            let current_principal_duration = Math.ceil(getDaysDifference(record.last_payment_date, Today) / 30);
+                            let last_payment_duration = getDaysDifference(record.loan_date, record.last_payment_date) % 30 < 0.24 ? Math.trunc(getDaysDifference(record.loan_date, record.last_payment_date) / 30): Math.ceil(getDaysDifference(record.loan_date, record.last_payment_date) / 30);
+                            let current_principal_duration = current_loan_duration - last_payment_duration;
                             //code below doesn't cater for points usage for latest loans
                             let pending_amount_interest = loanYear == thisYear ? constants.monthly_lending_rate * current_principal_duration : running_rate * record.principal_left / 100;
                             let payment_interest_amount = 0;
