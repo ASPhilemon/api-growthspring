@@ -2509,11 +2509,12 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
         let loan_units = loan_finding.loan_units + loan_finding.principal_left * last_payment_period;
         let remainder = getDaysDifference(loan_finding.loan_date, req.body.payment_date) % 30;
         let current_loan_duration = remainder / 30 < 0.24 ? Math.trunc(getDaysDifference(loan_finding.loan_date, req.body.payment_date) / 30): Math.ceil(getDaysDifference(loan_finding.loan_date, req.body.payment_date) / 30);    
-        let current_principal_duration = last_payment_period / 30 < 0.24 ? Math.trunc(getDaysDifference(loan_finding.last_payment_date, req.body.payment_date) / 30): Math.ceil(getDaysDifference(loan_finding.last_payment_date, req.body.payment_date) / 30);    
+        let last_payment_duration = getDaysDifference(loan_finding.loan_date, loan_finding.last_payment_date) % 30 < 0.24 ? Math.trunc(getDaysDifference(loan_finding.loan_date, loan_finding.last_payment_date) / 30): Math.ceil(getDaysDifference(loan_finding.loan_date, loan_finding.last_payment_date) / 30);
+        let current_principal_duration = current_loan_duration - last_payment_duration;
         let point_days = Math.max(0, Math.min(12, current_loan_duration) - 6) + Math.max(18, current_loan_duration) - 18;
         let running_rate = constants.monthly_lending_rate * (current_loan_duration - point_days);
         //code below doesn't cater for points usage for latest loans
-        let pending_amount_interest = loanYear == thisYear ? constants.monthly_lending_rate * current_principal_duration : running_rate * loan_finding.principal_left / 100;
+        let pending_amount_interest = loanYear == thisYear ? constants.monthly_lending_rate * current_principal_duration  * loan_finding.principal_left / 100: running_rate * loan_finding.principal_left / 100;
         let principal_left = loanYear == thisYear ? loan_finding.principal_left + pending_amount_interest - req.body.payment_amount : loan_finding.principal_left - req.body.payment_amount;
         let points = constants.monthly_lending_rate * point_days * loan_finding.principal_left / 100000;
         let payment_interest_amount = 0;  
