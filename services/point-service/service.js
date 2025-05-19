@@ -1,20 +1,12 @@
-class ServiceManager{
+import { PointTransfer } from "./models.js"
 
-  constructor(PointTransfer){
-    this.PointTransfer = PointTransfer
-  }
+export async function getPointTransfers(){}
 
-  async getPointTransfers(){}
+export async function getPointTransfer(){}
 
-  async getPointTransfer(){}
+export async function createPointTransfer(){}
 
-  async createPointTransfer(){}
+export async function updatePointTransfer(){}
 
-  async updatePointTransfer(){}
+export async function deletePointTransfer(){}
 
-  async deletePointTransfer(){}
-
-}
-
-
-export default ServiceManager

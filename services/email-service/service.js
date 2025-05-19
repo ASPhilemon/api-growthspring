@@ -1,5 +1,9 @@
-class ServiceManager{
-  static async sendEmail(recipient, msg, {msgFormat = "html"}){}
-}
+export async function sendEmail(
+  sender,
+  recipient,
+  subject,
+  message
+) {
 
-export default ServiceManager
+
+}

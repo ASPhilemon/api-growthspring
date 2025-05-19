@@ -1,33 +1,28 @@
 import express from "express"
 
-import RouteController  from "./controller.js"
-import ServiceManager from "./service.js"
-import { Deposit } from "./models.js"
-
-const serviceManager = new ServiceManager(Deposit)
-const routeController = new RouteController(serviceManager)
+import * as RouteController  from "./controller.js"
 
 const router = express.Router()
 
 router.get(
-  "/",
-  (req, res, next)=> routeController.getDeposits(req, res, next)
+  "/", 
+  RouteController.getDeposits
 )
 router.get(
-  "/:id",
-  (req, res, next)=> routeController.getDeposit(req, res, next)
+  "/:id", 
+  RouteController.getDeposit
 )
 router.post(
-  "/",
-  (req, res, next)=> routeController.createDeposit(req, res, next)
+  "/", 
+  RouteController.createDeposit
 )
 router.put(
-  "/:id",
-  (req, res, next)=> routeController.updateDeposit(req, res, next)
+  "/:id", 
+  RouteController.updateDeposit
 )
 router.delete(
-  "/:id",
-  (req, res, next)=> routeController.deleteDeposit(req, res, next)
+  "/:id", 
+  RouteController.deleteDeposit
 )
 
 export default router

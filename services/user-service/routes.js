@@ -1,33 +1,28 @@
 import express from "express"
 
-import RouteController  from "./controller.js"
-import ServiceManager from "./service.js"
-import { User } from "./models.js"
-
-const serviceManager = new ServiceManager(User)
-const routeController = new RouteController(serviceManager)
+import * as RouteController  from "./controller.js"
 
 const router = express.Router()
 
 router.get(
   "/",
-  (req, res, next)=> routeController.getUsers(req, res, next)
+  RouteController.getUsers
 )
 router.get(
   "/:id",
-  (req, res, next)=> routeController.getUser(req, res, next)
+  RouteController.getUser
 )
 router.post(
   "/",
-  (req, res, next)=> routeController.createUser(req, res, next)
+  RouteController.createUser
 )
 router.put(
   "/:id",
-  (req, res, next)=> routeController.updateUser(req, res, next)
+  RouteController.updateUser
 )
 router.delete(
   "/:id",
-  (req, res, next)=> routeController.deleteUser(req, res, next)
+  RouteController.deleteUser
 )
 
 export default router
