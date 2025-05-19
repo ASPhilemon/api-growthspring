@@ -1,19 +1,20 @@
-class ServiceManager{
+import { Deposit } from "./models.js"
 
-  constructor(Deposit){
-    this.Deposit = Deposit
-  }
-
-  async getDeposits(){}
-
-  async getDeposit(){}
-
-  async createDeposit(){}
-
-  async updateDeposit(){}
-
-  async deleteDeposit(){}
+export async function getDeposits(){
 }
 
+export async function getDeposit(){
 
-export default ServiceManager
+}
+
+export async function createDeposit(){
+
+}
+
+export async function updateDeposit(){
+
+}
+
+export async function deleteDeposit(){
+
+}

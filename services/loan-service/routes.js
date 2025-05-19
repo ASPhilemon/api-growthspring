@@ -1,11 +1,6 @@
 import express from "express"
 
-import RouteController  from "./controller.js"
-import ServiceManager from "./service.js"
-import { Loan, LoanPayment } from "./models.js"
-
-const serviceManager = new ServiceManager(Loan, LoanPayment)
-const routeController = new RouteController(serviceManager)
+import * as RouteController  from "./controller.js"
 
 const router = express.Router()
 const loanPaymentRouter = express.Router()
@@ -13,24 +8,24 @@ const loanPaymentRouter = express.Router()
 //loan payment routes
 loanPaymentRouter.get(
   "/",
-  (req, res, next)=> routeController.getLoanPayments(req, res, next)
+  RouteController.getLoanPayments
 )
 loanPaymentRouter.get(
   "/:id",
-  (req, res, next)=> routeController.getLoanPayment(req, res, next)
+  RouteController.getLoanPayment
 )
 loanPaymentRouter.post(
   "/",
-  (req, res, next)=> routeController.createLoanPayment(req, res, next)
+  RouteController.createLoanPayment
 )
 loanPaymentRouter.put(
   "/:id",
-  (req, res, next)=> routeController.updateLoanPayment(req, res, next)
+  RouteController.updateLoanPayment
 )
 
 loanPaymentRouter.delete(
   "/:id",
-  (req, res, next)=> routeController.deleteLoanPayment(req, res, next)
+  RouteController.deleteLoanPayment
 )
 
 //register loan payment routes
@@ -39,27 +34,27 @@ router.use("/payments", loanPaymentRouter)
 //loan routes
 router.get(
   "/",
-  (req, res, next)=> routeController.getLoans(req, res, next)
+  RouteController.getLoans
 )
 router.get(
   "/:id",
-  (req, res, next)=> routeController.getLoan(req, res, next)
+  RouteController.getLoan
 )
 router.post(
   "/",
-  (req, res, next)=> routeController.createLoan(req, res, next)
+  RouteController.createLoan
 )
 router.put(
   "/:id/approve",
-  (req, res, next)=> routeController.approveLoan(req, res, next)
+  RouteController.approveLoan
 )
 router.put(
   "/:id/close",
-  (req, res, next)=> routeController.closeLoan(req, res, next)
+  RouteController.closeLoan
 )
 router.delete(
   "/:id",
-  (req, res, next)=> routeController.deleteLoan(req, res, next)
+  RouteController.deleteLoan
 )
 
 

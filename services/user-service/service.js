@@ -1,19 +1,11 @@
-class ServiceManager{
+import { User } from "./models.js"
 
-  constructor(User){
-    this.User = User
-  }
+export async function getUsers(){}
 
-  async getUsers(){}
+export async function getUser(){}
 
-  async getUser(){}
+export async function createUser(){}
 
-  async createUser(){}
+export async function updateUser(){}
 
-  async updateUser(){}
-
-  async deleteUser(){}
-}
-
-
-export default ServiceManager
+export async function deleteUser(){}

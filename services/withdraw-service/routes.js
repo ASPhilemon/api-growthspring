@@ -1,33 +1,28 @@
 import express from "express"
 
-import RouteController  from "./controller.js"
-import ServiceManager from "./service.js"
-import { Withdraw } from "./models.js"
-
-const serviceManager = new ServiceManager(Withdraw)
-const routeController = new RouteController(serviceManager)
+import * as RouteController  from "./controller.js"
 
 const router = express.Router()
 
 router.get(
   "/",
-  (req, res, next)=> routeController.getWithdraws(req, res, next)
+  RouteController.getWithdraws
 )
 router.get(
   "/:id",
-  (req, res, next)=> routeController.getWithdraw(req, res, next)
+  RouteController.getWithdraw
 )
 router.post(
   "/",
-  (req, res, next)=> routeController.createWithdraw(req, res, next)
+  RouteController.createWithdraw
 )
 router.put(
   "/:id",
-  (req, res, next)=> routeController.updateWithdraw(req, res, next)
+  RouteController.updateWithdraw
 )
 router.delete(
   "/:id",
-  (req, res, next)=> routeController.deleteWithdraw(req, res, next)
+  RouteController.deleteWithdraw
 )
 
 export default router

@@ -1,30 +1,41 @@
-class ServiceManager{
+import { CashLocation, CashLocationTransfer } from "./models.js"
 
-  constructor(CashLocation, CashLocationTransfer){
-    this.CashLocation = CashLocation
-    this.CashLocationTransfer = CashLocationTransfer
-  }
-
-  async getCashLocations(){}
-
-  async getCashLocation(){}
-
-  async createCashLocation(){}
-
-  async updateCashLocation(){}
-
-  async deleteCashLocation(){}
-
-  async getCashLocationTransfers(){}
-
-  async getCashLocationTransfer(){}
-
-  async createCashLocationTransfer(){}
-
-  async updateCashLocationTransfer(){}
-
-  async deleteCashLocationTransfer(){}
+export async function getCashLocations(){
+  
 }
 
+export async function getCashLocation(){
+  
+}
 
-export default ServiceManager
+export async function createCashLocation(){
+  
+}
+
+export async function updateCashLocation(){
+  
+}
+
+export async function deleteCashLocation(){
+  
+}
+
+export async function getCashLocationTransfers(){
+  
+}
+
+export async function getCashLocationTransfer(){
+  
+}
+
+export async function createCashLocationTransfer(){
+  
+}
+
+export async function updateCashLocationTransfer(){
+  
+}
+
+export async function deleteCashLocationTransfer(){
+  
+}

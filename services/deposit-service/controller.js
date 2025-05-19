@@ -1,20 +1,21 @@
-class RouteController{
+import * as ServiceManager from "./service.js"
 
-  constructor(serviceManager){
-    this.serviceManager = serviceManager
-  }
-
-  async getDeposits(req, res){}
-
-  async getDeposit(req, res){}
-
-  async createDeposit(req, res){}
-
-  async updateDeposit(req, res){}
-
-  async deleteDeposit(req, res){}
+export async function getDeposits(req, res){
 
 }
 
+export async function getDeposit(req, res){
 
-export default RouteController
+}
+
+export async function createDeposit(req, res){
+
+}
+
+export async function updateDeposit(req, res){
+
+}
+
+export async function deleteDeposit(req, res){
+  
+}

@@ -1,19 +1,11 @@
-class ServiceManager{
+import { Withdraw } from "./models.js"
 
-  constructor(Withdraw){
-    this.Withdraw = Withdraw
-  }
+export async function getWithdraws(){}
 
-  async getWithdraws(){}
+export async function getWithdraw(){}
 
-  async getWithdraw(){}
+export async function createWithdraw(){}
 
-  async createWithdraw(){}
+export async function updateWithdraw(){}
 
-  async updateWithdraw(){}
-
-  async deleteWithdraw(){}
-}
-
-
-export default ServiceManager
+export async function deleteWithdraw(){}

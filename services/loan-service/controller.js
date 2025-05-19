@@ -1,31 +1,23 @@
-class RouteController{
+import * as ServiceManager from "./service.js"
 
-  constructor(serviceManager){
-    this.serviceManager = serviceManager
-  }
+export async function getLoans(req, res){}
 
-  async getLoans(req, res){}
+export async function getLoan(req, res){}
 
-  async getLoan(req, res){}
+export async function createLoan(req, res){}
 
-  async createLoan(req, res){}
+export async function approveLoan(req, res){}
 
-  async approveLoan(req, res){}
+export async function closeLoan(req, res){}
 
-  async closeLoan(req, res){}
+export async function deleteLoan(req, res){}
 
-  async deleteLoan(req, res){}
+export async function getLoanPayments(req, res){}
 
-  async getLoanPayments(req, res){}
+export async function getLoanPayment(req, res){}
 
-  async getLoanPayment(req, res){}
+export async function createLoanPayment(req, res){}
 
-  async createLoanPayment(req, res){}
+export async function updateLoanPayment(req, res){}
 
-  async updateLoanPayment(req, res){}
-  
-  async deleteLoanPayment(req, res){}
-}
-
-
-export default RouteController
+export async function deleteLoanPayment(req, res){}

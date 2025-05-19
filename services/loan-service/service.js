@@ -1,33 +1,23 @@
-class ServiceManager{
+import { Loan, LoanPayment} from "./models.js"
 
-  constructor(Loan, LoanPayment){
-    this.Loan = Loan
-    this.LoanPayment = LoanPayment
-  }
+export async function getLoans(){}
 
-  async getLoans(){}
+export async function getLoan(){}
 
-  async getLoan(){}
+export async function createLoan(){}
 
-  async createLoan(){}
+export async function approveLoan(){}
 
-  async approveLoan(){}
+export async function closeLoan(){}
 
-  async closeLoan(){}
+export async function deleteLoan(){}
 
-  async deleteLoan(){}
+export async function getLoanPayments(){}
 
-  async getLoanPayments(){}
+export async function getLoanPayment(){}
 
-  async getLoanPayment(){}
+export async function createLoanPayment(){}
 
-  async createLoanPayment(){}
+export async function updateLoanPayment(){}
 
-  async updateLoanPayment(){}
-  
-  async deleteLoanPayment(){}
-
-}
-
-
-export default ServiceManager
+export async function deleteLoanPayment(){}

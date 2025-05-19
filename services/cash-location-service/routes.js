@@ -1,11 +1,6 @@
 import express from "express"
 
-import RouteController  from "./controller.js"
-import ServiceManager from "./service.js"
-import { CashLocation, CashLocationTransfer } from "./models.js"
-
-const serviceManager = new ServiceManager(CashLocation, CashLocationTransfer)
-const routeController = new RouteController(serviceManager)
+import * as RouteController  from "./controller.js"
 
 const router = express.Router()
 const cashLocationTransferRouter = express.Router()
@@ -13,23 +8,23 @@ const cashLocationTransferRouter = express.Router()
 // cash location transfers routes
 cashLocationTransferRouter.get(
   "/",
-  (req, res, next)=> routeController.getCashLocationTransfers(req, res, next)
+  RouteController.getCashLocationTransfers
 )
 cashLocationTransferRouter.get(
   "/:id",
-  (req, res, next)=> routeController.getCashLocationTransfer(req, res, next)
+  RouteController.getCashLocationTransfer
 )
 cashLocationTransferRouter.post(
-  "/",
-  (req, res, next)=> routeController.createCashLocationTransfer(req, res, next)
+  "/", 
+  RouteController.createCashLocationTransfer
 )
 cashLocationTransferRouter.put(
   "/:id", 
-  (req, res, next)=> routeController.updateCashLocationTransfer(req, res, next)
+  RouteController.updateCashLocationTransfer
 )
 cashLocationTransferRouter.delete(
   "/:id",
-  (req, res, next)=> routeController.deleteCashLocationTransfer(req, res, next)
+  RouteController.deleteCashLocationTransfer
 )
 
 //register cash location transfers routes
@@ -39,23 +34,23 @@ router.use("/transfers", cashLocationTransferRouter)
 //cash location routes
 router.get(
   "/",
-  (req, res, next)=> routeController.getCashLocations(req, res, next)
+  RouteController.getCashLocations
 )
 router.get(
   "/:id",
-  (req, res, next)=> routeController.getCashLocation(req, res, next)
+  RouteController.getCashLocation
 )
 router.post(
   "/",
-  (req, res, next)=> routeController.createCashLocation(req, res, next)
+  RouteController.createCashLocation
 )
 router.put(
   "/:id",
-  (req, res, next)=> routeController.updateCashLocation(req, res, next)
+  RouteController.updateCashLocation
 )
 router.delete(
   "/:id",
-  (req, res, next)=> routeController.deleteCashLocation(req, res, next)
+  RouteController.deleteCashLocation
 )
 
 

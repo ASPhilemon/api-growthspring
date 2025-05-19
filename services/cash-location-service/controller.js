@@ -1,29 +1,21 @@
-class RouteController{
+import * as ServiceManager from "./service.js"
 
-  constructor(serviceManager){
-    this.serviceManager = serviceManager
-  }
+export async function getCashLocations(req, res){}
 
-  async getCashLocations(req, res){}
+export async function getCashLocation(req, res){}
 
-  async getCashLocation(req, res){}
+export async function createCashLocation(req, res){}
 
-  async createCashLocation(req, res){}
+export async function updateCashLocation(req, res){}
 
-  async updateCashLocation(req, res){}
+export async function deleteCashLocation(req, res){}
 
-  async deleteCashLocation(req, res){}
+export async function getCashLocationTransfers(req, res){}
 
-  async getCashLocationTransfers(req, res){}
+export async function  getCashLocationTransfer(req, res){}
 
-  async getCashLocationTransfer(req, res){}
+export async function createCashLocationTransfer(req, res){}
 
-  async createCashLocationTransfer(req, res){}
-
-  async updateCashLocationTransfer(req, res){}
+export async function updateCashLocationTransfer(req, res){}
   
-  async deleteCashLocationTransfer(req, res){}
-}
-
-
-export default RouteController
+export async function deleteCashLocationTransfer(req, res){}

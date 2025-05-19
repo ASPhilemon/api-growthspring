@@ -1,20 +1,11 @@
-class RouteController{
+import * as ServiceManager from "./service.js"
 
-  constructor(serviceManager){
-    this.serviceManager = serviceManager
-  }
+export async function getUsers(req, res){}
 
-  async getUsers(req, res){}
+export async function getUser(req, res){}
 
-  async getUser(req, res){}
+export async function createUser(req, res){}
 
-  async createUser(req, res){}
+export async function updateUser(req, res){}
 
-  async updateUser(req, res){}
-
-  async deleteUser(req, res){}
-
-}
-
-
-export default RouteController
+export async function deleteUser(req, res){}
