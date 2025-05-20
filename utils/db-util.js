@@ -4,6 +4,6 @@ export async function tryMongoose(promise) {
   try {
     return await promise
   } catch (err) {
-    handleMongooseError(err)
+    ErrorUtil.handleMongooseError(err)
   }
 }
