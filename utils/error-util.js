@@ -15,7 +15,7 @@ export function handleMongooseError(err){
   let statusCode
   if (err instanceof ValidationError || err instanceof CastError){
     statusCode = 400
-    throw new AppError("Data validation failed", statusCode, err)
+    throw new AppError("Failed to validate user input", statusCode, err)
   }
   else{
     statusCode =  500
