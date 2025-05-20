@@ -1,4 +1,4 @@
-import express from "express"
+import express, { json } from "express"
 
 //routers imports
 import cashLocationRouter from "./services/cash-location-service/routes.js"
@@ -15,6 +15,7 @@ import { errorHandler } from "./middleware/error-middleware.js"
 const app = express()
 
 app.use(cors({origin: true , credentials: true}))
+app.use(express.json())
 
 //routes
 app.use("/cash-locations", cashLocationRouter)
