@@ -21,13 +21,8 @@ loanPaymentRouter.get(
 )
 loanPaymentRouter.post(
   "/",
-  (req, res, next)=> routeController.createLoanPayment(req, res, next)
+  RouteController.makeLoanPayment
 )
-loanPaymentRouter.put(
-  "/:id",
-  (req, res, next)=> routeController.updateLoanPayment(req, res, next)
-)
-
 loanPaymentRouter.delete(
   "/:id",
   (req, res, next)=> routeController.deleteLoanPayment(req, res, next)
@@ -43,7 +38,7 @@ router.get(
 )
 router.get(
   "/:id",
-  (req, res, next)=> routeController.getLoan(req, res, next)
+  RouteController.getLoanById
 )
 router.post(
   "/",
