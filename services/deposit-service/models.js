@@ -105,7 +105,7 @@ depositSchema.statics.getDeposits = async function({
     })
 
     //execute pipeline
-    return await DB.tryMongoose(Deposit.aggregate(pipeline))
+    return await DB.query(Deposit.aggregate(pipeline))
 }
 
 //models
