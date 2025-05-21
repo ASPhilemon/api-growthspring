@@ -14,7 +14,7 @@ export async function getDeposits({ filter, sort, pagination }){
 }
 
 export async function getDeposit(depositId){
-  const deposit = await DB.tryMongoose(Deposit.findById(depositId))
+  const deposit = await DB.query(Deposit.findById(depositId))
   const statusCode = 400
   if (!deposit) throw new ErrorUtil.AppError("Failed to find deposit", statusCode)
   return deposit
@@ -31,7 +31,7 @@ export async function createDeposit(deposit){
   const userUpdate = { investmentAmount : user.investmentAmount + deposit.amount }
   
   await Promise.all([
-    DB.tryMongoose(Deposit.create(deposit)),
+    DB.query(Deposit.create(deposit)),
     UserServiceManager.updateUser(user._id, userUpdate),
     CashLocationServiceManager.addToCashLocation(deposit.cashLocationId, deposit.amount)
   ])
@@ -56,7 +56,7 @@ export async function updateDeposit(depositId, update){
 
   await Promise.all([
     UserServiceManager.updateUser(userId, userUpdate ),
-    DB.tryMongoose(Deposit.updateOne({ _id: deposit._id }, update))
+    DB.query(Deposit.updateOne({ _id: deposit._id }, update))
   ])
 }
 
@@ -73,6 +73,6 @@ export async function deleteDeposit(depositId) {
   await Promise.all([
     UserServiceManager.updateUser(userId, userUpdate),
     CashLocationServiceManager.deductFromCashLocation(cashLocationId, deposit.amount),
-    DB.tryMongoose(Deposit.deleteOne({ _id: depositId }))
+    DB.query(Deposit.deleteOne({ _id: depositId }))
   ])
 }
