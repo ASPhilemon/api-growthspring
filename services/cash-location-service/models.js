@@ -1,26 +1,57 @@
 import mongoose from "mongoose";
 
-//schemas
-const cashLocationSchema = new mongoose.Schema(
-  {}, 
-  { timestamps:true }
-);
+const { ObjectId } = mongoose.Types
 
-const cashLocationTransferSchema = new mongoose.Schema(
-  {},
-  { timestamps:true }
-);
+//cash-location schema
+const cashLocationSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+  },
+  amount: {
+    type:  Number,
+    required: true,
+  },
+}, { timestamps:true });
 
+//cash-location-transfer schema
+const cashLocationTransferSchema = new mongoose.Schema({
+  sourceCashLocation: {
+    type: String,
+    required: true,
+  },
+  destCashLocation: {
+    type: {
+      id: ObjectId,
+      name: String
+    }
+  },
+  mover:{
+    type:{
+      id:{
+        type: ObjectId,
+        required: true
+      },
+      name: {
+        type: String,
+        required: true
+      }
+    }
+  },
+  amount: {
+    type:  Number,
+    required: true,
+  },
+  date: {
+    type: Date,
+    required: true,
+  },
+}, { timestamps:true });
 
-//models
-const CashLocation  = mongoose.model(
-  'cash-location',
-  cashLocationSchema
-);
+//cash-location model
+const CashLocation  = mongoose.model('cash-location', cashLocationSchema);
 
-const CashLocationTransfer  = mongoose.model(
-  'cash-location-transfer',
-  cashLocationTransferSchema
-);
+//cash-location-transfer model
+const CashLocationTransfer  = mongoose.model('cash-location-transfer', cashLocationTransferSchema);
 
-export { CashLocation, CashLocationTransfer }
+export {CashLocation, CashLocationTransfer}

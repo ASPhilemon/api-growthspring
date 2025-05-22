@@ -1,20 +1,11 @@
-class RouteController{
+import * as ServiceManager from "./service.js"
 
-  constructor(serviceManager){
-    this.serviceManager = serviceManager
-  }
+export async function getWithdraws(req, res){}
 
-  async getWithdraws(req, res){}
+export async function getWithdraw(req, res){}
 
-  async getWithdraw(req, res){}
+export async function createWithdraw(req, res){}
 
-  async createWithdraw(req, res){}
+export async function updateWithdraw(req, res){}
 
-  async updateWithdraw(req, res){}
-
-  async deleteWithdraw(req, res){}
-
-}
-
-
-export default RouteController
+export async function deleteWithdraw(req, res){}

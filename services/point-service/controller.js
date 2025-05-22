@@ -1,20 +1,11 @@
-class RouteController{
+import * as ServiceManager from "./service.js"
 
-  constructor(serviceManager){
-    this.serviceManager = serviceManager
-  }
+export async function getPointTransfers(req, res){}
 
-  async getPointTransfers(req, res){}
+export async function getPointTransfer(req, res){}
 
-  async getPointTransfer(req, res){}
+export async function createPointTransfer(req, res){}
 
-  async createPointTransfer(req, res){}
+export async function updatePointTransfer(req, res){}
 
-  async updatePointTransfer(req, res){}
-
-  async deletePointTransfer(req, res){}
-
-}
-
-
-export default RouteController
+export async function deletePointTransfer(req, res){}

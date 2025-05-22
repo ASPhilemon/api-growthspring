@@ -1,33 +1,28 @@
 import express from "express"
 
-import RouteController  from "./controller.js"
-import ServiceManager from "./service.js"
-import { PointTransfer } from "./models.js"
-
-const serviceManager = new ServiceManager(PointTransfer)
-const routeController = new RouteController(serviceManager)
+import * as RouteController  from "./controller.js"
 
 const router = express.Router()
 
 router.get(
   "/",
-  (req, res, next)=> routeController.getPointTransfers(req, res, next)
+  RouteController.getPointTransfers
 )
 router.get(
   "/:id",
-  (req, res, next)=> routeController.getPointTransfer(req, res, next)
+  RouteController.getPointTransfer
 )
 router.post(
   "/",
-  (req, res, next)=> routeController.createPointTransfer(req, res, next)
+  RouteController.createPointTransfer
 )
 router.put(
   "/:id",
-  (req, res, next)=> routeController.updatePointTransfer(req, res, next)
+  RouteController.updatePointTransfer
 )
 router.delete(
   "/:id",
-  (req, res, next)=> routeController.deletePointTransfer(req, res, next)
+  RouteController.deletePointTransfer
 )
 
 export default router
