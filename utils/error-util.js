@@ -1,48 +1,66 @@
 import mongoose from "mongoose"
 
 export class AppError extends Error {
-  constructor({ message, statusCode, cause = null}) {
+  constructor({ message, statusCode, cause = null }) {
     super(message);
     this.statusCode = statusCode;
-    this.cause = cause
+    this.cause = cause;
     Error.captureStackTrace(this, this.constructor);
+  }
+
+  static buildArgs(arg1, defaultMessage, statusCode, arg2 = null) {
+    if (typeof arg1 === "string") {
+      return { message: arg1, statusCode, cause: arg2 };
+    } else {
+      return {
+        message: arg1?.message || defaultMessage,
+        statusCode,
+        cause: arg1?.cause || null,
+      };
+    }
   }
 }
 
 export class NotAuthenticatedError extends AppError {
-  constructor({message = "Failed to authenticate request", cause = null}={}) {
+  constructor(arg1 = {}, arg2 = null) {
+    const defaultMessage = "Failed to authenticate"
     const statusCode = 401
-    super({message, statusCode, cause});
+    super(AppError.buildArgs(arg1, defaultMessage , statusCode, arg2));
   }
 }
 
 export class NotAllowedError extends AppError {
-  constructor({message = "Access Denied", cause = null}={}) {
+  constructor(arg1 = {}, arg2 = null) {
+    const defaultMessage = "Access denied"
     const statusCode = 403
-    super({message, statusCode, cause});
+    super(AppError.buildArgs(arg1, defaultMessage, statusCode, arg2));
   }
 }
 
 export class BadRequestError extends AppError {
-  constructor({message = "There was something wrong in your request", cause = null}={}) {
+  constructor(arg1 = {}, arg2 = null) {
+    const defaultMessage = "The request has an error"
     const statusCode = 400
-    super({message, statusCode, cause});
+    super(AppError.buildArgs(arg1, defaultMessage, statusCode, arg2));
   }
 }
 
 export class NotFoundError extends AppError {
-  constructor({message = "Resource not found", cause = null}={}) {
+  constructor(arg1 = {}, arg2 = null) {
+    const defaultMessage = "Resource not found on the server"
     const statusCode = 404
-    super({message, statusCode, cause});
+    super(AppError.buildArgs(arg1, defaultMessage, statusCode, arg2));
   }
 }
 
 export class InternalServerError extends AppError {
-  constructor({message = "Sorry, something went wrong on the server", cause = null}={}) {
+  constructor(arg1 = {}, arg2 = null) {
+    const defaultMessage = "Internal server error"
     const statusCode = 500
-    super({message, statusCode, cause});
+    super(AppError.buildArgs(arg1, defaultMessage, statusCode, arg2));
   }
 }
+
 
 export function handleMongooseError(err){
   const { ValidationError, CastError } = mongoose.Error
