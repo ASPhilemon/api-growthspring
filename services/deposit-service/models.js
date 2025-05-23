@@ -27,7 +27,8 @@ const depositSchema = new mongoose.Schema({
     },
     type:{
       type:"String",
-      enum: ["Club Saving", "Temporary Saving"]
+      enum: ["Club Saving", "Temporary Saving"],
+      required: true
     },
 
     recordedBy: {
@@ -54,7 +55,7 @@ const depositSchema = new mongoose.Schema({
     },
     cashLocation:{
       type: {
-        id: {
+        _id: {
           type: ObjectId,
           required: true
         },
