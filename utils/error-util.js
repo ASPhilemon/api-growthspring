@@ -66,7 +66,7 @@ export function handleMongooseError(err){
   const { ValidationError, CastError } = mongoose.Error
 
   if (err instanceof ValidationError || err instanceof CastError){
-    throw new BadRequestError({message: "Failed to validate user input", cause: err})
+    throw new BadRequestError("Failed to validate user input", err)
   }
   else{
     throw new InternalServerError()

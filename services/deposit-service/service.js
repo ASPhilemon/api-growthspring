@@ -3,6 +3,7 @@ import { Deposit } from "./models.js"
 
 //util
 import * as DB from "../../utils/db-util.js"
+import * as ErrorUtil from "../../utils/error-util.js"
 
 //collaborator services
 import * as UserServiceManager from "../user-service/service.js"
@@ -15,8 +16,7 @@ export async function getDeposits({ filter, sort, pagination }){
 
 export async function getDeposit(depositId){
   const deposit = await DB.query(Deposit.findById(depositId))
-  const statusCode = 400
-  if (!deposit) throw new ErrorUtil.AppError("Failed to find deposit", statusCode)
+  if (!deposit) throw new ErrorUtil.NotFoundError("Failed to find deposit")
   return deposit
 }
 
