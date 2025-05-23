@@ -7,11 +7,11 @@ const { ObjectId } = mongoose.Types
 const depositSchema = new mongoose.Schema({
     depositor: {
       type: {
-        userId: {
+        _id: {
           type: ObjectId,
           required: true
         },
-        name: {
+        fullName: {
           type: String,
           required: true
         }
@@ -27,24 +27,24 @@ const depositSchema = new mongoose.Schema({
     },
     recordedBy: {
       type: {
-        userId: {
+        _id: {
           type: ObjectId,
           required: true
         },
-        name: {
+        fullName: {
           type: String,
           required: true
         }
       }
     },
-    balance_before:{
+    balanceBefore:{
       type: Number,
       min: 0,
       required: true
     },
     source:{
       type: String,
-      enum: ["Savings", "Profits", "Excess Loan Payment", "Interest"],
+      enum: ["Savings", "Temporary Savings", "Profits", "Excess Loan Payment", "Interest"],
       required: true
     },
     cashLocation:{
@@ -75,7 +75,7 @@ depositSchema.statics.getDeposits = async function({
     const matchCriteria = [];
     if (filter?.year) matchCriteria.push({ $expr: { $eq: [{ $year: "$date" }, filter.year] }});
     if (filter?.month) matchCriteria.push({ $expr: { $eq: [{ $month: "$date" }, filter.month]}});
-    if (filter?.userId) matchCriteria.push({ "depositor.userId": filter.userId });
+    if (filter?.userId) matchCriteria.push({ "depositor._id": filter.userId });
 
     if (matchCriteria.length > 0) matchStage.$and = matchCriteria
     pipeline.push({ $match: matchStage });
@@ -91,7 +91,7 @@ depositSchema.statics.getDeposits = async function({
     pipeline.push({
       $lookup: {
         from: "users",
-        localField: "depositor.userId",
+        localField: "depositor._id",
         foreignField: "_id",
         as: "depositor"
       },

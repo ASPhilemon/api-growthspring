@@ -47,7 +47,7 @@ export async function createDeposit(deposit){
 export async function updateDeposit(depositId, update){
   const deposit = await getDeposit(depositId)
 
-  const { userId } = deposit.depositor
+  const { _id: userId } = deposit.depositor
   const user = await UserServiceManager.getUser(userId)
 
   //update user and deposit
@@ -63,7 +63,7 @@ export async function updateDeposit(depositId, update){
 export async function deleteDeposit(depositId) {
   const deposit = await getDeposit(depositId)
 
-  const { userId } = deposit.depositor
+  const { _id:userId } = deposit.depositor
   const user = await UserServiceManager.getUser(userId)
     
   const updatedInvestmentAmount = user.investmentAmount - deposit.amount
