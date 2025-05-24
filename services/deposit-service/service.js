@@ -3,6 +3,7 @@ import { Deposit } from "./models.js"
 
 //util
 import * as DB from "../../utils/db-util.js"
+import * as ErrorUtil from "../../utils/error-util.js"
 
 //collaborator services
 import * as UserServiceManager from "../user-service/service.js"
@@ -15,8 +16,7 @@ export async function getDeposits({ filter, sort, pagination }){
 
 export async function getDeposit(depositId){
   const deposit = await DB.query(Deposit.findById(depositId))
-  const statusCode = 400
-  if (!deposit) throw new ErrorUtil.AppError("Failed to find deposit", statusCode)
+  if (!deposit) throw new ErrorUtil.NotFoundError("Failed to find deposit")
   return deposit
 }
 
@@ -47,7 +47,7 @@ export async function createDeposit(deposit){
 export async function updateDeposit(depositId, update){
   const deposit = await getDeposit(depositId)
 
-  const { userId } = deposit.depositor
+  const { _id: userId } = deposit.depositor
   const user = await UserServiceManager.getUser(userId)
 
   //update user and deposit
@@ -63,7 +63,7 @@ export async function updateDeposit(depositId, update){
 export async function deleteDeposit(depositId) {
   const deposit = await getDeposit(depositId)
 
-  const { userId } = deposit.depositor
+  const { _id:userId } = deposit.depositor
   const user = await UserServiceManager.getUser(userId)
     
   const updatedInvestmentAmount = user.investmentAmount - deposit.amount
