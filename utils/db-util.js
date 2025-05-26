@@ -13,7 +13,7 @@ export async function query(promise) {
 export async function transaction(transactionCallback) {
   try {
     await mongoose.connection.transaction(async () => {
-      await fn();
+      await transactionCallback();
     });
   }
   catch (err) {
