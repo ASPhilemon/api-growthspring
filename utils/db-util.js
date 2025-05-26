@@ -10,11 +10,9 @@ export async function query(promise) {
   }
 }
 
-export async function transaction(transactionCallback) {
+export async function transaction(callback) {
   try {
-    await mongoose.connection.transaction(async () => {
-      await transactionCallback();
-    });
+    await mongoose.connection.transaction(callback);
   }
   catch (err) {
     if (err instanceof AppError) throw err;
