@@ -1,5 +1,7 @@
 import mongoose from "mongoose"
 
+mongoose.set('transactionAsyncLocalStorage', true);
+
 async function connectDB(){
   try {
     await mongoose.connect(process.env.MONGODB_URI, {});
