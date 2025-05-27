@@ -79,7 +79,7 @@ const yearDepositSchema = new mongoose.Schema({
   },
   monthTotals: {
     type : Array,
-    required: True
+    required: true
   }
 })
 
