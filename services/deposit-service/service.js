@@ -23,18 +23,20 @@ export async function getDeposit(depositId){
 export async function createDeposit(deposit){
   //get user
   const { userId } = deposit.depositor
-  const user = await UserServiceManager.getUser(userId)
+  const user = await UserServiceManager.getUserById(userId)
 
   //add field balance before to deposit
-  deposit.balance_before = user.investmentAmount
+  deposit.balanceBefore = user.investmentAmount
 
-  const userUpdate = { investmentAmount : user.investmentAmount + deposit.amount }
-  
-  await Promise.all([
-    DB.query(Deposit.create(deposit)),
-    UserServiceManager.updateUser(user._id, userUpdate),
-    CashLocationServiceManager.addToCashLocation(deposit.cashLocationId, deposit.amount)
-  ])
+  await DB.transaction(async ()=>{
+    await DB.query(Deposit.create(deposit))
+
+    await (deposit.type === "club saving"
+    ? UserServiceManager.addInvestmentAmount
+    : UserServiceManager.addTempSavingsAmount)(userId, deposit.amount);
+
+    await CashLocationServiceManager.addToCashLocation(deposit.cashLocationId, deposit.amount)
+  })
   
   EmailServiceManager.sendEmail({
     sender: "growthspring",
@@ -44,35 +46,44 @@ export async function createDeposit(deposit){
   })
 }
 
-export async function updateDeposit(depositId, update){
+export async function setAmount(depositId, newAmount){
   const deposit = await getDeposit(depositId)
 
   const { _id: userId } = deposit.depositor
-  const user = await UserServiceManager.getUser(userId)
 
-  //update user and deposit
-  const investmentAmountUpdate = user.investmentAmount - deposit.amount + update.amount
-  const userUpdate = {investmentAmount: investmentAmountUpdate  }
+  await DB.transaction(async()=> {
+    await UserServiceManager.addInvestmentAmount(newAmount - deposit.amount)
+    await DB.query(Deposit.updateOne({_id: userId}, {amount: newAmount}))
+  })
 
-  await Promise.all([
-    UserServiceManager.updateUser(userId, userUpdate ),
-    DB.query(Deposit.updateOne({ _id: deposit._id }, update))
-  ])
+  EmailServiceManager.sendEmail({
+    sender: "growthspring",
+    recipient: deposit.depositor.email,
+    subject: "Deposit Updated",
+    message: "Your deposit has been updated"
+  })
 }
 
 export async function deleteDeposit(depositId) {
   const deposit = await getDeposit(depositId)
+  const { _id: userId } = deposit.depositor
+   const { amount } = deposit
+  const { _id: cashLocationId } = deposit.cashLocation
 
-  const { _id:userId } = deposit.depositor
-  const user = await UserServiceManager.getUser(userId)
-    
-  const updatedInvestmentAmount = user.investmentAmount - deposit.amount
-  const userUpdate = { investmentAmount: updatedInvestmentAmount }
-  const { cashLocationId } = deposit.cashLocation
+  await DB.transaction(async ()=> {
+    await (deposit.type === "club saving"
+    ? UserServiceManager.deductInvestmentAmount
+    : UserServiceManager.deductTempSavingsAmount)(userId, amount);
 
-  await Promise.all([
-    UserServiceManager.updateUser(userId, userUpdate),
-    CashLocationServiceManager.deductFromCashLocation(cashLocationId, deposit.amount),
-    DB.query(Deposit.deleteOne({ _id: depositId }))
-  ])
+    await CashLocationServiceManager.deductFromCashLocation(cashLocationId, deposit.amount),
+    await DB.query(Deposit.updateOne({ _id: depositId }, {deleted: true}))
+  })
+
+  EmailServiceManager.sendEmail({
+    sender: "growthspring",
+    recipient: deposit.depositor.email,
+    subject: "Deposit Deleted",
+    message: "Your deposit has been deleted"
+  })
+
 }
