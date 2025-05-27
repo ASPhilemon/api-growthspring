@@ -24,10 +24,16 @@ export async function recordTransaction(transaction){
   await DB.query(PointTransaction.create(transaction))
 }
 
-export async function updateTransaction(transactionId, update){
-
+export async function setPoints(filter, newPoints){
+  const result = await DB.query(PointTransaction.updateOne({filter}, {$set: {points: newPoints}}))
+  if (result.matchedCount == 0){
+    throw new ErrorUtil.BadRequestError("Failed to find point transaction")
+  }
 }
 
-export async function deleteTransaction(transactionId){
-  await DB.query(PointTransaction.findByIdAndDelete(transactionId))
+export async function deleteTransaction(filter){
+  const result = await DB.query(PointTransaction.findOneAndDelete(filter))
+  if (result.matchedCount == 0){
+    throw new ErrorUtil.BadRequestError("Failed to find transaction to delete")
+  }
 }

@@ -18,7 +18,7 @@ router.post(
 )
 router.put(
   "/:id",
-  RouteController.updateTransaction
+  RouteController.setPoints
 )
 router.delete(
   "/:id",

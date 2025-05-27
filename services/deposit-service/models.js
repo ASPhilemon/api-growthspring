@@ -68,6 +68,21 @@ const depositSchema = new mongoose.Schema({
   }, { timestamps:true }
 );
 
+const yearDepositSchema = new mongoose.Schema({
+  year: {
+    type: Number,
+    required: true,
+  },
+  total:{
+    type: Number,
+    required: true
+  },
+  monthTotals: {
+    type : Array,
+    required: true
+  }
+})
+
 //custom static methods on model
 depositSchema.statics.getDeposits = async function({
   filter,
@@ -115,10 +130,8 @@ depositSchema.statics.getDeposits = async function({
 }
 
 //models
-const Deposit  = mongoose.model(
-  'deposit',
-  depositSchema
-);
+const Deposit  = mongoose.model('deposit', depositSchema );
+const YearDeposit  = mongoose.model('year-deposit', yearDepositSchema );
 
 
-export { Deposit }
+export { Deposit, YearDeposit }
