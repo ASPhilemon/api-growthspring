@@ -1,6 +1,5 @@
 import * as ErrorUtil from "./error-util.js"
 import mongoose from "mongoose"
-import * as ErrorUtil from "./error-util.js"
 
 export async function query(promise) {
   try {
