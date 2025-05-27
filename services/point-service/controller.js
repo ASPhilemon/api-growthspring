@@ -19,15 +19,15 @@ export async function recordTransaction(req, res){
   Response.sendSuccess(res, null)
 }
 
-export async function updateTransaction(req, res){
-  const { transactionUpdate } = req.body
+export async function setPoints(req, res){
+  const { newPoints } = req.body
   const { transactionId } = req.params
-  await ServiceManager.updateTransaction(transactionId, transactionUpdate)
+  await ServiceManager.setPoints({_id: transactionId, newPoints})
   Response.sendSuccess(res, null)
 }
 
 export async function deleteTransaction(req, res){
   const { transactionId } = req.params
-  await ServiceManager.deleteTransaction(transactionId)
+  await ServiceManager.deleteTransaction({_id: transactionId})
   Response.sendSuccess(res, null)
 }

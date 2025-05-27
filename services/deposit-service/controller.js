@@ -7,6 +7,11 @@ export async function getDeposits(req, res){
   Response.sendSuccess(res, deposits)
 }
 
+export async function getClubDeposits(req, res){
+  const clubDeposits = await ServiceManager.getClubDeposits()
+  Response.sendSuccess(res, clubDeposits)
+}
+
 export async function getDeposit(req, res){
   const { id: depositId }= req.params
   const deposit = await ServiceManager.getDeposit(depositId)
@@ -19,10 +24,10 @@ export async function createDeposit(req, res){
   Response.sendSuccess(res, null)
 }
 
-export async function updateDeposit(req, res){
+export async function updateAmount(req, res){
   const { id: depositId } = req.params
-  const { update } = req.body
-  await ServiceManager.updateDeposit(depositId, update)
+  const { amount } = req.body
+  await ServiceManager.setAmount(depositId, amount)
   Response.sendSuccess(res, null)
 }
 
