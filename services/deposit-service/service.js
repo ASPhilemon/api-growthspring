@@ -52,7 +52,9 @@ export async function setAmount(depositId, newAmount){
   const { _id: userId } = deposit.depositor
 
   await DB.transaction(async()=> {
-    await UserServiceManager.addInvestmentAmount(newAmount - deposit.amount)
+    await (deposit.type === "club saving"
+    ? UserServiceManager.addInvestmentAmount
+    : UserServiceManager.addTempSavingsAmount)(newAmount - deposit.amount)
     await DB.query(Deposit.updateOne({_id: userId}, {amount: newAmount}))
   })
 
