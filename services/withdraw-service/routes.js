@@ -10,15 +10,15 @@ router.get(
 )
 router.get(
   "/:id",
-  RouteController.getWithdraw
+  RouteController.getWithdrawById
 )
 router.post(
   "/",
-  RouteController.createWithdraw
+  RouteController.recordWithdraw
 )
 router.put(
   "/:id",
-  RouteController.updateWithdraw
+  RouteController.updateWithdrawAmount
 )
 router.delete(
   "/:id",
