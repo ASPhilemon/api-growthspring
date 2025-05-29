@@ -1,142 +1,95 @@
 import { CashLocation, CashLocationTransfer } from "./models.js"
 
+//util
+import * as ErrorUtil from "../../utils/error-util.js"
+import * as DB from "../../utils/db-util.js"
+
 export async function getCashLocations(){
-  return await CashLocation.find()
+  return await DB.query(CashLocation.find({deleted: false}))
 }
 
-export async function getCashLocation(cashLocationId){
-  return await CashLocation.findById(cashLocationId)
+export async function getCashLocationById(cashLocationId){
+  const cashLocation = await DB.query(CashLocation.findOne({_id: cashLocationId, deleted: false}))
+  if (!cashLocation) throw new ErrorUtil.NotFoundError("Failed to find cash location")
 }
 
 export async function createCashLocation(cashLocation){
-  return await CashLocation.create(cashLocation)
+  return await DB.query(CashLocation.create(cashLocation))
 }
 
-export async function updateCashLocation(cashLocationId, update){
-  return await CashLocation.updateOne({_id:cashLocationId}, update)
+export async function setCashLocationAmount(cashLocationId, newAmount){
+  return await DB.query(CashLocation.updateOne({_id:cashLocationId}, {amount: newAmount}))
 }
 
 export async function deleteCashLocation(cashLocationId){
-  return await CashLocation.findByIdAndDelete(cashLocationId)
-}
-
-export async function getCashLocationTransfers(){
-  return await CashLocationTransfer.find()
-}
-
-export async function getCashLocationTransfer(cashLocationTransferId){
-  return await CashLocationTransfer.findById(cashLocationTransferId)
-}
-
-export async function createCashLocationTransfer(cashLocationTransfer){
-  const { sourceCashLocationId, destCashLocationId, amount} = cashLocationTransfer
-  const [sourceCashLocation, destCashLocation] = await Promise.all([
-    getCashLocation(sourceCashLocationId),
-    getCashLocation(destCashLocationId)
-  ])
-
-  helperDeductFromCashLocation(sourceCashLocation, amount)
-  helperAddToCashLocation(destCashLocation, amount)
-
-  await Promise.all([
-    sourceCashLocation.save(),
-    destCashLocation.save(),
-    CashLocationTransfer.create(cashLocationTransfer)
-  ])
-}
-
-export async function deductFromCashLocation(cashLocationId, amount){
-  const cashLocation = getCashLocation(cashLocationId)
-  helperDeductFromCashLocation(cashLocation, amount)
-  await cashLocation.save()
+  return await DB.query(CashLocation.updateOne({_id, cashLocationId},{deleted: true}))
 }
 
 export async function addToCashLocation(cashLocationId, amount){
-  const cashLocation = getCashLocation(cashLocationId)
-  helperAddToCashLocation(cashLocation, amount)
+  const cashLocation = await getCashLocationById(cashLocationId)
+  _addToCashLocation(cashLocation, amount)
   await cashLocation.save()
 }
 
-export async function updateCashLocationTransfer(transferId, update){
-  const cashLocationTransfer = await CashLocationTransfer.findById(transferId)
-  const { sourceCashLocationId, destCashLocationId, amount } = cashLocationTransfer
-
-  const [sourceCashLocation, destCashLocation] = await Promise.all([
-    CashLocation.findById(sourceCashLocationId),
-    CashLocation.findById(destCashLocationId),
-  ])
-
-  // Set up new locations (possibly same as current)
-  let sourceCashLocationNewPromise = sourceCashLocation ;
-  let destCashLocationNewPromise = destCashLocation;
-
-  if (sourceCashLocationId != update.sourceCashLocationId){
-    sourceCashLocationNewPromise = CashLocation.findById(update.sourceCashLocationId)
-  }
-
-  if (destCashLocationId != update.destCashLocationId){
-    destCashLocationNewPromise = CashLocation.findById(update.destCashLocationId)
-  }
-
-  const [sourceCashLocationNew, destCashLocationNew] = await Promise.all([
-    sourceCashLocationNewPromise,
-    destCashLocationNewPromise
-  ])
- 
-//adjust source
-  helperAddToCashLocation(sourceCashLocation, amount)
-
-  try{
-    helperDeductFromCashLocation(sourceCashLocationNew, update.amount)
-  }
-  catch(err){
-    throw new Error(`Can not update the transfer because ${sourceCashLocationNew.name} would go negative `)
-  }
-
-  //adjust destination
-  helperAddToCashLocation(destCashLocationNew, update.amount)
-
-  try{
-    helperDeductFromCashLocation(destCashLocation, amount)
-  }
-  catch(err){
-    throw new Error(`Can not update the transfer because ${destCashLocation.name} would go negative `)
-  }
-
+export async function getTransfers(){
+  return await Blob.query(CashLocationTransfer.find({deleted: false}))
 }
 
-export async function deleteCashLocationTransfer(transferId){
-  const cashLocationTransfer = await CashLocationTransfer.findById(transferId)
-  const { sourceCashLocationId, destCashLocationId, amount } = cashLocationTransfer
-
-  const [sourceCashLocation, destCashLocation] = await Promise.all([
-    CashLocation.findById(sourceCashLocationId),
-    CashLocation.findById(destCashLocationId),
-  ])
-
-  try {
-    helperDeductFromCashLocation(destCashLocation, amount)
-  }
-  catch(err){
-    throw new Error(`Can not delete this transfer because ${destCashLocation.name} will go to negative balance`)
-  }
-
-  helperAddToCashLocation(sourceCashLocation, amount)
-
-  await Promise.all([
-    sourceCashLocation.save(),
-    destCashLocation.save(),
-    cashLocationTransfer.deleteOne()
-  ])
+export async function getTransferById(transferId){
+  return await DB.query(CashLocationTransfer.findOne({_id : transferId, deleted: false}))
 }
 
-function helperDeductFromCashLocation(cashLocation, amount){
-  if (amount < 0) throw new Error("Amount can not be less than 0.")
-  if (cashLocation.amount < amount) throw new Error(`Insufficient balance in ${cashLocation.name}`)
-  cashLocation.amount -= amount
+export async function recordTransfer(transfer){
+  const [source, dest] = await Promise.all([
+    getCashLocationById(transfer.source._id),
+    getCashLocationById(transfer.dest._id)
+  ])
+
+  _addToCashLocation(source, amount)
+  _addToCashLocation(source, -amount)
+
+  await DB.transaction(async()=>{
+    await source.save()
+    await dest.save()
+    await CashLocationTransfer.create(transfer)
+  })
 }
 
-function helperAddToCashLocation(cashLocation, amount){
-  if (amount < 0) throw new Error("Amount can not be less than 0.")
-  cashLocation.amount -= amount
+export async function updateTransferAmount(transferId, newAmount){
+  const transfer = await CashLocationTransfer.findById(transferId)
+
+  const [source, dest] = await Promise.all([
+    CashLocation.findById(source._id),
+    CashLocation.findById(dest._id),
+  ])
+
+  await DB.transaction(async()=>{
+    await addToCashLocation(source, transfer.amount - newAmount)
+    await addToCashLocation(dest, newAmount - transfer.amount)
+  })
+}
+
+export async function deleteTransfer(transferId){
+  const transfer = await CashLocationTransfer.findById(transferId)
+
+  const [source, dest] = await Promise.all([
+    CashLocation.findById(transfer.source._id),
+    CashLocation.findById(transfer.dest._id),
+  ])
+
+  _addToCashLocation(source, transfer.amount)
+  _addToCashLocation(dest, -transfer.amount)
+
+  await DB.transaction(async()=> {
+    await source.save()
+    await dest.save()
+    await CashLocationTransfer.updateOne({_id: transferId}, {deleted: true})
+  })
+}
+
+//helpers
+function _addToCashLocation(cashLocation, amount){
+  if (cashLocation.amount + amount < 0) {
+    throw new ErrorUtil.BadRequestError(`Insufficient balance in ${cashLocation.name}`)
+  }
 }

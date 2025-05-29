@@ -8,23 +8,23 @@ const cashLocationTransferRouter = express.Router()
 // cash location transfers routes
 cashLocationTransferRouter.get(
   "/",
-  RouteController.getCashLocationTransfers
+  RouteController.getTransfers
 )
 cashLocationTransferRouter.get(
   "/:id",
-  RouteController.getCashLocationTransfer
+  RouteController.getTransferById
 )
 cashLocationTransferRouter.post(
   "/", 
-  RouteController.createCashLocationTransfer
+  RouteController.recordTransfer
 )
 cashLocationTransferRouter.put(
   "/:id", 
-  RouteController.updateCashLocationTransfer
+  RouteController.updateTransferAmount
 )
 cashLocationTransferRouter.delete(
   "/:id",
-  RouteController.deleteCashLocationTransfer
+  RouteController.deleteTransfer
 )
 
 //register cash location transfers routes
@@ -38,7 +38,7 @@ router.get(
 )
 router.get(
   "/:id",
-  RouteController.getCashLocation
+  RouteController.getCashLocationById
 )
 router.post(
   "/",
@@ -46,12 +46,11 @@ router.post(
 )
 router.put(
   "/:id",
-  RouteController.updateCashLocation
+  RouteController.setCashLocationAmount
 )
 router.delete(
   "/:id",
   RouteController.deleteCashLocation
 )
-
 
 export default router
