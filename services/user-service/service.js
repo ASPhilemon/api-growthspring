@@ -45,28 +45,36 @@ export async function createUser(user){
   })
 }
 
-function _buildUser(user){
-  const password = PasswordUtil.generatePassword()
-  const hashedPassword = PasswordUtil.generateHashedPassword(password)
-  
-  user = {...user,
-    membershipDate: Date.now(),
-    investmentAmount: 0,
-    tempSavingsAmount: 0,
-    points: 500,
-    active: true,
-    password: hashedPassword
-  }
-
-  return user
-}
-
 export async function updateUser(userId, update){
   await DB.query(User.findByIdAndUpdate(userId, update))
 }
 
 export async function deleteUser(userId){
   await updateUser(userId, {deleted: true})
+}
+
+export async function getInvestmentAmount(userId){
+  const user = await getUserById()
+  return user.investmentAmount
+}
+
+export async function getTempSavingsAmount(userId){
+  const user = await getUserById()
+  return user.tempSavingsAmount
+}
+
+export async function setInvestmentAmount(userId, investmentAmount){
+  const result = DB.query(User.updateOne({_id: userId}, {investmentAmount}))
+  if (result.matchedCount === 0){
+    throw new ErrorUtil.NotFoundError("Failed to find user")
+  }
+}
+
+export async function setTempSavingsAmount(userId, tempSavingsAmount){
+  const result = DB.query(User.updateOne({_id: userId}, {tempSavingsAmount}))
+  if (result.matchedCount === 0){
+    throw new ErrorUtil.NotFoundError("Failed to find user")
+  }
 }
 
 export async function addInvestmentAmount(userId, amount){
@@ -85,3 +93,19 @@ export async function deductTempSavingsAmount(userId, amount){
   await DB.query(User.findOneAndUpdate({_id: userId}, {$inc: {tempSavingsAmount: -amount}}))
 }
 
+//helpers
+function _buildUser(user){
+  const password = PasswordUtil.generatePassword()
+  const hashedPassword = PasswordUtil.generateHashedPassword(password)
+  
+  user = {...user,
+    membershipDate: Date.now(),
+    investmentAmount: 0,
+    tempSavingsAmount: 0,
+    points: 500,
+    active: true,
+    password: hashedPassword
+  }
+
+  return user
+}
