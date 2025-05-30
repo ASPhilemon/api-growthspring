@@ -6,13 +6,9 @@ import ejs from "ejs"
 //connect to mongoDB
 const MONGODB_URI = 'mongodb+srv://blaise1:blaise119976@cluster0.nmt34.mongodb.net/GrowthSpringNew?retryWrites=true&w=majority';
 await mongoose.connect(MONGODB_URI)
-console.log("connected to MongoDB")
 
 async function sendDepositReminders(){
   let users = await getUsersWithoutDepositsThisMonth()
-  //console.log("users", users)
-  //users = [{fullName: "Ariko Stephen Philemon", email: "philemonariko@gmail.com"}]
-
   await Promise.all(
     users.map(async(user)=>{
       try{
@@ -80,7 +76,6 @@ async function getAllUsers(){
 
   return users
 }
-
 
 // await renderTemplateAndSave()
 await sendDepositReminders()
