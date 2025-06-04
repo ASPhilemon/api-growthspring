@@ -3,61 +3,61 @@ import * as Response from "../../utils/http-response-util.js"
 
 export async function getCashLocations(req, res){
   const cashLocations = await ServiceManager.getCashLocations()
-  Response.sendSuccess(res, cashLocations)
+  Response.sendSuccess(cashLocations, req, res)
 }
 
 export async function getCashLocationById(req, res){
   const { id: cashLocationId } = req.params
   const cashLocation = await ServiceManager.getCashLocationById(cashLocationId)
-  Response.sendSuccess(res, cashLocation)
+  Response.sendSuccess(cashLocation, req, res)
 }
 
 export async function createCashLocation(req, res){
   const { cashLocation } = req.body
   await ServiceManager.createCashLocation(cashLocation)
-  Response.sendSuccess(res, null)
+  Response.sendSuccess(null, req, res)
 }
 
 export async function setCashLocationAmount(req, res){
   const { id : cashLocationId } = req.params
   const { newAmount } = req.body
   await ServiceManager.setCashLocationAmount(cashLocationId, newAmount)
-  Response.sendSuccess(res, null)
+  Response.sendSuccess(null, req, res)
 }
 
 export async function deleteCashLocation(req, res){
   const {id: cashLocationId}  = req.params
   await ServiceManager.deleteCashLocation(cashLocationId)
-  Response.sendSuccess(res, null)
+  Response.sendSuccess(null, req, res)
 }
 
 export async function getTransfers(req, res){
-  const cashLocationTransfers = await ServiceManager.getTransfers()
-  Response.sendSuccess(res, cashLocationTransfers)
+  const transfers = await ServiceManager.getTransfers()
+  Response.sendSuccess(transfers, req, res)
 }
 
 export async function  getTransferById(req, res){
   const {id: transferId }  = req.params
   const transfer = await ServiceManager.getTransferById(transferId)
-  Response.sendSuccess(res, transfer)
+  Response.sendSuccess(transfer, req, res)
 }
 
 export async function recordTransfer(req, res){
   const { transfer } = req.body
   await ServiceManager.recordTransfer(transfer)
-  Response.sendSuccess(res, null)
+  Response.sendSuccess(null, req, res)
   
 }
 
 export async function updateTransferAmount(req, res){
   const { id: transferId }  = req.params
   const { newAmount } = req.body
-  await ServiceManager.updateTransferAmont(transferId, newAmount)
-  Response.sendSuccess(res, null)
+  await ServiceManager.updateTransferAmount(transferId, newAmount)
+  Response.sendSuccess(null, req, res)
 }
   
 export async function deleteTransfer(req, res){
   const {id: transferId}  = req.params
   await ServiceManager.deleteTransfer(transferId)
-  Response.sendSuccess(res, null)
+  Response.sendSuccess(null, req, res)
 }
