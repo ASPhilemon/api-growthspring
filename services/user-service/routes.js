@@ -4,7 +4,6 @@ import * as RouteController  from "./controller.js"
 
 const router = express.Router()
 
-//user routes
 router.get(
   "/me",
   RouteController.getMe
@@ -26,7 +25,7 @@ router.delete(
 )
 
 
-//admin routes
+//admin only
 router.get(
   "/",
   RouteController.getUsers

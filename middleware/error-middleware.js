@@ -5,6 +5,6 @@ export function errorHandler(err, req, res, next) {
   console.log(err)
   const isAppError = err instanceof AppError;
   const statusCode = isAppError ? err.statusCode : 500;
-  const message = isAppError ? err.message : 'Sorry, an unknown error occured';
-  Response.sendError(res, message, statusCode)
+  const errMessage = isAppError ? err.message : 'Sorry, an unknown error occured';
+  Response.sendError(errMessage, statusCode, {req, res})
 }

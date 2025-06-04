@@ -1,7 +1,7 @@
-export function sendSuccess(res, data) {
+export function sendSuccess(data, {req, res}) {
   return res.json({ error: null, data })
 }
 
-export function sendError(res, message, statusCode) {
-  return res.status(statusCode).json({ error: message, data: null })
+export function sendError(errMessage, statusCode, {req, res}) {
+  return res.status(statusCode).json({ error: errMessage, data: null })
 }
