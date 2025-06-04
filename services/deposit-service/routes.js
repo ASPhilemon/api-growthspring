@@ -9,6 +9,10 @@ router.get(
   RouteController.getDeposits
 )
 router.get(
+  "/club-deposits", 
+  RouteController.getClubDeposits
+)
+router.get(
   "/:id", 
   RouteController.getDeposit
 )
@@ -24,5 +28,6 @@ router.delete(
   "/:id", 
   RouteController.deleteDeposit
 )
+
 
 export default router

@@ -21,7 +21,7 @@ app.use(express.json())
 app.use("/cash-locations", cashLocationRouter)
 app.use("/deposits", depositRouter)
 app.use("/loans", loanRouter)
-app.use("/points/transfers", pointRouter)
+app.use("/point-transactions", pointRouter)
 app.use("/users", userRouter)
 app.use("/withdraws", withdrawRouter)
 

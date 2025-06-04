@@ -14,29 +14,44 @@ const cashLocationSchema = new mongoose.Schema({
   },
 }, { timestamps:true });
 
-//cash-location-transfer schema
-const cashLocationTransferSchema = new mongoose.Schema({
-  sourceCashLocation: {
+//cash-location sub document schema
+const subCashLocationSchema = new mongoose.Schema({
+  _id : {
+    type: ObjectId,
+    required: true
+  },
+  name: {
     type: String,
     required: true,
+  }
+});
+
+//user sub schema
+
+const subUserScmema = new mongoose.Schema({
+  _id: {
+    type: ObjectId,
+    required: true
   },
-  destCashLocation: {
-    type: {
-      id: ObjectId,
-      name: String
-    }
+  fullName: {
+    type: String,
+    required: true
+  }
+})
+
+//cash-location-transfer schema
+const cashLocationTransferSchema = new mongoose.Schema({
+  source: {
+    type: subCashLocationSchema,
+    required: true
   },
-  mover:{
-    type:{
-      id:{
-        type: ObjectId,
-        required: true
-      },
-      name: {
-        type: String,
-        required: true
-      }
-    }
+  dest: {
+    type: subCashLocationSchema,
+    required: true
+  },
+  recordedBy : {
+    type: subUserScmema,
+    required: true
   },
   amount: {
     type:  Number,

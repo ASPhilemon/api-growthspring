@@ -1,132 +1,63 @@
 import * as ServiceManager from "./service.js"
+import * as Response from "../../utils/http-response-util.js"
 
 export async function getCashLocations(req, res){
-  try{
-    const cashLocations = await ServiceManager.getCashLocations()
-    const response = {error:null, data:cashLocations}
-    return res.json(response)
-  }
-  catch(err){
-    console.log(err)
-    const response = {error: err, data:null}
-    return res.status(400).json(response)
-  }
+  const cashLocations = await ServiceManager.getCashLocations()
+  Response.sendSuccess(res, cashLocations)
 }
 
-export async function getCashLocation(req, res){
-  const cashLocationId  = req.params.id
-  try{
-    const cashLocation = await ServiceManager.getCashLocation(cashLocationId)
-    return res.json({error:null, data:cashLocation})
-  }
-  catch(err){
-    console.log(err)
-    const response = {error: err, data:null}
-    return res.status(400).json(response)
-  }
+export async function getCashLocationById(req, res){
+  const { id: cashLocationId } = req.params
+  const cashLocation = await ServiceManager.getCashLocationById(cashLocationId)
+  Response.sendSuccess(res, cashLocation)
 }
 
 export async function createCashLocation(req, res){
   const { cashLocation } = req.body
-  try{
-    await ServiceManager.createCashLocation(cashLocation)
-    const response = {error: null, data:null}
-    return res.json(response)
-  }
-  catch(err){
-    console.log(err)
-    return res.status(400).json({error: err})
-  }
+  await ServiceManager.createCashLocation(cashLocation)
+  Response.sendSuccess(res, null)
 }
 
-export async function updateCashLocation(req, res){
-  const cashLocationId = req.params.id
-  const { update } = req.body
-  try{
-    await ServiceManager.updateCashLocation(cashLocationId, update)
-    const response = {error: null, data: null}
-    return res.json(response)
-  }
-  catch(err){
-    console.log(err)
-    return res.status(400).json({error: err})
-  }
+export async function setCashLocationAmount(req, res){
+  const { id : cashLocationId } = req.params
+  const { newAmount } = req.body
+  await ServiceManager.setCashLocationAmount(cashLocationId, newAmount)
+  Response.sendSuccess(res, null)
 }
 
 export async function deleteCashLocation(req, res){
-  const cashLocationId  = req.params.id
-  try{
-    await ServiceManager.deleteCashLocation(cashLocationId)
-    const response = {error: null, data: null}
-    return res.json(response)
-  }
-  catch(err){
-    console.log(err)
-    return res.status(400).json({error: err})
-  }
+  const {id: cashLocationId}  = req.params
+  await ServiceManager.deleteCashLocation(cashLocationId)
+  Response.sendSuccess(res, null)
 }
 
-export async function getCashLocationTransfers(req, res){
-  try{
-    const cashLocationTransfers = await ServiceManager.getCashLocationTransfers(req.body)
-    const response = {error: null, data: cashLocationTransfers}
-    return res.json(response)
-  }
-  catch(err){
-    console.log(err)
-    return res.status(400).json({error: err})
-  }
+export async function getTransfers(req, res){
+  const cashLocationTransfers = await ServiceManager.getTransfers()
+  Response.sendSuccess(res, cashLocationTransfers)
 }
 
-export async function  getCashLocationTransfer(req, res){
-  const cashLocationTransferId  = req.params.id
-  try{
-    const cashLocationTransfer = await ServiceManager.getCashLocationTransfer(cashLocationTransferId)
-    const response = {error: null, data: cashLocationTransfer}
-    return res.json(response)
-  }
-  catch(err){
-    console.log(err)
-    return res.status(400).json({error: err})
-  }
+export async function  getTransferById(req, res){
+  const {id: transferId }  = req.params
+  const transfer = await ServiceManager.getTransferById(transferId)
+  Response.sendSuccess(res, transfer)
 }
 
-export async function createCashLocationTransfer(req, res){
-  const cashLocationTransfer = req.body
-  try{
-    await ServiceManager.createCashLocationTransfer(cashLocationTransfer)
-    const response = {error: null, data: null}
-    return res.json(response)
-  }
-  catch(err){
-    console.log(err)
-    return res.status(400).json({error: err})
-  }
+export async function recordTransfer(req, res){
+  const { transfer } = req.body
+  await ServiceManager.recordTransfer(transfer)
+  Response.sendSuccess(res, null)
+  
 }
 
-export async function updateCashLocationTransfer(req, res){
-  const cashLocationTransferId  = req.params.id
-  const {update} = req.body
-  try{
-    await ServiceManager.updateCashLocationTransfer(cashLocationTransferId, update)
-    const response = {error: null, data: null}
-    return res.json(response)
-  }
-  catch(err){
-    console.log(err)
-    return res.status(400).json({error: err})
-  }
+export async function updateTransferAmount(req, res){
+  const { id: transferId }  = req.params
+  const { newAmount } = req.body
+  await ServiceManager.updateTransferAmont(transferId, newAmount)
+  Response.sendSuccess(res, null)
 }
   
-export async function deleteCashLocationTransfer(req, res){
-  const cashLocationTransferId  = req.params.id
-  try{
-    await ServiceManager.deleteCashLocationTransfer(cashLocationTransferId)
-    const response = {error: null, data: null}
-    return res.json(response)
-  }
-  catch(err){
-    console.log(err)
-    return res.status(400).json({error: err})
-  }
+export async function deleteTransfer(req, res){
+  const {id: transferId}  = req.params
+  await ServiceManager.deleteTransfer(transferId)
+  Response.sendSuccess(res, null)
 }

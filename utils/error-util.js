@@ -1,4 +1,3 @@
-import mongoose from "mongoose"
 
 export class AppError extends Error {
   constructor({ message, statusCode, cause = null }) {
@@ -61,14 +60,10 @@ export class InternalServerError extends AppError {
   }
 }
 
-
-export function handleMongooseError(err){
-  const { ValidationError, CastError } = mongoose.Error
-
-  if (err instanceof ValidationError || err instanceof CastError){
-    throw new BadRequestError({message: "Failed to validate user input", cause: err})
-  }
-  else{
-    throw new InternalServerError()
+export class UnknownError extends AppError {
+  constructor(arg1 = {}, arg2 = null) {
+    const defaultMessage = "An unknown error occurred";
+    const statusCode = 500;
+    super(AppError.buildArgs(arg1, defaultMessage, statusCode, arg2));
   }
 }

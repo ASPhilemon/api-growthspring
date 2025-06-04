@@ -4,13 +4,37 @@ import * as RouteController  from "./controller.js"
 
 const router = express.Router()
 
+//user routes
+router.get(
+  "/me",
+  RouteController.getMe
+)
+
+router.get(
+  "/me/dashboard",
+  RouteController.getMyDashboard
+)
+
+router.put(
+  "/me",
+  RouteController.updateMe
+)
+
+router.delete(
+  "/me",
+  RouteController.deleteMe
+)
+
+
+//admin routes
 router.get(
   "/",
   RouteController.getUsers
 )
+
 router.get(
   "/:id",
-  RouteController.getUser
+  RouteController.getUserById
 )
 router.post(
   "/",

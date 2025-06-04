@@ -6,23 +6,23 @@ const router = express.Router()
 
 router.get(
   "/",
-  RouteController.getPointTransfers
+  RouteController.getTransactions
 )
 router.get(
   "/:id",
-  RouteController.getPointTransfer
+  RouteController.getTransactionById
 )
 router.post(
   "/",
-  RouteController.createPointTransfer
+  RouteController.recordTransaction
 )
 router.put(
   "/:id",
-  RouteController.updatePointTransfer
+  RouteController.setPoints
 )
 router.delete(
   "/:id",
-  RouteController.deletePointTransfer
+  RouteController.deleteTransaction
 )
 
 export default router
