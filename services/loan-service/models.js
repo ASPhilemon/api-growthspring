@@ -1,62 +1,90 @@
 import mongoose from "mongoose";
-import * as DB from "../../utils/db-util.js"; // Assuming db-util for tryMongoose
+import * as DB from "../../utils/db-util.js"; 
 
 const { ObjectId } = mongoose.Types;
 
 // --- Loan Schema ---
 const loanSchema = new mongoose.Schema({
-  loan_duration: { type: Number, required: true },
-  loan_rate: { type: Number, required: true },
-  earliest_date: { type: Date, required: true },
-  latest_date: { type: Date, required: true },
-  loan_status: { type: String, required: true, enum: ["Pending Approval", "Ongoing", "Ended", "Cancelled"] },
-  initiated_by: { type: String, required: true }, 
-  approved_by: { type: String }, 
-  worth_at_loan: { type: Number, required: true },
-  loan_amount: { type: Number, required: true },
-  loan_date: { type: Date }, 
-  borrower_name: { type: String, required: true }, 
-  points_spent: { type: Number, default: 0 },
-  principal_left: { type: Number, required: true },
-  last_payment_date: { type: Date, required: true },
-  loan_units: { type: Number, default: 0 },
-  rate_after_discount: { type: Number, default: 0 },
+  duration: { type: Number, required: true },
+  rate: { type: Number, required: true },
+  earliestDate: { type: Date, required: true },
+  latestDate: { type: Date, required: true },
+  status: { type: String, required: true, enum: ["Pending Approval", "Ongoing", "Ended", "Cancelled"] },
+  initiatedBy: { 
+    id: { type: ObjectId, required: true, ref: 'User' },
+    name: { type: String, required: true }
+  },
+  approvedBy: { 
+    id: { type: ObjectId, ref: 'User' },
+    name: { type: String }
+  },
+  worthAtLoan: { type: Number, required: true },
+  amount: { type: Number, required: true },
+  date: { type: Date },
+  borrower: { 
+    id: { type: ObjectId, required: true, ref: 'User' },
+    name: { type: String, required: true }
+  },
+  pointsSpent: { type: Number, default: 0 },
+  principalLeft: { type: Number, required: true },
+  lastPaymentDate: { type: Date, required: true },
+  units: { type: Number, default: 0 },
+  rateAfterDiscount: { type: Number, default: 0 },
   discount: { type: Number, default: 0 },
-  points_worth_bought: { type: Number, default: 0 },
-  points_accrued: { type: Number, default: 0 },
-  interest_accrued: { type: Number, default: 0 },
-  interest_amount: { type: Number, required: true },
-  installment_amount: { type: Number, required: true },
-  
+  pointsWorthBought: { type: Number, default: 0 },
+  pointsAccrued: { type: Number, default: 0 },
+  interestAccrued: { type: Number, default: 0 },
+  interestAmount: { type: Number, required: true },
+  installmentAmount: { type: Number, required: true },
+
   sources: [{
-    id: { type: ObjectId, required: true }, 
+    id: { type: ObjectId, required: true, ref: 'CashLocation' }, 
     name: { type: String, required: true }, 
     amount: { type: Number, required: true }
   }],
   payments: [{
-    payment_date: { type: Date, required: true },
-    payment_amount: { type: Number, required: true },
-    updated_by: { type: String, required: true }, 
-    payment_location: { type: ObjectId, required: true }, 
-    _id: false 
+    date: { type: Date, required: true },
+    amount: { type: Number, required: true },
+    updatedBy: { 
+      id: { type: ObjectId, required: true, ref: 'User' },
+      name: { type: String, required: true }
+    },
+    location: { type: ObjectId, required: true, ref: 'CashLocation' }, 
+    _id: false
   }],
 }, { timestamps: true });
 
-// Custom static method for filtering/sorting loans
-loanSchema.statics.getLoans = async function({
+
+loanSchema.statics.getFilteredLoans = async function({
   filter,
-  sort = { field: "loan_date", order: -1 }, // Default sort by most recent loan
+  sort = { field: "date", order: -1 }, 
   pagination = { page: 1, perPage: 20 }
 }) {
   const pipeline = [];
   const matchCriteria = [];
 
   // Match stage
-  if (filter?.year) matchCriteria.push({ $expr: { $eq: [{ $year: "$loan_date" }, filter.year] } });
-  if (filter?.month) matchCriteria.push({ $expr: { $eq: [{ $month: "$loan_date" }, filter.month] } });
-  if (filter?.borrowerId) matchCriteria.push({ "borrower.userId": filter.borrowerId }); // Assuming 'borrower' sub-schema
+  if (filter?.year) matchCriteria.push({ $expr: { $eq: [{ $year: "$date" }, filter.year] } });
+  if (filter?.month) matchCriteria.push({ $expr: { $eq: [{ $month: "$date" }, filter.month] } });
+  if (filter?.borrowerId) matchCriteria.push({ "borrower.id": new ObjectId(filter.borrowerId) }); 
 
   if (matchCriteria.length > 0) pipeline.push({ $match: { $and: matchCriteria } });
+
+  // Lookup stage to fetch borrower details
+  pipeline.push({
+    $lookup: {
+      from: "users", 
+      localField: "borrower.id",
+      foreignField: "_id",
+      as: "borrowerDetail"
+    }
+  });
+  pipeline.push({
+    $addFields: {
+      borrower: { $arrayElemAt: ["$borrowerDetail", 0] } 
+    }
+  });
+  pipeline.push({ $project: { borrowerDetail: 0 } }); 
 
   // Sort stage
   pipeline.push({ $sort: { [sort.field]: sort.order } });
@@ -65,47 +93,35 @@ loanSchema.statics.getLoans = async function({
   pipeline.push({ $skip: (pagination.page - 1) * pagination.perPage });
   pipeline.push({ $limit: pagination.perPage });
 
-  return await DB.tryMongoose(Loan.aggregate(pipeline));
+  return await DB.tryMongoose(this.aggregate(pipeline)); 
 };
 
 
-// --- Constants Schema ---
-const constantsSchema = new mongoose.Schema({
-  one_point_value: { type: Number, required: true },
-  max_lending_rate: { type: Number, required: true },
-  min_lending_rate: { type: Number, required: true },
-  annual_tax_rate: { type: Number, required: true },
-  max_credits: { type: Number, required: true },
-  min_discount: { type: Number, required: true },
-  discount_profit_percentage: { type: Number, required: true },
-  monthly_lending_rate: { type: Number, required: true },
-  loan_risk: { type: Number, required: true },
-  members_served_percentage: { type: Number, required: true },
-  loan_multiple: { type: Number, required: true }
-}, { timestamps: true });
-
-
-// --- PointsSale Schema (renamed from transfersSchema for clarity) ---
+// --- PointsSale Schema ---
 const pointsSaleSchema = new mongoose.Schema({
-  name: { type: String, required: true }, // Consider changing to { userId: ObjectId, name: String }
-  transaction_date: { type: Date, required: true },
-  points_worth: { type: Number, required: true },
-  recorded_by: { type: String, required: true }, // Consider changing to { userId: ObjectId, name: String }
-  points_involved: { type: Number, required: true },
+  entity: { 
+    id: { type: ObjectId, required: true, ref: 'User' },
+    name: { type: String, required: true }
+  },
+  date: { type: Date, required: true }, 
+  pointsWorth: { type: Number, required: true }, 
+  recordedBy: { 
+    id: { type: ObjectId, required: true, ref: 'User' },
+    name: { type: String, required: true }
+  },
+  pointsInvolved: { type: Number, required: true }, 
   reason: { type: String, required: true },
-  type: { type: String, required: true, enum: ["Spent", "Earned", "Bought", "Sold"] }, // Added more enum values for clarity
+  type: { type: String, required: true, enum: ["Spent", "Earned", "Bought", "Sold"] },
 }, { timestamps: true });
 
 
 // --- Models ---
 const Loan = mongoose.model('Loan', loanSchema);
-const Constants = mongoose.model('Constant', constantsSchema); 
 const PointsSale = mongoose.model('PointsSale', pointsSaleSchema);
 
 
 // --- Exports ---
 export {
   Loan,
-  Constants,
   PointsSale,
 };

@@ -1,389 +1,234 @@
 // model
-import { Loan, Constants, PointsSale } from "./models.js";
+import { Loan, PointsSale } from "./models.js";
 
 // util
 import * as DB from "../../utils/db-util.js";
-import * as ErrorUtil from "../../utils/error-util.js"; // Assuming this path exists
+import * as ErrorUtil from "../../utils/error-util.js";
+import { getDaysDifference } from "../../utils/utility-functions.js"; // Assuming getDaysDifference is here
+import CONSTANTS from "../../config/constants.js"; // Assuming constants are imported from a config file
 
 // collaborator services
 import * as UserServiceManager from "../user-service/service.js";
 import * as EmailServiceManager from "../email-service/service.js";
 import * as CashLocationServiceManager from "../cash-location-service/service.js";
-import * as DepositServiceManager from "../deposit-service/service.js"; // New service for deposits
+import * as DepositServiceManager from "../deposit-service/service.js";
 
-// --- Helper Functions (these remain internal to this service) ---
+// --- Internal Helper Functions (exported for potential reusability/testing) ---
 
 /**
- * Calculates the difference in days between two dates.
- * @param {Date | string} date1 - The first date.
- * @param {Date | string} date2 - The second date.
- * @returns {number} The number of days difference.
+ * Calculates the borrower's available loan limit based on their investment and existing debts.
+ * @param {string} borrowerId - The ID of the borrower.
+ * @returns {Promise<number>} The calculated loan limit.
  */
-function getDaysDifference(date1, date2) {
-  const d1 = new Date(date1);
-  const d2 = new Date(date2);
-  const diffTime = Math.abs(d2.getTime() - d1.getTime());
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  return diffDays;
+export async function _calculateBorrowerLoanLimit(borrowerId) {
+  const user = await UserServiceManager.getUser(borrowerId);
+
+  const ongoingDebts = await DB.tryMongoose(Loan.find({
+    "borrower.id": new ObjectId(borrowerId),
+    status: "Ongoing"
+  }));
+
+  const loanLimit = user.investmentAmount * 1.5 - ongoingDebts.reduce((total, loan) => total + loan.principalLeft, 0);
+  return loanLimit;
 }
 
+/**
+ * Calculates the initial financial metrics for a new loan request.
+ * @param {number} loanAmount - The requested loan amount.
+ * @param {number} loanDuration - The loan duration in months.
+ * @param {number} borrowerPoints - The borrower's current points.
+ * @returns {object} An object containing totalRate, pointsSpent, actualInterest, installmentAmount.
+ */
+export function _calculateInitialLoanMetrics(loanAmount, loanDuration, borrowerPoints) {
+  const totalRate = CONSTANTS.MONTHLY_LENDING_RATE * loanDuration;
+  let pointsNeeded = (loanDuration / 12) < 1.5
+    ? Math.max(0, (totalRate - 12)) * loanAmount / 100000
+    : 12 * loanAmount / 100000 + (loanDuration - 18) * CONSTANTS.MONTHLY_LENDING_RATE * loanAmount / 100000;
 
-// --- Loan Service Functions ---
-
-export async function getLoans() {
-  return await Loan.find();
-}
-
-export async function getMemberOngoingLoans(memberName) {
-  return await Loan.find({"borrower_name": memberName, loan_status: "Ongoing"});
-  }
-
-export async function getMemberEndedLoans(memberName) {
-  return await Loan.find({"borrower_name": memberName, loan_status: "Ended"});
-}  
-
-export async function getLoanById(loanId){
-  const loan = await DB.tryMongoose(Loan.findById(loanId));
-  const statusCode = 400;
-  if (!loan) throw new ErrorUtil.AppError("Failed to find loan", statusCode);
-  return loan;
-}
-
-export async function initiateLoanRequest(
-  loanAmount,
-  loanDuration,
-  earliestDate,
-  latestDate,
-  borrowerId,
-  currentUser
-) {
-  if (!loanAmount || !loanDuration || !earliestDate || !latestDate || !borrowerId) {
-    throw new ErrorUtil.AppError('Required loan request information is missing. Please fill in everything needed.', 400);
-  }
-
-  const today = new Date();
-  
-  const [member, constants, allDebts] = await Promise.all([
-    UserServiceManager.getUser(borrowerId), 
-    DB.tryMongoose(Constants.findOne()), 
-    DB.tryMongoose(Loan.find({ loan_status: "Ongoing" })),
-  ]);
-
-  if (!member) {
-    throw new ErrorUtil.AppError('Borrower not found.', 404);
-  }
-  if (!constants) {
-    throw new ErrorUtil.AppError('System constants not found.', 500);
-  }
-
-  const debts = allDebts.filter((loan) => loan.borrower_name === member.fullName);
-  const loanLimit = member.investmentAmount - debts.reduce((total, loan) => total + loan.principal_left, 0);
-
-  if (loanAmount > loanLimit) {
-    throw new ErrorUtil.AppError(`The Loan Limit of ${Math.round(loanLimit).toLocaleString('en-US')} has been exceeded!`, 400);
-  }
-
-  const duration = loanDuration;
-  const totalRate = constants.monthly_lending_rate * duration;
-  let pointsNeeded = (duration / 12) < 1.5 ? Math.max(0, (totalRate - 12)) * loanAmount / 100000 : 12 * loanAmount / 100000 + (duration - 18) * constants.monthly_lending_rate * loanAmount / 100000;
-
-  const pointsSpent = pointsNeeded <= member.points ? pointsNeeded : member.points;
-  const actualInterest = totalRate * loanAmount / 100 - pointsSpent * 1000;
+  const pointsSpent = pointsNeeded <= borrowerPoints ? pointsNeeded : borrowerPoints;
+  const actualInterest = (totalRate * loanAmount / 100) - (pointsSpent * 1000); // Corrected calculation
   const installmentAmount = Math.round(loanAmount / (1000 * loanDuration)) * 1000;
 
-  const newLoan = {
-    loan_duration: loanDuration,
-    loan_units: 0,
-    interest_accrued: 0,
-    points_accrued: 0,
-    loan_rate: totalRate,
-    earliest_date: earliestDate,
-    latest_date: latestDate,
-    loan_status: "Pending Approval",
-    installment_amount: installmentAmount,
-    initiated_by: currentUser.fullName,
-    approved_by: "",
-    worth_at_loan: member.investmentAmount,
-    loan_amount: loanAmount,
-    loan_date: today,
-    borrower_name: member.fullName, 
-    points_spent: pointsSpent,
-    discount: 0,
-    points_worth_bought: 0,
-    rate_after_discount: totalRate,
-    interest_amount: actualInterest,
-    principal_left: loanAmount,
-    last_payment_date: today,
-  };
-
-  const createdLoan = await DB.tryMongoose(Loan.create(newLoan));
-  return createdLoan;
+  return { totalRate, pointsSpent, actualInterest, installmentAmount };
 }
 
-export async function approveLoan(loanId, approvedBy, sources) {
-  const loan = await DB.tryMongoose(Loan.findById(loanId));
-  const statusCode = 400; 
-
-  if (!loan) {
-    throw new ErrorUtil.AppError("Loan not found.", 404); 
-  }
-  if (loan.loan_status !== "Pending Approval") {
-    throw new ErrorUtil.AppError("Loan is not in 'Pending Approval' status.", statusCode);
-  }
-
-  // Validate total amount from sources
-  const totalFromSources = sources.reduce((total, source) => total + source.amount, 0);
-  if (totalFromSources !== loan.loan_amount) {
-    throw new ErrorUtil.AppError('The total amount from selected sources does not match the loan amount.', statusCode);
-  }
-
-  // Assume 'source.location' in the `sources` array now refers to the `cashLocationId`.
-  for (const source of sources) {
-    const cashLocation = await CashLocationServiceManager.getCashLocation(source.location); // Use service to get location
-    if (!cashLocation) {
-        throw new ErrorUtil.AppError(`Cash location with ID '${source.location}' not found.`, 404);
-    }
-    if (cashLocation.amount < source.amount) {
-      throw new ErrorUtil.AppError(`Insufficient balance in '${cashLocation.name}'. Required: ${source.amount}, Available: ${cashLocation.amount}.`, statusCode);
-    }
-  }
-
+/**
+ * Deducts funds from specified cash locations.
+ * @param {Array<object>} sources - An array of objects { id: cashLocationId, amount: number }.
+ * @returns {Promise<void>}
+ */
+export async function _disburseFundsFromSources(sources) {
   await Promise.all(
     sources.map(source =>
-      CashLocationServiceManager.deductFromCashLocation(source.location, source.amount)
+      CashLocationServiceManager.deductFromCashLocation(source.id, source.amount)
     )
   );
-
-  const updatedLoan = await DB.tryMongoose(Loan.updateOne(
-    { _id: loanId },
-    {
-      $set: {
-        loan_status: "Ongoing",
-        approved_by: approvedBy.fullName,
-        loan_date: new Date(),
-        sources: sources, 
-      },
-    }
-  ));
-
-  if (updatedLoan.matchedCount === 0) {
-      throw new ErrorUtil.AppError("Failed to approve loan. Loan not found or update failed.", 500);
-  }
-
-  return updatedLoan;
 }
 
-export async function cancelLoanRequest(loanId) {
-  const updatedLoan = await Loan.updateOne({ _id: loanId }, { $set: { "loan_status": "Cancelled" } });
-  if (updatedLoan.matchedCount === 0) {
-      throw new Error("Loan request not found or already cancelled.");
-  }
-  return { msg: 'Loan request cancelled successfully.' };
-}
+/**
+ * Calculates the total interest due for a loan up to a specific payment date.
+ * @param {object} loan - The loan document.
+ * @param {Date} paymentDate - The date of the current payment.
+ * @returns {object} An object containing calculated pointsSpentForLoan and totalInterestDue.
+ */
+export function _calculateCurrentInterestDue(loan, paymentDate) {
+  const thisYear = new Date().getFullYear(); // Current year for comparison
+  const loanYear = new Date(loan.date).getFullYear();
 
+  const lastPaymentPeriodDays = getDaysDifference(loan.lastPaymentDate, paymentDate);
+  let loanUnits = loan.units + loan.principalLeft * lastPaymentPeriodDays; 
 
-export async function deleteLoanPermanently(loanId) {
-  if (!loanId) {
-    throw new Error("loan_id is required.");
-  }
-  const result = await Loan.deleteOne({ _id: loanId });
-  if (result.deletedCount === 0) {
-      throw new Error("Loan request not found or already deleted.");
-  }
-  return { msg: "Loan request deleted permanently." };
-}
-
-export async function getLoanPayments(loanId) {
-    // Assuming payments are embedded or linked to a loan
-    const loan = await Loan.findById(loanId);
-    if (!loan) {
-        throw new Error("Loan not found.");
-    }
-    return loan.payments || []; 
-}
-
-export async function getLoanPayment(loanId, paymentId) {
-    // Assuming payments are embedded in the Loan model
-    const loan = await Loan.findById(loanId);
-    if (!loan) {
-        throw new Error("Loan not found.");
-    }
-    const payment = loan.payments.id(paymentId); 
-    if (!payment) {
-        throw new Error("Loan payment not found.");
-    }
-    return payment;
-}
-
-export async function makeLoanPayment(
-  loanId,
-  paymentAmount,
-  paymentDate,
-  paymentCashLocationId,
-  currentUser
-) {
-  if (!paymentAmount || !paymentDate || !loanId || !paymentCashLocationId) {
-    throw new ErrorUtil.AppError('Required payment information is missing. Please provide all information needed.', 400);
-  }
-
-  const today = new Date();
-  const parsedPaymentDate = new Date(paymentDate);
-
-  const [loan, constants] = await Promise.all([
-    DB.tryMongoose(Loan.findById(loanId)),
-    DB.tryMongoose(Constants.findOne()),
-  ]);
-
-  if (!loan) {
-    throw new ErrorUtil.AppError('Loan not found.', 404);
-  }
-  if (!constants) {
-    throw new ErrorUtil.AppError('System constants not found.', 500);
-  }
-
-  
-  const member = await UserServiceManager.getUserByFullName(loan.borrower_name);
-  if (!member) {
-    throw new ErrorUtil.AppError('Borrower user not found for this loan.', 404);
-  }
-
-  if (new Date(loan.loan_date).getTime() > parsedPaymentDate.getTime()) {
-    throw new ErrorUtil.AppError("Payment date cannot be before the loan initiation date!", 400);
-  }
-
-  const loanYear = new Date(loan.loan_date).getFullYear();
-  
-  
-  let pointsBalance = 0; 
-  let pointsSpentOnLoan = loan.points_spent; 
-
-  const lastPaymentPeriodDays = getDaysDifference(loan.last_payment_date, parsedPaymentDate);
-  let loanUnits = loan.loan_units + loan.principal_left * lastPaymentPeriodDays; 
-
-  const totalDaysSinceLoan = getDaysDifference(loan.loan_date, parsedPaymentDate);
+  const totalDaysSinceLoan = getDaysDifference(loan.date, paymentDate);
   let currentLoanDurationMonths = totalDaysSinceLoan / 30;
   currentLoanDurationMonths = (currentLoanDurationMonths % 1 < 0.24) ? Math.trunc(currentLoanDurationMonths) : Math.ceil(currentLoanDurationMonths);
 
-  const daysSinceLastPayment = getDaysDifference(loan.loan_date, loan.last_payment_date);
+  const daysSinceLastPayment = getDaysDifference(loan.date, loan.lastPaymentDate);
   let lastPaymentDurationMonths = daysSinceLastPayment / 30;
   lastPaymentDurationMonths = (lastPaymentDurationMonths % 1 < 0.24) ? Math.trunc(lastPaymentDurationMonths) : Math.ceil(lastPaymentDurationMonths);
-  
+
   let currentPrincipalDurationMonths = currentLoanDurationMonths - lastPaymentDurationMonths;
 
   let pointDays = Math.max(0, Math.min(12, currentLoanDurationMonths) - 6) + Math.max(0, currentLoanDurationMonths - 18);
-  let runningRate = constants.monthly_lending_rate * (currentLoanDurationMonths - pointDays);
+  let runningRate = CONSTANTS.MONTHLY_LENDING_RATE * (currentLoanDurationMonths - pointDays);
 
   let pendingInterestAmount = loanYear === thisYear
-    ? constants.monthly_lending_rate * currentPrincipalDurationMonths * loan.principal_left / 100
-    : runningRate * loan.principal_left / 100;
-  
-  let principalLeft = loan.principal_left;
-  let loanInterestAmount = loan.interest_amount;
-  let loanStatus = loan.loan_status;
-  let loanDurationActual = loan.loan_duration; 
-  
-  let pointsSpentForLoan = constants.monthly_lending_rate * pointDays * loan.principal_left / 100000;
+    ? CONSTANTS.MONTHLY_LENDING_RATE * currentPrincipalDurationMonths * loan.principalLeft / 100
+    : runningRate * loan.principalLeft / 100;
+
   let paymentsInterestAmount = 0;
-  
-  if (loan.payments) {
+  let totalPayments = 0;
+  let pointsSpentForLoan = CONSTANTS.MONTHLY_LENDING_RATE * pointDays * loan.principalLeft / 100000;
+
+  if (loan.payments && loan.payments.length > 0) {
     loan.payments.forEach(payment => {
-        const paymentDurationDays = getDaysDifference(loan.loan_date, payment.payment_date);
-        let paymentDurationMonths = paymentDurationDays / 30;
-        paymentDurationMonths = (paymentDurationMonths % 1 < 0.24) ? Math.trunc(paymentDurationMonths) : Math.ceil(paymentDurationMonths);                
-        let paymentInterest = constants.monthly_lending_rate * (duration - point_day) * payment.payment_amount / 100;
-                
-        let paymentPointDay = Math.max(0, Math.min(12, paymentDurationMonths) - 6) + Math.max(0, paymentDurationMonths - 18);
-        pointsSpentForLoan += constants.monthly_lending_rate * paymentPointDay * payment.payment_amount / 100000;
-        paymentsInterestAmount += paymentInterest;
+      const paymentDurationDays = getDaysDifference(loan.date, payment.date);
+      let paymentDurationMonths = paymentDurationDays / 30;
+      paymentDurationMonths = (paymentDurationMonths % 1 < 0.24) ? Math.trunc(paymentDurationMonths) : Math.ceil(paymentDurationMonths);
+
+      let paymentInterest = CONSTANTS.MONTHLY_LENDING_RATE * (loan.duration - pointDays) * payment.amount / 100;
+      let paymentPointDay = Math.max(0, Math.min(12, paymentDurationMonths) - 6) + Math.max(0, paymentDurationMonths - 18);
+      pointsSpentForLoan += CONSTANTS.MONTHLY_LENDING_RATE * paymentPointDay * payment.amount / 100000;
+      paymentsInterestAmount += paymentInterest;
+      totalPayments += payment.amount;
     });
   }
 
-  // Calculate total interest due before this payment
   let totalInterestDue = loanYear === thisYear
     ? pendingInterestAmount
-    : pendingInterestAmount + paymentsInterestAmount; 
-  
-  // A safety check if totalInterestDue somehow becomes 0 when it shouldn't
-  if (totalInterestDue === 0 && loan.principal_left > 0) {
-      totalInterestDue = constants.monthly_lending_rate * loan.principal_left / 100;
+    : pendingInterestAmount + paymentsInterestAmount;
+
+  let currentTotalInterest = loanYear === thisYear
+  ? pendingInterestAmount + (totalPayments - loan.principalLeft)
+  : totalInterestDue;
+
+  if (totalInterestDue === 0 && loan.principalLeft > 0) {
+    totalInterestDue = CONSTANTS.MONTHLY_LENDING_RATE * loan.principalLeft / 100;
   }
 
-  // Logic for applying payment amount
-  let paymentMsg = '';
-  if (paymentAmount < (principalLeft + totalInterestDue)) {
-    if (paymentAmount >= principalLeft) {
-      principalLeft = 0;
-      loanInterestAmount = totalInterestDue + loan.principal_left - paymentAmount;
-    } else {
-        principalLeft -= paymentAmount;
-    }
-  } else if (paymentAmount >= (principalLeft + totalInterestDue)) {
-    principalLeft = 0;
-    loanInterestAmount = 0; 
-    loanStatus = "Ended";
-    loanDurationActual = currentLoanDurationMonths;
-    pointsSpentOnLoan = pointsSpentForLoan; 
-    pointsBalance = loan.points_spent - pointsSpentForLoan;
+  return { totalInterestDue, pointsSpentForLoan, loanUnits, currentTotalInterest };
+}
 
-    const newDepositAmount = paymentAmount - loan.principal_left - totalInterestDue;
-    if (newDepositAmount >= 5000) {
-      await DepositServiceManager.createDeposit({ 
-        userId: member._id,
-        amount: newDepositAmount,
-        cashLocationId: paymentCashLocationId, 
-        reason: "Excess Loan Payment",
-        transaction_date: parsedPaymentDate,
-        recordedBy: currentUser.fullName
+/**
+ * Applies a payment to a loan, adjusting principal, interest, and status.
+ * Handles excess payments by creating a deposit.
+ * @param {object} loan - The loan document (will be mutated).
+ * @param {number} paymentAmount - The amount paid.
+ * @param {number} totalInterestDue - The total interest calculated as due.
+ * @param {object} borrowerUser - The borrower's user document.
+ * @param {string} cashLocationId - The ID of the cash location for the payment.
+ * @param {object} currentUser - The user making the payment.
+ * @returns {Promise<string>} A message describing the payment outcome.
+ */
+export async function _applyPaymentLogic(loan, pointsSpentForLoan, currentTotalInterest, paymentAmount, totalInterestDue, borrowerUser, cashLocationId, currentUser) {
+  let paymentMsg = '';
+
+  if (paymentAmount < (loan.principalLeft + totalInterestDue)) {
+    if (paymentAmount >= totalInterestDue) {
+      loan.principalLeft -= (paymentAmount - totalInterestDue);
+      loan.interestAmount = 0;
+    } else {
+      loan.interestAmount -= paymentAmount;
+    }
+  } else { // Payment covers principal and interest, possibly with excess
+    const excessAmount = paymentAmount - (loan.principalLeft + totalInterestDue);
+    loan.principalLeft = 0;
+    loan.interestAmount = currentTotalInterest;
+    loan.status = "Ended";
+    loan.duration = _calculateCurrentInterestDue(loan, new Date()).currentLoanDurationMonths; // Update actual duration
+    loan.pointsSpent = pointsSpentForLoan;
+    loan.pointsBalance = loan.pointsSpent - pointsSpentForLoan;
+
+    if (excessAmount >= 5000) {
+      await DepositServiceManager.createDeposit({
+        depositor: { id: borrowerUser.id, name: borrowerUser.fullName },
+        amount: excessAmount,
+        cashLocation: { id: cashLocationId, name: 'Automatically Determined' }, // Name needs to be fetched or passed
+        source: "Excess Loan Payment",
+        date: new Date(),
+        recordedBy: { id: currentUser.id, name: currentUser.fullName }
       });
-      paymentMsg += `A Deposit of ${newDepositAmount.toLocaleString('en-US')} was recorded as excess Payment. `;
+      paymentMsg += `A Deposit of ${excessAmount.toLocaleString('en-US')} was recorded as excess Payment. `;
     }
     paymentMsg += `The Loan is now Ended.`;
   }
+  return paymentMsg;
+}
 
-  await CashLocationServiceManager.addToCashLocation(paymentCashLocationId, paymentAmount);
-
-  const newPaymentRecord = {
-    payment_date: parsedPaymentDate,
-    payment_amount: paymentAmount,
-    updated_by: currentUser.fullName,
-    payment_location: paymentCashLocationId, 
-  };
-
-  const updatedLoanData = {
-    principal_left: principalLeft,
-    interest_amount: loanInterestAmount,
-    loan_units: loanUnits,
-    last_payment_date: parsedPaymentDate,
-    loan_status: loanStatus,
-    loan_duration: loanDurationActual,
-    points_spent: pointsSpentOnLoan,
-    $push: { payments: newPaymentRecord },
-  };
-
+/**
+ * Updates the loan document in the database.
+ * @param {string} loanId - The ID of the loan to update.
+ * @param {object} updatedLoanData - The data to update the loan with.
+ * @returns {Promise<object>} The update result.
+ * @throws {ErrorUtil.AppError} If update fails.
+ */
+export async function _updateLoanDocument(loanId, updatedLoanData) {
   const loanUpdateResult = await DB.tryMongoose(Loan.updateOne({ _id: loanId }, { $set: updatedLoanData }));
-
   if (loanUpdateResult.matchedCount === 0) {
-      throw new ErrorUtil.AppError("Failed to update loan. Loan not found or no changes applied.", 500);
+    throw new ErrorUtil.AppError("Failed to update loan. Loan not found or no changes applied.", 500);
   }
-  
-  paymentMsg += ' Payment was successfully Recorded.';
+  return loanUpdateResult;
+}
 
-  if (pointsSpentOnLoan > 0) {
-    await DB.tryMongoose(PointsSale.create({ 
-      "name": member.fullName, 
-      "transaction_date": parsedPaymentDate,
-      "points_worth": pointsSpentOnLoan * 1000,
-      "recorded_by": currentUser.fullName,
-      "points_involved": pointsSpentOnLoan,
-      "reason": "Loan interest",
-      "type": "Spent"
-    }));
+/**
+ * Creates a PointsSale record.
+ * @param {object} user - The user involved in the points sale.
+ * @param {Date} date - The transaction date.
+ * @param {number} pointsAmount - The amount of points involved.
+ * @param {object} currentUser - The user recording the transaction.
+ */
+export async function _recordPointsSale(user, date, pointsAmount, currentUser) {
+  await DB.tryMongoose(PointsSale.create({
+    entity: { id: user.id, name: user.fullName },
+    date: date,
+    pointsWorth: pointsAmount * 1000,
+    recordedBy: { id: currentUser.id, name: currentUser.fullName },
+    pointsInvolved: pointsAmount,
+    reason: "Loan interest",
+    type: "Spent"
+  }));
+}
+
+/**
+ * Updates a user's points balance.
+ * @param {string} userId - The ID of the user to update.
+ * @param {number} pointsChange - The amount to change the points by (positive for add, negative for deduct).
+ */
+export async function _updateUserPoints(userId, pointsChange) {
+  if (pointsChange !== 0) {
+    await UserServiceManager.updateUser(userId, { $inc: { "points": pointsChange } });
   }
+}
 
-  if (pointsBalance !== 0) {
-      await UserServiceManager.updateUser(member._id, { $inc: { "points": pointsBalance} }); 
-  }
-
+/**
+ * Sends an email notification about a loan payment.
+ * @param {string} loanStatus - The updated loan status.
+ * @param {number} principalLeft - Remaining principal.
+ * @param {number} interestAmount - Remaining interest.
+ * @param {number} paymentAmount - Amount of the current payment.
+ * @param {Date} parsedPaymentDate - Date of the current payment.
+ * @param {object} borrowerUser - The borrower's user document.
+ */
+export async function _sendLoanPaymentNotification(loanStatus, principalLeft, interestAmount, paymentAmount, parsedPaymentDate, borrowerUser) {
   const formattedDate = parsedPaymentDate.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -391,33 +236,275 @@ export async function makeLoanPayment(
   });
 
   const notificationParams = {
-    amount_paid: paymentAmount,
+    amountPaid: paymentAmount,
     date: formattedDate,
-    outstanding_debt: principalLeft + loanInterestAmount,
-    loan_status: loanStatus,
-    user_email: member.email,
-    user_first_name: member.displayName || member.fullName
+    outstandingDebt: principalLeft + interestAmount,
+    loanStatus: loanStatus,
+    userEmail: borrowerUser.email,
+    userFirstName: borrowerUser.displayName || borrowerUser.fullName
   };
 
-  await EmailServiceManager.sendEmail({ 
-    sender: "growthspring", 
-    recipient: notificationParams.user_email,
+  await EmailServiceManager.sendEmail({
+    sender: "growthspring",
+    recipient: notificationParams.userEmail,
     subject: "Loan Payment Recorded",
-    message: `Dear ${notificationParams.user_first_name},\n\nYour loan payment of ${notificationParams.amount_paid.toLocaleString('en-US')} on ${notificationParams.date} has been recorded.\nOutstanding debt: ${notificationParams.outstanding_debt.toLocaleString('en-US')}\nLoan Status: ${notificationParams.loan_status}`
+    message: `Dear ${notificationParams.userFirstName},\n\nYour loan payment of ${notificationParams.amountPaid.toLocaleString('en-US')} on ${notificationParams.date} has been recorded.\nOutstanding debt: ${notificationParams.outstandingDebt.toLocaleString('en-US')}\nLoan Status: ${notificationParams.loanStatus}`
   });
-
-  return { msg: paymentMsg, loan_status: loanStatus };
 }
 
-export async function deleteLoanPayment(loanId, paymentId) {// Complex Logic for the current scope
-    const loan = await Loan.findById(loanId);
-    if (!loan) {
-        throw new Error("Loan not found.");
+// --- Loan Service Functions ---
+
+/**
+ * Retrieves a list of loans based on filter, sort, and pagination criteria.
+ * @param {object} params - Object containing filter, sort, and pagination.
+ * @returns {Promise<Array>} A promise that resolves to an array of loan documents.
+ */
+export async function getFilteredLoans({ filter, sort, pagination }) {
+  return await Loan.getFilteredLoans({ filter, sort, pagination });
+}
+
+export async function getLoans(status, user) {
+  return await DB.tryMongoose(Loan.find({status: status, borrower.id: user } ));
+}
+
+/**
+ * Retrieves a single loan by its ID.
+ * @param {string} loanId - The ID of the loan to retrieve.
+ * @returns {Promise<object>} A promise that resolves to the loan document.
+ * @throws {ErrorUtil.AppError} If the loan is not found.
+ */
+export async function getLoanById(loanId) {
+  const loan = await DB.tryMongoose(Loan.findById(loanId));
+  if (!loan) {
+    throw new ErrorUtil.AppError("Loan not found.", 404);
+  }
+  return loan;
+}
+
+/**
+ * Initiates a new loan request.
+ * @param {number} amount - The requested loan amount.
+ * @param {number} duration - The loan duration in months.
+ * @param {Date|string} earliestDate - The earliest possible disbursement date.
+ * @param {Date|string} latestDate - The latest possible disbursement date.
+ * @param {string} borrowerId - The ID of the borrower.
+ * @param {object} currentUser - The user initiating the request (from req.user).
+ * @returns {Promise<object>} A promise that resolves to the created loan document.
+ * @throws {ErrorUtil.AppError} If required information is missing, borrower not found, or loan limit exceeded.
+ */
+export async function initiateLoanRequest(
+  amount,
+  duration,
+  earliestDate,
+  latestDate,
+  borrowerId,
+  currentUser
+) {
+
+  const loanLimit = await _calculateBorrowerLoanLimit(borrowerId);
+  if (amount > loanLimit) {
+    throw new ErrorUtil.AppError(`The Loan Limit of ${Math.round(loanLimit).toLocaleString('en-US')} has been exceeded!`, 400);
+  }
+
+  const borrowerUser = await UserServiceManager.getUser(borrowerId); // Fetch user again for their points
+  const { totalRate, pointsSpent, actualInterest, installmentAmount } =
+    _calculateInitialLoanMetrics(amount, duration, borrowerUser.points);
+
+  const today = new Date();
+  const newLoan = {
+    duration: duration,
+    units: 0,
+    interestAccrued: 0,
+    pointsAccrued: 0,
+    rate: totalRate,
+    earliestDate: earliestDate,
+    latestDate: latestDate,
+    status: "Pending Approval",
+    installmentAmount: installmentAmount,
+    initiatedBy: { id: currentUser.id, name: currentUser.fullName },
+    approvedBy: {},
+    worthAtLoan: borrowerUser.investmentAmount,
+    amount: amount,
+    date: today,
+    borrower: { id: borrowerUser.id, name: borrowerUser.fullName },
+    pointsSpent: pointsSpent,
+    discount: 0,
+    pointsWorthBought: 0,
+    rateAfterDiscount: totalRate,
+    interestAmount: actualInterest,
+    principalLeft: amount,
+    lastPaymentDate: today,
+  };
+
+  const createdLoan = await DB.tryMongoose(Loan.create(newLoan));
+  return createdLoan;
+}
+
+/**
+ * Approves a pending loan request and disburses funds.
+ * @param {string} loanId - The ID of the loan to approve.
+ * @param {object} approvedBy - The user approving the loan (from req.user).
+ * @param {Array<object>} sources - An array of objects { id: cashLocationId, amount: number } for disbursement.
+ * @returns {Promise<object>} A promise that resolves to the updated loan document.
+ * @throws {ErrorUtil.AppError} If loan not found, not pending, total amount mismatch, or insufficient funds.
+ */
+export async function approveLoan(loanId, approvedBy, sources) {
+  const loan = await getLoanById(loanId); // Use getLoanById
+
+  if (loan.status !== "Pending Approval") {
+    throw new ErrorUtil.AppError("Loan is not in 'Pending Approval' status.", 400);
+  }
+
+  await _disburseFundsFromSources(sources);
+
+  // Update the loan status and details
+  const updatedLoan = await DB.tryMongoose(Loan.updateOne(
+    { _id: loanId },
+    {
+      $set: {
+        status: "Ongoing",
+        approvedBy: { id: approvedBy.id, name: approvedBy.fullName },
+        date: new Date(),
+        sources: sources,
+      },
     }
+  ));
 
-    // Remove the payment subdocument from the array
-    loan.payments.pull(paymentId);
-    await loan.save(); 
+  if (updatedLoan.matchedCount === 0) {
+    throw new ErrorUtil.AppError("Failed to approve loan. Loan not found or update failed.", 500);
+  }
 
-    return { msg: 'Loan payment deleted successfully.' };
+  return updatedLoan;
 }
+
+/**
+ * Cancels a pending loan request.
+ * @param {string} loanId - The ID of the loan request to cancel.
+ * @returns {Promise<object>} A success message if cancelled.
+ * @throws {ErrorUtil.AppError} If loan not found or not in pending status.
+ */
+export async function cancelLoanRequest(loanId) {
+  const loan = await getLoanById(loanId); // Use getLoanById
+
+  if (loan.status !== "Pending Approval") {
+    throw new ErrorUtil.AppError("Only 'Pending Approval' loans can be cancelled.", 400);
+  }
+
+  const updatedLoan = await DB.tryMongoose(
+    Loan.updateOne({ _id: loanId }, { $set: { status: "Cancelled" } })
+  );
+  if (updatedLoan.matchedCount === 0) {
+    throw new ErrorUtil.AppError("Loan request not found or failed to cancel.", 500);
+  }
+  return { msg: 'Loan request cancelled successfully.' };
+}
+
+/**
+ * Retrieves all payments for a specific loan.
+ * @param {string} loanId - The ID of the loan.
+ * @returns {Promise<Array>} An array of payment sub-documents.
+ * @throws {ErrorUtil.AppError} If the loan is not found.
+ */
+export async function getLoanPayments(loanId) {
+  const loan = await getLoanById(loanId); // Use getLoanById
+  return loan.payments || [];
+}
+
+/**
+ * Retrieves a specific payment from a loan.
+ * @param {string} loanId - The ID of the loan.
+ * @param {string} paymentId - The ID of the payment sub-document.
+ * @returns {Promise<object>} The payment sub-document.
+ * @throws {ErrorUtil.AppError} If loan or payment not found.
+ */
+export async function getLoanPayment(loanId, paymentId) {
+  const loan = await getLoanById(loanId); // Use getLoanById
+  const payment = loan.payments.id(paymentId);
+  if (!payment) {
+    throw new ErrorUtil.AppError("Loan payment not found.", 404);
+  }
+  return payment;
+}
+
+/**
+ * Records a new payment for a loan.
+ * @param {string} loanId - The ID of the loan.
+ * @param {number} paymentAmount - The amount of the payment.
+ * @param {Date|string} paymentDate - The date of the payment.
+ * @param {string} cashLocationId - The ID of the cash location where the payment was made.
+ * @param {object} currentUser - The user recording the payment (from req.user).
+ * @returns {Promise<object>} An object containing the new loan status and a message.
+ * @throws {ErrorUtil.AppError} If loan not found, invalid payment date, or constants missing.
+ */
+export async function makeLoanPayment(
+  loanId,
+  paymentAmount,
+  paymentDate,
+  cashLocationId,
+  currentUser
+) {
+  const parsedPaymentDate = new Date(paymentDate);
+  const loan = await getLoanById(loanId); 
+
+  const borrowerUser = await UserServiceManager.getUser(loan.borrower.id);
+
+  if (loan.status !== "Ongoing") {
+    throw new ErrorUtil.AppError(`Payment cannot be made on a loan with status: '${loan.status}'.`, 400);
+  }
+
+  if (new Date(loan.date).getTime() > parsedPaymentDate.getTime()) {
+    throw new ErrorUtil.AppError("Payment date cannot be before the loan initiation date!", 400);
+  }
+
+  // --- Calculate interest and other metrics ---
+  const { totalInterestDue, pointsSpentForLoan, loanUnits, currentTotalInterest } = _calculateCurrentInterestDue(loan, parsedPaymentDate);
+
+  // --- Apply payment logic and get message ---
+  let paymentMsg = await _applyPaymentLogic(loan, pointsSpentForLoan, currentTotalInterest, paymentAmount, totalInterestDue, borrowerUser, cashLocationId, currentUser);
+
+  // Add payment to cash location
+  await CashLocationServiceManager.addToCashLocation(cashLocationId, paymentAmount);
+
+  // Prepare new payment record for embedding
+  const newPaymentRecord = {
+    date: parsedPaymentDate,
+    amount: paymentAmount,
+    updatedBy: { id: currentUser.id, name: currentUser.fullName },
+    location: cashLocationId,
+  };
+
+  // Update loan document in DB (using the modified loan object properties)
+  const updatedLoanData = {
+    principalLeft: loan.principalLeft,
+    interestAmount: loan.interestAmount,
+    units: loanUnits, 
+    lastPaymentDate: parsedPaymentDate,
+    status: loan.status,
+    duration: loan.duration, 
+    pointsSpent: pointsSpentForLoan, 
+    $push: { payments: newPaymentRecord },
+  };
+
+  await _updateLoanDocument(loanId, updatedLoanData);
+
+  paymentMsg += ' Payment was successfully Recorded.';
+
+  // Record PointsSale if points were spent
+  await _recordPointsSale(borrowerUser, parsedPaymentDate, pointsSpentForLoan, currentUser);
+
+  // Update borrower's points balance
+  await _updateUserPoints(borrowerUser.id, loan.pointsBalance); 
+
+  // Send email notification
+  await _sendLoanPaymentNotification(
+    loan.status,
+    loan.principalLeft,
+    loan.interestAmount,
+    paymentAmount,
+    parsedPaymentDate,
+    borrowerUser
+  );
+
+  return { loanStatus: loan.status};
+}
+

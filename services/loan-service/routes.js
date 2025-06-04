@@ -37,7 +37,7 @@ router.get(
 )
 router.post(
   "/",
-  RouteController.createLoan
+  RouteController.initiateLoan
 )
 router.put(
   "/:id/approve",
