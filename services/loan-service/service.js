@@ -4,8 +4,8 @@ import { Loan, PointsSale } from "./models.js";
 // util
 import * as DB from "../../utils/db-util.js";
 import * as ErrorUtil from "../../utils/error-util.js";
-import { getDaysDifference } from "../../utils/utility-functions.js"; // Assuming getDaysDifference is here
-import CONSTANTS from "../../config/constants.js"; // Assuming constants are imported from a config file
+import { getDaysDifference } from "../../utils/date-util.js"; 
+import CONSTANTS from "../../config/constants.js"; 
 
 // collaborator services
 import * as UserServiceManager from "../user-service/service.js";
@@ -21,9 +21,9 @@ import * as DepositServiceManager from "../deposit-service/service.js";
  * @returns {Promise<number>} The calculated loan limit.
  */
 export async function _calculateBorrowerLoanLimit(borrowerId) {
-  const user = await UserServiceManager.getUser(borrowerId);
+  const user = await UserServiceManager.getUserById(borrowerId);
 
-  const ongoingDebts = await DB.tryMongoose(Loan.find({
+  const ongoingDebts = await DB.query(Loan.find({
     "borrower.id": new ObjectId(borrowerId),
     status: "Ongoing"
   }));
@@ -92,7 +92,7 @@ export function _calculateCurrentInterestDue(loan, paymentDate) {
   let runningRate = CONSTANTS.MONTHLY_LENDING_RATE * (currentLoanDurationMonths - pointDays);
 
   let pendingInterestAmount = loanYear === thisYear
-    ? CONSTANTS.MONTHLY_LENDING_RATE * currentPrincipalDurationMonths * loan.principalLeft / 100
+    ? (1 + CONSTANTS.MONTHLY_LENDING_RATE  / 100) ^ currentPrincipalDurationMonths * loan.principalLeft - loan.principalLeft
     : runningRate * loan.principalLeft / 100;
 
   let paymentsInterestAmount = 0;
@@ -118,7 +118,7 @@ export function _calculateCurrentInterestDue(loan, paymentDate) {
     : pendingInterestAmount + paymentsInterestAmount;
 
   let currentTotalInterest = loanYear === thisYear
-  ? pendingInterestAmount + (totalPayments - loan.principalLeft)
+  ? pendingInterestAmount + (totalPayments + loan.principalLeft - loan.amount)
   : totalInterestDue;
 
   if (totalInterestDue === 0 && loan.principalLeft > 0) {
@@ -154,7 +154,7 @@ export async function _applyPaymentLogic(loan, pointsSpentForLoan, currentTotalI
     loan.principalLeft = 0;
     loan.interestAmount = currentTotalInterest;
     loan.status = "Ended";
-    loan.duration = _calculateCurrentInterestDue(loan, new Date()).currentLoanDurationMonths; // Update actual duration
+    loan.duration = _calculateCurrentInterestDue(loan, new Date()).currentLoanDurationMonths; 
     loan.pointsSpent = pointsSpentForLoan;
     loan.pointsBalance = loan.pointsSpent - pointsSpentForLoan;
 
@@ -162,7 +162,7 @@ export async function _applyPaymentLogic(loan, pointsSpentForLoan, currentTotalI
       await DepositServiceManager.createDeposit({
         depositor: { id: borrowerUser.id, name: borrowerUser.fullName },
         amount: excessAmount,
-        cashLocation: { id: cashLocationId, name: 'Automatically Determined' }, // Name needs to be fetched or passed
+        cashLocation: { id: cashLocationId, name: 'Automatically Determined' }, 
         source: "Excess Loan Payment",
         date: new Date(),
         recordedBy: { id: currentUser.id, name: currentUser.fullName }
@@ -182,7 +182,7 @@ export async function _applyPaymentLogic(loan, pointsSpentForLoan, currentTotalI
  * @throws {ErrorUtil.AppError} If update fails.
  */
 export async function _updateLoanDocument(loanId, updatedLoanData) {
-  const loanUpdateResult = await DB.tryMongoose(Loan.updateOne({ _id: loanId }, { $set: updatedLoanData }));
+  const loanUpdateResult = await DB.query(Loan.updateOne({ _id: loanId }, { $set: updatedLoanData }));
   if (loanUpdateResult.matchedCount === 0) {
     throw new ErrorUtil.AppError("Failed to update loan. Loan not found or no changes applied.", 500);
   }
@@ -197,7 +197,7 @@ export async function _updateLoanDocument(loanId, updatedLoanData) {
  * @param {object} currentUser - The user recording the transaction.
  */
 export async function _recordPointsSale(user, date, pointsAmount, currentUser) {
-  await DB.tryMongoose(PointsSale.create({
+  await DB.query(PointsSale.create({
     entity: { id: user.id, name: user.fullName },
     date: date,
     pointsWorth: pointsAmount * 1000,
@@ -264,7 +264,7 @@ export async function getFilteredLoans({ filter, sort, pagination }) {
 }
 
 export async function getLoans(status, user) {
-  return await DB.tryMongoose(Loan.find({status: status, borrower.id: user } ));
+  return await DB.query(Loan.find({status: status, "borrower.id": user } ));
 }
 
 /**
@@ -274,7 +274,7 @@ export async function getLoans(status, user) {
  * @throws {ErrorUtil.AppError} If the loan is not found.
  */
 export async function getLoanById(loanId) {
-  const loan = await DB.tryMongoose(Loan.findById(loanId));
+  const loan = await DB.query(Loan.findById(loanId));
   if (!loan) {
     throw new ErrorUtil.AppError("Loan not found.", 404);
   }
@@ -306,7 +306,7 @@ export async function initiateLoanRequest(
     throw new ErrorUtil.AppError(`The Loan Limit of ${Math.round(loanLimit).toLocaleString('en-US')} has been exceeded!`, 400);
   }
 
-  const borrowerUser = await UserServiceManager.getUser(borrowerId); // Fetch user again for their points
+  const borrowerUser = await UserServiceManager.getUserById(borrowerId); // Fetch user again for their points
   const { totalRate, pointsSpent, actualInterest, installmentAmount } =
     _calculateInitialLoanMetrics(amount, duration, borrowerUser.points);
 
@@ -336,7 +336,7 @@ export async function initiateLoanRequest(
     lastPaymentDate: today,
   };
 
-  const createdLoan = await DB.tryMongoose(Loan.create(newLoan));
+  const createdLoan = await DB.query(Loan.create(newLoan));
   return createdLoan;
 }
 
@@ -358,7 +358,7 @@ export async function approveLoan(loanId, approvedBy, sources) {
   await _disburseFundsFromSources(sources);
 
   // Update the loan status and details
-  const updatedLoan = await DB.tryMongoose(Loan.updateOne(
+  const updatedLoan = await DB.query(Loan.updateOne(
     { _id: loanId },
     {
       $set: {
@@ -390,7 +390,7 @@ export async function cancelLoanRequest(loanId) {
     throw new ErrorUtil.AppError("Only 'Pending Approval' loans can be cancelled.", 400);
   }
 
-  const updatedLoan = await DB.tryMongoose(
+  const updatedLoan = await DB.query(
     Loan.updateOne({ _id: loanId }, { $set: { status: "Cancelled" } })
   );
   if (updatedLoan.matchedCount === 0) {
@@ -446,7 +446,7 @@ export async function makeLoanPayment(
   const parsedPaymentDate = new Date(paymentDate);
   const loan = await getLoanById(loanId); 
 
-  const borrowerUser = await UserServiceManager.getUser(loan.borrower.id);
+  const borrowerUser = await UserServiceManager.getUserById(loan.borrower.id);
 
   if (loan.status !== "Ongoing") {
     throw new ErrorUtil.AppError(`Payment cannot be made on a loan with status: '${loan.status}'.`, 400);
