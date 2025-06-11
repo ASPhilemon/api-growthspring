@@ -16,7 +16,13 @@ export async function getUsers(sort, pagination){
 }
 
 export async function getUserById(userId){
-  const user = DB.query(await User.findById(userId))
+  const user = DB.query(User.findById(userId))
+  if (!user) throw new ErrorUtil.NotFoundError("Failed to find user");
+  return user
+}
+
+export async function getUserByEmail(email){
+  const user = DB.query(await User.findOne({email, deleted: false}))
   if (!user) throw new ErrorUtil.NotFoundError("Failed to find user");
   return user
 }

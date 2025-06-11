@@ -18,8 +18,12 @@
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "generate-password": "^1.7.1",
+    "google-auth-library": "^9.15.1",
+    "joi": "^17.13.3",
+    "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.14.3",
-    "nodemailer": "^7.0.3"
+    "nodemailer": "^7.0.3",
+    "zxcvbn": "^4.4.2"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
