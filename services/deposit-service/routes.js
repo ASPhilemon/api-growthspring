@@ -18,11 +18,11 @@ router.get(
 )
 router.post(
   "/", 
-  RouteController.createDeposit
+  RouteController.recordDeposit
 )
 router.put(
   "/:id", 
-  RouteController.updateDeposit
+  RouteController.setDepositAmount
 )
 router.delete(
   "/:id", 

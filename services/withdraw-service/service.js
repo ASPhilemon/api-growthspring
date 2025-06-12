@@ -106,7 +106,7 @@ function _calculateTotalInCashLocations(cashLocations){
 async function _deductFromCashLocations(cashLocations){
   for (let cashLocation of cashLocations){
     let {_id : cashLocationId, amount} = cashLocation
-    await CashLocationServiceManager.deductFromCashLocation(cashLocationId, amount)
+    await CashLocationServiceManager.addToCashLocation(cashLocationId, -amount)
   }
 }
 

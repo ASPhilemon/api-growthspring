@@ -60,7 +60,7 @@ export async function createDeposit(deposit){
   })
 }
 
-export async function setAmount(depositId, newAmount){
+export async function setDepositAmount(depositId, newAmount){
   const deposit = await getDeposit(depositId)
 
   const { _id: userId } = deposit.depositor
