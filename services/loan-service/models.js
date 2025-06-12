@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import * as DB from "../../utils/db-util.js"; 
+import * as DB from "../../utils/db-util.js";
 
 const { ObjectId } = mongoose.Types;
 
@@ -9,21 +9,22 @@ const loanSchema = new mongoose.Schema({
   rate: { type: Number, required: true },
   earliestDate: { type: Date, required: true },
   latestDate: { type: Date, required: true },
+  type: { type: String, required: true },
   status: { type: String, required: true, enum: ["Pending Approval", "Ongoing", "Ended", "Cancelled"] },
-  initiatedBy: { 
+  initiatedBy: {
     id: { type: ObjectId, required: true, ref: 'User' },
     name: { type: String, required: true }
   },
-  approvedBy: { 
+  approvedBy: {
     id: { type: ObjectId, ref: 'User' },
     name: { type: String }
   },
   worthAtLoan: { type: Number, required: true },
   amount: { type: Number, required: true },
-  date: { type: Date },
-  borrower: { 
+  date: { type: Date }, // Renamed from loan_date in your example for consistency
+  borrower: {
     id: { type: ObjectId, required: true, ref: 'User' },
-    name: { type: String, required: true }
+    name: { type: String, required: true } // Assuming borrower_name maps to borrower.name
   },
   pointsSpent: { type: Number, default: 0 },
   principalLeft: { type: Number, required: true },
@@ -38,78 +39,128 @@ const loanSchema = new mongoose.Schema({
   installmentAmount: { type: Number, required: true },
 
   sources: [{
-    id: { type: ObjectId, required: true, ref: 'CashLocation' }, 
-    name: { type: String, required: true }, 
+    id: { type: ObjectId, required: true, ref: 'CashLocation' },
+    name: { type: String, required: true },
     amount: { type: Number, required: true }
   }],
   payments: [{
     date: { type: Date, required: true },
     amount: { type: Number, required: true },
-    updatedBy: { 
+    updatedBy: {
       id: { type: ObjectId, required: true, ref: 'User' },
       name: { type: String, required: true }
     },
-    location: { type: ObjectId, required: true, ref: 'CashLocation' }, 
+    location: { type: ObjectId, required: true, ref: 'CashLocation' },
     _id: false
   }],
 }, { timestamps: true });
 
 
+// Define a static method for filtered loan retrieval
 loanSchema.statics.getFilteredLoans = async function({
-  filter,
-  sort = { field: "date", order: -1 }, 
-  pagination = { page: 1, perPage: 20 }
+  member, 
+  year,
+  status, 
+  page = 1,
+  month,
+  order = -1, 
+  sortBy = "date", 
 }) {
   const pipeline = [];
-  const matchCriteria = [];
+  const matchCriteria = []; // Array to hold individual match conditions
 
-  // Match stage
-  if (filter?.year) matchCriteria.push({ $expr: { $eq: [{ $year: "$date" }, filter.year] } });
-  if (filter?.month) matchCriteria.push({ $expr: { $eq: [{ $month: "$date" }, filter.month] } });
-  if (filter?.borrowerId) matchCriteria.push({ "borrower.id": new ObjectId(filter.borrowerId) }); 
+  // --- Match Stage ---
+  // Filtering by year
+  if (year) {
+    matchCriteria.push({ $expr: { $eq: [{ $year: "$date" }, year] } });
+  }
+  // Filtering by month
+  if (month) {
+    matchCriteria.push({ $expr: { $eq: [{ $month: "$date" }, month] } });
+  }
 
-  if (matchCriteria.length > 0) pipeline.push({ $match: { $and: matchCriteria } });
+  if (!status) {
+    matchCriteria.push({ status: { $in: ["Ended", "Ongoing"] } });
+  } else {
+    if (status === "Overdue") {
+      matchCriteria.push({ status: "Ongoing" });
+    } else {
+      matchCriteria.push({ status: status });
+    }
+  }
 
-  // Lookup stage to fetch borrower details
+  if (member) {
+    // Check if 'member' is a valid ObjectId string. If so, filter by ID.
+    // Otherwise, assume it's a name and filter by name.
+    if (mongoose.Types.ObjectId.isValid(member)) {
+      matchCriteria.push({ "borrower.id": new ObjectId(member) });
+    } else {
+      matchCriteria.push({ "borrower.name": member });
+    }
+  }
+
+  // Add the combined match criteria to the pipeline if any conditions exist
+  if (matchCriteria.length > 0) {
+    pipeline.push({ $match: { $and: matchCriteria } });
+  }
+
+  // --- Lookup and AddFields for Borrower Details ---
+  // This fetches the full user document for the borrower
   pipeline.push({
     $lookup: {
-      from: "users", 
+      from: "users", // Name of the users collection
       localField: "borrower.id",
       foreignField: "_id",
-      as: "borrowerDetail"
+      as: "borrowerFullDetails" // Temporary field name
     }
   });
+  // Replace the 'borrower' field with the first element of the lookup result
   pipeline.push({
     $addFields: {
-      borrower: { $arrayElemAt: ["$borrowerDetail", 0] } 
+      borrower: { $arrayElemAt: ["$borrowerFullDetails", 0] }
     }
   });
-  pipeline.push({ $project: { borrowerDetail: 0 } }); 
+  // Project out the temporary lookup field
+  pipeline.push({ $project: { borrowerFullDetails: 0 } });
 
-  // Sort stage
-  pipeline.push({ $sort: { [sort.field]: sort.order } });
+  // --- Sort Stage ---
+  // Using dynamic field names based on sortBy and order
+  pipeline.push({ $sort: { [sortBy]: order } });
 
-  // Skip and Limit for pagination
-  pipeline.push({ $skip: (pagination.page - 1) * pagination.perPage });
-  pipeline.push({ $limit: pagination.perPage });
+  // --- Pagination Stages ---
+  pipeline.push({ $skip: (page - 1) * perPage });
+  pipeline.push({ $limit: perPage });
 
-  return await DB.tryMongoose(this.aggregate(pipeline)); 
+  const loans = await DB.tryMongoose(this.aggregate(pipeline));
+
+  // --- Post-query filter for "Overdue" status ---
+  if (status === "Overdue") {
+    const currentDate = new Date();
+
+    return loans.filter((loan) => {
+      const loanEndDate = new Date(loan.date);
+      loanEndDate.setMonth(loanEndDate.getMonth() + loan.duration);
+
+      return loanEndDate < currentDate && loan.status === "Ongoing";
+    });
+  }
+
+  return loans;
 };
-
 
 // --- PointsSale Schema ---
 const pointsSaleSchema = new mongoose.Schema({
-  entity: { 
+  entity: {
     id: { type: ObjectId, required: true, ref: 'User' },
     name: { type: String, required: true }
   },
-  date: { type: Date, required: true }, 
-  pointsWorth: { type: Number, required: true }, 
-  recordedBy: { 
+  date: { type: Date, required: true },
+  pointsWorth: { type: Number, required: true },
+  recordedBy: {
     id: { type: ObjectId, required: true, ref: 'User' },
     name: { type: String, required: true }
   },
-  pointsInvolved: { type: Number, required: true }, 
+  pointsInvolved: { type: Number, required: true },
   reason: { type: String, required: true },
   type: { type: String, required: true, enum: ["Spent", "Earned", "Bought", "Sold"] },
 }, { timestamps: true });

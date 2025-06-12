@@ -6,6 +6,7 @@ dotenv.config();
 const CONSTANTS = {
   // Loan related constants
   MONTHLY_LENDING_RATE: Number(process.env.MONTHLY_LENDING_RATE),
+  TEMPORARY_SAVINGS_LOAN_FRACTION: Number(process.env.TEMPORARY_SAVINGS_LOAN_FRACTION),
   MAX_LENDING_RATE: Number(process.env.MAX_LENDING_RATE),
   MIN_LENDING_RATE: Number(process.env.MIN_LENDING_RATE),
   ANNUAL_TAX_RATE: Number(process.env.ANNUAL_TAX_RATE),
