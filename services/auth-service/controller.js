@@ -3,19 +3,15 @@ import * as Response from "../../utils/http-response-util.js"
 
 export async function signInWithPassword(req, res){
   const jwt = await ServiceManager.signInWithPassword()
-  _setJWTCookie(jwt, res)
+    const cookieDuration = 60*60*24*40 // 40 days
+  _setCookie(res, {name: "jwt", value: jwt, duration:cookieDuration})
   Response.sendSuccess(jwt, {req, res})
 }
 
 export async function signInWithGoogle(req, res){
   const jwt = await ServiceManager.signInWithGoogle()
-  _setJWTCookie(jwt, res)
-  Response.sendSuccess(jwt, {req, res})
-}
-
-export async function signInWithWebAuthn(req, res){
-  const jwt = await ServiceManager.signInWithWebAuthn()
-  _setJWTCookie(jwt, res)
+    const cookieDuration = 60*60*24*40 // 40 days
+  _setCookie(res, {name: "jwt", value: jwt, duration:cookieDuration})
   Response.sendSuccess(jwt, {req, res})
 }
 
@@ -29,22 +25,71 @@ export async function resetPassword(req, res){
   Response.sendSuccess(null, {req, res})
 }
 
-export async function registerWebauthn(req, res){
-  await ServiceManager.registerWebauthn()
+export async function getRegisterationOptionsWebAuthn(req, res){
+  const {otpCode} = req.query
+  const {registrationOptions, challengeId} = await ServiceManager.getRegistrationOptionsWebAuthn(otpCode)
+  _setCookie(res, {
+    name:"challengeIdRegistration",
+    value: challengeId,
+    duration: 60*60 //1 hour
+  })
+  Response.sendSuccess(registrationOptions, {req, res})
+}
+
+export async function verifyRegisterationWebAuthn(req, res){
+  const {registrationResponse} = req.body
+  const {challengeIdRegistration:challengeId} = req.cookies
+  await ServiceManager.verifyRegistrationWebAuthn(registrationResponse, challengeId)
+
+  _clearCookie(res, "challengeIdRegistration")
+  
   Response.sendSuccess(null, {req, res})
+}
+
+export async function getAuthenticationOptionsWebAuthn(req, res){
+  const {authenticationOptions, challengeId} = await ServiceManager.getAuthenticationOptionsWebAuthn()
+  _setCookie(res, {
+    name:"challengeIdAuthentication",
+    value: challengeId,
+    duration: 60*60 //1 hour
+  })
+  Response.sendSuccess(authenticationOptions, {req, res})
+}
+
+export async function verifyAuthenticationWebAuthn(req, res){
+  const {authenticationResponse:response} = req.body
+  const {challengeIdAuthentication:challengeId} = req.cookies
+  const jwt = await ServiceManager.verifyAuthenticationWebAuthn(response, challengeId)
+
+  _setCookie(res, {
+    name: "jwt",
+    value: jwt,
+    duration: 60*60*24*40 //40 days
+  })
+
+  _clearCookie(res, "challengeIdAuthentication")
+  Response.sendSuccess(jwt, {req, res})
 }
 
 export async function signOut(req, res){
-  const invalidJWT = "invalid";
-  _setJWTCookie(invalidJWT, res, {cookieDuration:0})
+  _clearCookie(res, "jwt")
   Response.sendSuccess(null, {req, res})
 }
 
-function _setJWTCookie(jwt, res, {cookieDuration}){
-  if (!cookieDuration) cookieDuration = 40*24*60*60*1000; //40 days default 
-  res.cookie('jwt', jwt, {
+function _setCookie(res, {name, value, duration }){
+  res.cookie(name, value, {
     httpOnly: true,
-    maxAge: cookieDuration,
+    maxAge:duration,
+    secure: true,
+    domain:"growthspringers.com"
+  });
+}
+
+function _clearCookie(res, cookieName){
+  const cookieValue = "invalid"
+  res.cookie(cookieName, cookieValue, {
+    httpOnly: true,
+    maxAge: 0,
     secure: true,
     domain:"growthspringers.com"
   });

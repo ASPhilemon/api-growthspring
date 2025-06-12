@@ -13,10 +13,6 @@ router.post(
   RouteController.signInWithGoogle
 )
 router.post(
-  "/signin-webauthn", 
-  RouteController.signInWithWebAuthn
-)
-router.post(
   "/otps", 
   RouteController.createOTP
 )
@@ -24,10 +20,26 @@ router.post(
   "/reset-password", 
   RouteController.resetPassword
 )
-router.post(
-  "/register-webauthn", 
-  RouteController.registerWebauthn
+
+//webauthn 
+router.get(
+  "/webauthn-registartion-options", 
+  RouteController.getRegisterationOptionsWebAuthn
 )
+router.get(
+  "/webauthn-authentication-options", 
+  RouteController.getAuthenticationOptionsWebAuthn
+)
+router.post(
+  "/webauthn-verify-registartion", 
+  RouteController.verifyRegisterationWebAuthn
+)
+router.post(
+  "/webauthn-verify-authentication", 
+  RouteController.verifyAuthenticationWebAuthn
+)
+
+//sign out
 router.post(
   "/signout", 
   RouteController.signOut

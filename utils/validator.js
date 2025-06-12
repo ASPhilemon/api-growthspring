@@ -12,9 +12,14 @@ export function required(input){
   }
 }
 
-export function assert(arg, errMessage){
+export function assert(arg, errMessage, {errType = Errors.BadRequestError}){
   if (!arg){
-    throw new Errors.BadRequestError(errMessage)
+    if (errType == Errors.InternalServerError){
+      throw new Errors.InternalServerError({cause: new Error(errMessage)})
+    }
+    else {
+      throw new errType(errMessage);
+    }
   }
 }
 
