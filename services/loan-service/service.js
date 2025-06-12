@@ -6,7 +6,7 @@ import * as DB from "../../utils/db-util.js";
 import * as ErrorUtil from "../../utils/error-util.js";
 import { getDaysDifference } from "../../utils/date-util.js"; 
 import { ACCOUNT_BALANCE_RANGES, categorizeAmounts } from "../../utils/financial-analytics-util.js";
-import CONSTANTS from "../../config/constants.js"; 
+import CONSTANTS from "../../src/config/constants.js"; 
 
 // collaborator services
 import * as UserServiceManager from "../user-service/service.js";
@@ -673,11 +673,6 @@ export async function makeLoanPayment(
   return { loanStatus: loan.status};
 }
 
-// src/services/loan-service/service.js
-
-// ... (existing imports like mongoose, DB, Loan, etc.) ...
-import { ACCOUNT_BALANCE_RANGES, categorizeAmounts } from "../../utils/financial-analytics-util.js";
-
 
 /**
  * Fetches and processes loan records to categorize members based on their total loan amounts,
@@ -957,13 +952,14 @@ export async function makeFreeLoanPayment(
 //----------------------------CODE FOR OTHER SERVICES............................................
 
 
+
 //admin-dashboard/service.js (New file for aggregation)
 
-import { getLoanFinancialRecords } from "../loan-service/service.js";
-import { getDepositFinancialRecords } from "../deposit-service/service.js";
-import * as DB from "../../utils/db-util.js";
-import { User, Deposit } from "../../models/models.js"; 
-import { getHistoricalDepositAccountStandings } from "../deposit-service/service.js"; 
+//import { getLoanFinancialRecords } from "../loan-service/service.js";
+//import { getDepositFinancialRecords } from "../deposit-service/service.js";
+//import * as DB from "../../utils/db-util.js";
+//import { User, Deposit } from "../../models/models.js"; 
+//import { getHistoricalDepositAccountStandings } from "../deposit-service/service.js"; 
 
 async function analyzeHistoricalDeposits(dateToAnalyze) {
     // 1. Fetch all necessary data from the database ONCE
@@ -1021,7 +1017,7 @@ export async function getAllFinancialRecordsGrouped() {
 
 
 // src/services/deposit-service/service.js-------------------------------
-import { ACCOUNT_BALANCE_RANGES, categorizeAmounts } from "../../utils/financial-analytics-util.js";
+//import { ACCOUNT_BALANCE_RANGES, categorizeAmounts } from "../../utils/financial-analytics-util.js";
 
 
 // Assuming these functions are provided elsewhere in your service/module or globally accessible
@@ -1084,7 +1080,7 @@ export async function getHistoricalDepositAccountStandings(targetDate, allUsers,
         };
         memberInfoMap[userId] = {
             name: user.fullName || 'Unknown Member',
-            membershipDate: user.membershipDate ? new Date(user.membershipDate) : new Date(0) // Default to epoch for safety
+            membershipDate: user.membershipDate ? new Date(user.membershipDate) : new Date(0) 
         };
     });
 
@@ -1230,48 +1226,3 @@ export async function generateDepositAccountStandings(depositRecords) {
 
 // ... (other functions related to deposits) ...
 
-// src/services/earnings-service/service.js (New File)
-
-import { ACCOUNT_BALANCE_RANGES, categorizeAmounts } from "../../utils/financial-analytics-util.js";
-
-
-/**
- * Fetches and processes earning records to categorize members based on their total earning amounts,
- * and also returns each member's total earnings with names.
- *
- * @param {Array<object>} earningRecords - An array of earning documents, ideally already filtered.
- * Expected structure: { member: { id: '...', name: '...' }, amount: number, ... }
- * @returns {Promise<object>} An object containing:
- * - standings: Array of earning account standings by range.
- * - memberTotals: Array of objects where each object is { id: string, name: string, total: number }.
- */
-export async function generateEarningAccountStandings(earningRecords) {
-    const memberEarningTotalsById = {}; // Aggregate by ID
-    const memberInfoMap = {};           // Map to store member's name
-
-    earningRecords.forEach(record => {
-        const memberId = record.member.id.toString(); // Assuming 'member' field has 'id'
-        const memberName = record.member.name;
-
-        if (!memberEarningTotalsById[memberId]) {
-            memberEarningTotalsById[memberId] = 0;
-            memberInfoMap[memberId] = memberName;
-        }
-        memberEarningTotalsById[memberId] += record.amount;
-    });
-
-    const memberEarningTotals = Object.keys(memberEarningTotalsById).map(memberId => ({
-        id: memberId,
-        name: memberInfoMap[memberId],
-        total: memberEarningTotalsById[memberId]
-    }));
-
-    const earningStandings = categorizeAmounts(memberEarningTotalsById, ACCOUNT_BALANCE_RANGES);
-
-    return {
-        standings: earningStandings,
-        memberTotals: memberEarningTotals
-    };
-}
-
-// ... (other functions related to earnings) ...

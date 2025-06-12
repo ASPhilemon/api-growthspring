@@ -45,7 +45,7 @@ const loanSchema = new mongoose.Schema({
   }],
   payments: [{
     date: { type: Date, required: true },
-    amount: { type: true, required: true },
+    amount: { type: Number, required: true },
     updatedBy: {
       id: { type: ObjectId, required: true, ref: 'User' },
       name: { type: String, required: true }
