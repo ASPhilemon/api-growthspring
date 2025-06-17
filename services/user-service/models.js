@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import * as DB from "../../utils/db-util.js"
 //schemas
+
 const userSchema = new mongoose.Schema({
   email: {
     type: String,
@@ -11,10 +12,6 @@ const userSchema = new mongoose.Schema({
     required: true
   },
   phoneContact: {
-    type: String,
-    required: true
-  },
-  password: {
     type: String,
     required: true
   },

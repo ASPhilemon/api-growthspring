@@ -12,7 +12,7 @@ export async function sendEmail({
     port: 587,
     auth: {
       user: "api",
-      pass: "dfa04f6b252a5436c6afc525de9f22ef"
+      pass: process.env.MAILTRAP_SECRET
     }
   });
   
