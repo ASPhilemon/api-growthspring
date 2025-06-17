@@ -51,7 +51,7 @@ export async function _calculateFreeLoanLimit(borrowerId, amount) {
 
 
 // Helper function for grouping loan records
-function groupFinancialRecordsByMonth(records) {
+export async function groupFinancialRecordsByMonth(records) {
   return records.reduce((acc, record) => {
     const month = new Date(record.date).toLocaleString('default', { month: 'long', year: 'numeric' });
     if (!acc[month]) {
@@ -100,7 +100,7 @@ export function _calculateInitialLoanMetrics(loanAmount, loanDuration, borrowerP
 export async function _disburseFundsFromSources(sources) {
   await Promise.all(
     sources.map(source =>
-      CashLocationServiceManager.deductFromCashLocation(source.id, source.amount)
+      CashLocationServiceManager.addToCashLocation(source.id, -source.amount)
     )
   );
 }
@@ -200,12 +200,13 @@ export async function _applyPaymentLogic(loan, pointsSpentForLoan, currentTotalI
 
     if (excessAmount >= 5000) {
       await DepositServiceManager.createDeposit({
-        depositor: { id: borrowerUser.id, name: borrowerUser.fullName },
+        depositor: borrowerUser.id,
         amount: excessAmount,
-        cashLocation: { id: cashLocationId, name: 'Automatically Determined' }, 
+        type: "club saving",
+        cashLocation: { _id: cashLocationId, name: 'Automatically Determined' }, 
         source: "Excess Loan Payment",
         date: new Date(),
-        recordedBy: { id: currentUser.id, name: currentUser.fullName }
+        recordedBy: { _id: currentUser.id, fullName: currentUser.fullName }
       });
       paymentMsg += `A Deposit of ${excessAmount.toLocaleString('en-US')} was recorded as excess Payment. `;
     }
@@ -242,7 +243,7 @@ export async function _recordPointsSale(user, date, pointsAmount, currentUser) {
     date: date,
     pointsWorth: pointsAmount * 1000,
     recordedBy: { id: currentUser.id, name: currentUser.fullName },
-    pointsInvolved: pointsAmount,
+    amountPoints: pointsAmount,
     reason: "Loan interest",
     type: "Spent"
   }));
@@ -290,6 +291,75 @@ export async function _sendLoanPaymentNotification(loanStatus, principalLeft, in
     subject: "Loan Payment Recorded",
     message: `Dear ${notificationParams.userFirstName},\n\nYour loan payment of ${notificationParams.amountPaid.toLocaleString('en-US')} on ${notificationParams.date} has been recorded.\nOutstanding debt: ${notificationParams.outstandingDebt.toLocaleString('en-US')}\nLoan Status: ${notificationParams.loanStatus}`
   });
+}
+
+// --- New Shared Helper Function for Loan Creation ---
+
+/**
+ * Creates and persists a new loan document with common properties.
+ * This function abstracts the core loan document construction and database insertion.
+ *
+ * @param {object} params - Object containing all necessary parameters for loan creation.
+ * @param {number} params.amount - The loan amount.
+ * @param {number} params.duration - The loan duration.
+ * @param {Date|string} params.earliestDate - The earliest disbursement date.
+ * @param {Date|string} params.latestDate - The latest disbursement date.
+ * @param {object} params.borrowerUser - The borrower's user document (containing id, fullName, investmentAmount).
+ * @param {object} params.currentUser - The user initiating/recording the loan (containing id, fullName).
+ * @param {number} params.rate - The loan interest rate (e.g., totalRate for standard, 0 for interest-free).
+ * @param {string} params.type - The loan type (e.g., "Standard", "Interest-Free").
+ * @param {number} params.loanUnits - Calculated loan units (0 for standard, duration*amount for free).
+ * @param {number} params.interestAmount - The total interest amount (0 for interest-free).
+ * @param {number} params.installmentAmount - The monthly installment amount (0 for interest-free).
+ * @param {number} params.pointsSpent - Points spent on the loan (0 for interest-free).
+ * @param {number} params.rateAfterDiscount - Rate after discount (e.g., totalRate for standard, 0 for interest-free).
+ * @returns {Promise<object>} A promise that resolves to the created loan document.
+ */
+export async function _createAndPersistLoan({
+  amount,
+  duration,
+  earliestDate,
+  latestDate,
+  borrowerUser,
+  currentUser,
+  rate,
+  type,
+  loanUnits,
+  interestAmount,
+  installmentAmount,
+  pointsSpent,
+  rateAfterDiscount
+}) {
+  const today = new Date(); 
+
+  const newLoan = {
+    duration: duration,
+    units: loanUnits, 
+    interestAccrued: 0,
+    pointsAccrued: 0,
+    rate: rate, 
+    type: type, 
+    earliestDate: earliestDate,
+    latestDate: latestDate,
+    status: "Pending Approval",
+    installmentAmount: installmentAmount, 
+    initiatedBy: { id: currentUser.id, name: currentUser.fullName },
+    approvedBy: {}, 
+    worthAtLoan: borrowerUser.investmentAmount, 
+    amount: amount,
+    date: today, 
+    borrower: { id: borrowerUser.id, name: borrowerUser.fullName },
+    pointsSpent: pointsSpent, 
+    discount: 0, 
+    pointsWorthBought: 0, 
+    rateAfterDiscount: rateAfterDiscount, 
+    interestAmount: interestAmount, 
+    principalLeft: amount, 
+    lastPaymentDate: today, 
+  };
+
+  const createdLoan = await DB.tryMongoose(Loan.create(newLoan));
+  return createdLoan;
 }
 
 // --------------------------------- Loan Service Functions -----------------------------------------------
@@ -402,14 +472,16 @@ export async function getLoanById(loanId) {
  * @returns {Promise<object>} A promise that resolves to the created loan document.
  * @throws {ErrorUtil.AppError} If required information is missing, borrower not found, or loan limit exceeded.
  */
+
 export async function initiateLoanRequest(
   amount,
   duration,
   earliestDate,
   latestDate,
   borrowerId,
-  currentUser, 
+  currentUser,
 ) {
+  // _validateLoanRequestInputs(amount, duration, earliestDate, latestDate, borrowerId);
 
   const loanLimit = await _calculateBorrowerLoanLimit(borrowerId);
 
@@ -417,41 +489,28 @@ export async function initiateLoanRequest(
     throw new ErrorUtil.AppError(`The Loan Limit of ${Math.round(loanLimit).toLocaleString('en-US')} has been exceeded!`, 400);
   }
 
-
   const borrowerUser = await UserServiceManager.getUserById(borrowerId); 
-  const { totalRate, pointsSpent, actualInterest, installmentAmount } = _calculateInitialLoanMetrics(amount, duration, borrowerUser.points);
+  const { totalRate, pointsSpent, actualInterest, installmentAmount } =
+    _calculateInitialLoanMetrics(amount, duration, borrowerUser.points);
 
-  const today = new Date();
-  const newLoan = {
-    duration: duration,
-    units: 0,
-    interestAccrued: 0,
-    pointsAccrued: 0,
+  const createdLoan = await _createAndPersistLoan({
+    amount,
+    duration,
+    earliestDate,
+    latestDate,
+    borrowerUser,
+    currentUser,
     rate: totalRate,
-    type: type,
-    earliestDate: earliestDate,
-    latestDate: latestDate,
-    status: "Pending Approval",
-    installmentAmount: installmentAmount,
-    initiatedBy: { id: currentUser.id, name: currentUser.fullName },
-    approvedBy: {},
-    worthAtLoan: borrowerUser.investmentAmount,
-    amount: amount,
-    date: today,
-    borrower: { id: borrowerUser.id, name: borrowerUser.fullName },
-    pointsSpent: pointsSpent,
-    discount: 0,
-    pointsWorthBought: 0,
-    rateAfterDiscount: totalRate,
+    type: "Standard",
+    loanUnits: 0, 
     interestAmount: actualInterest,
-    principalLeft: amount,
-    lastPaymentDate: today,
-  };
+    installmentAmount: installmentAmount,
+    pointsSpent: pointsSpent,
+    rateAfterDiscount: totalRate 
+  });
 
-  const createdLoan = await DB.query(Loan.create(newLoan));
   return createdLoan;
 }
-
 
 /**
  * Fetches all loan-related financial records (loan disbursements and payments).
@@ -778,56 +837,45 @@ export async function generateLoanAccountStandings(loanRecords) {
  * @returns {Promise<object>} A promise that resolves to the created loan document.
  * @throws {ErrorUtil.AppError} If required information is missing, borrower not found, or loan limit exceeded.
  */
+
 export async function initiateFreeLoanRequest(
   amount,
   duration,
   earliestDate,
   latestDate,
   borrowerId,
-  currentUser, 
+  currentUser,
 ) {
 
-  const {loanLimit, loanPeriodLimit} = await _calculateFreeLoanLimit(borrowerId);
+  const { loanLimit, loanPeriodLimit } = await _calculateFreeLoanLimit(borrowerId);
 
   if (amount > loanLimit) {
-    throw new ErrorUtil.AppError(`The Loan Limit of ${Math.round(loanLimit).toLocaleString('en-US')} has been exceeded!`, 400);
+    throw new ErrorUtil.AppError(`The Loan Limit of ${Math.round(loanLimit).toLocaleString('en-US')}, has been exceeded!`, 400);
   }
 
-  if (  duration > loanPeriodLimit) {
-    throw new ErrorUtil.AppError(`The Loan Period of ${Math.round(loanPeriodLimit).toLocaleString('en-US')} has been exceeded!`, 400);
+  if (duration > loanPeriodLimit) {
+    throw new ErrorUtil.AppError(`The Loan Period of ${Math.round(loanPeriodLimit).toLocaleString('en-US')}, has been exceeded!`, 400);
   }
 
   const borrowerUser = await UserServiceManager.getUserById(borrowerId); 
-  const loanUnits = duration * amount; //duration in days
+  const loanUnits = duration * amount; 
 
-  const today = new Date();
-  const newLoan = {
-    duration: duration,
-    units: loanUnits,
-    interestAccrued: 0,
-    pointsAccrued: 0,
-    rate: 0,
-    type: "Interest-Free",
-    earliestDate: earliestDate,
-    latestDate: latestDate,
-    status: "Pending Approval",
-    installmentAmount: 0,
-    initiatedBy: { id: currentUser.id, name: currentUser.fullName },
-    approvedBy: {},
-    worthAtLoan: borrowerUser.investmentAmount,
-    amount: amount,
-    date: today,
-    borrower: { id: borrowerUser.id, name: borrowerUser.fullName },
-    pointsSpent: 0,
-    discount: 0,
-    pointsWorthBought: 0,
-    rateAfterDiscount: 0,
-    interestAmount: 0,
-    principalLeft: amount,
-    lastPaymentDate: today,
-  };
+  const createdLoan = await _createAndPersistLoan({
+    amount,
+    duration,
+    earliestDate,
+    latestDate,
+    borrowerUser,
+    currentUser,
+    rate: 0, 
+    type: "Interest-Free", 
+    loanUnits: loanUnits,
+    interestAmount: 0, 
+    installmentAmount: 0, 
+    pointsSpent: 0, 
+    rateAfterDiscount: 0
+  });
 
-  const createdLoan = await DB.query(Loan.create(newLoan));
   return createdLoan;
 }
 
