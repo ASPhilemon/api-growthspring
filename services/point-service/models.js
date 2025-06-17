@@ -45,11 +45,12 @@ const pointTransactionSchema = new mongoose.Schema({
       min: 1
     },
     reason: {
-      _id: ObjectId, // Deposit or Loan ID, etc if applicable
-      description: {
-        type: String,
-        required: true
-      }
+      type: String,
+      required: true
+    },
+    refId:{
+      type: ObjectId,
+      required: true
     }
   }, { timestamps: true }
 );

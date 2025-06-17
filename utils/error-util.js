@@ -44,6 +44,14 @@ export class BadRequestError extends AppError {
   }
 }
 
+export class ValidationError extends AppError {
+  constructor(arg1 = {}, arg2 = null) {
+    const defaultMessage = "Failed to validate input"
+    const statusCode = 400
+    super(AppError.buildArgs(arg1, defaultMessage, statusCode, arg2));
+  }
+}
+
 export class NotFoundError extends AppError {
   constructor(arg1 = {}, arg2 = null) {
     const defaultMessage = "Resource not found on the server"
@@ -65,5 +73,11 @@ export class UnknownError extends AppError {
     const defaultMessage = "An unknown error occurred";
     const statusCode = 500;
     super(AppError.buildArgs(arg1, defaultMessage, statusCode, arg2));
+  }
+}
+
+export class EmailError extends Error{
+  constructor( message){
+    super(message)
   }
 }
