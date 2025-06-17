@@ -2,8 +2,9 @@ import { User } from "./models.js"
 
 //utils
 import * as DB from "../../utils/db-util.js"
-import * as ErrorUtil from "../../utils/error-util.js"
+import * as Errors from "../../utils/error-util.js"
 import * as PasswordUtil from "../../utils/password-util.js"
+import * as Validator from "../../utils/validator-util.js"
 
 //collaborator services
 import * as EmailServiceManager from "../email-service/service.js"
@@ -17,13 +18,13 @@ export async function getUsers(sort, pagination){
 
 export async function getUserById(userId){
   const user = DB.query(User.findById(userId))
-  if (!user) throw new ErrorUtil.NotFoundError("Failed to find user");
+  Validator.assert(user, "Failed to find user", {errType: Errors.NotFoundError})
   return user
 }
 
 export async function getUserByEmail(email){
-  const user = DB.query(await User.findOne({email, deleted: false}))
-  if (!user) throw new ErrorUtil.NotFoundError("Failed to find user");
+  const user = DB.query(await User.findOne({email}))
+  Validator.assert(user, "Failed to find user", {errType: Errors.NotFoundError})
   return user
 }
 
@@ -59,44 +60,46 @@ export async function deleteUser(userId){
   await updateUser(userId, {deleted: true})
 }
 
-export async function getInvestmentAmount(userId){
-  const user = await getUserById()
-  return user.investmentAmount
+//permanent investment 
+export async function addPermanentInvestmentAmount(userId, amount){
+  await DB.query(User.findOneAndUpdate({_id: userId}, {$inc: {"permanentInvestment.amount": amount}}))
 }
 
-export async function getTempSavingsAmount(userId){
-  const user = await getUserById()
-  return user.tempSavingsAmount
+export async function deductPermanentInvestmentAmount(userId, amount){
+  await DB.query(User.findOneAndUpdate({_id: userId}, {$inc: {"permanentInvestment.amount": -amount}}))
 }
 
-export async function setInvestmentAmount(userId, investmentAmount){
-  const result = DB.query(User.updateOne({_id: userId}, {investmentAmount}))
-  if (result.matchedCount === 0){
-    throw new ErrorUtil.NotFoundError("Failed to find user")
-  }
+export async function addPermanentInvestmentUnits(userId, units){
+  await DB.query(User.findOneAndUpdate({_id: userId}, {$inc: {"permanentInvestment.units": units}}))
 }
 
-export async function setTempSavingsAmount(userId, tempSavingsAmount){
-  const result = DB.query(User.updateOne({_id: userId}, {tempSavingsAmount}))
-  if (result.matchedCount === 0){
-    throw new ErrorUtil.NotFoundError("Failed to find user")
-  }
+export async function deductPermanentInvestmentUnits(userId, units){
+  await DB.query(User.findOneAndUpdate({_id: userId}, {$inc: {"permanentInvestment.units": -units}}))
 }
 
-export async function addInvestmentAmount(userId, amount){
-  await DB.query(User.findOneAndUpdate({_id: userId}, {$inc: {investmentAmount: amount}}))
+export async function setPermanentInvestmentUnitsDate(userId, permanentInvestmentUnitsDate){
+  await DB.query(User.findOneAndUpdate({_id: userId}, {$set: {"permanentInvestment.unitsDate": permanentInvestmentUnitsDate}}))
 }
 
-export async function deductInvestmentAmount(userId, amount){
-  await DB.query(User.findOneAndUpdate({_id: userId}, {$inc: {investmentAmount: -amount}}))
+//temporary investment 
+export async function addTemporaryInvestmentAmount(userId, amount){
+  await DB.query(User.findOneAndUpdate({_id: userId}, {$inc: {"temporaryInvestment.amount": amount}}))
 }
 
-export async function addTempSavingsAmount(userId, amount){
-  await DB.query(User.findOneAndUpdate({_id: userId}, {$inc: {tempSavingsAmount: amount}}))
+export async function deductTemporaryInvestmentAmount(userId, amount){
+  await DB.query(User.findOneAndUpdate({_id: userId}, {$inc: {"temporaryInvestment.amount": -amount}}))
 }
 
-export async function deductTempSavingsAmount(userId, amount){
-  await DB.query(User.findOneAndUpdate({_id: userId}, {$inc: {tempSavingsAmount: -amount}}))
+export async function addTemporaryInvestmentUnits(userId, units){
+  await DB.query(User.findOneAndUpdate({_id: userId}, {$inc: {"temporaryInvestment.units": units}}))
+}
+
+export async function deductTemporaryInvestmentUnits(userId, units){
+  await DB.query(User.findOneAndUpdate({_id: userId}, {$inc: {"temporaryInvestment.units": -units}}))
+}
+
+export async function setTemporaryInvestmentUnitsDate(userId, temporaryInvestmentUnitsDate){
+  await DB.query(User.findOneAndUpdate({_id: userId}, {$set: {"temporaryInvestment.unitsDate": temporaryInvestmentUnitsDate}}))
 }
 
 //helpers

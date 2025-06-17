@@ -1,7 +1,7 @@
 import { PointTransaction } from "./models.js"
 import * as DB from "../../utils/db-util.js"
 import * as Errors from "../../utils/error-util.js"
-import * as Validator from "../../utils/validator.js"
+import * as Validator from "../../utils/validator-util.js"
 
 //collaborator services
 import * as UserServiceManager from "../user-service/service.js"
