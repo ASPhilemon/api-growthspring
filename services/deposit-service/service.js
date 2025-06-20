@@ -5,7 +5,11 @@ import { Deposit, YearDeposit } from "./models.js"
 
 //util
 import * as DB from "../../utils/db-util.js"
-import * as ErrorUtil from "../../utils/error-util.js"
+import * as Errors from "../../utils/error-util.js"
+import * as Validator from "../../utils/validator-util.js"
+
+//validation Schemas
+import * as Schemas from "./schemas.js"
 
 //collaborator services
 import * as UserServiceManager from "../user-service/service.js"
@@ -13,22 +17,25 @@ import * as CashLocationServiceManager from "../cash-location-service/service.js
 import * as PointServiceManager from "../point-service/service.js"
 import * as EmailServiceManager from "../email-service/service.js"
 
-export async function getDeposits({ filter, sort, pagination }){
-  return await Deposit.getDeposits({filter, sort, pagination})
+export async function getDeposits(filter, sort, pagination){
+  Validator.schema(Schemas.getDeposits, {filter, sort, pagination})
+  return await Deposit.getDeposits(filter, sort, pagination)
 }
 
-export async function getClubDeposits(){
-  return await DB.query(YearDeposit.find())
-}
-
-export async function getDeposit(depositId){
+export async function getDepositById(depositId){
+  Validator.schema(Schemas.getDepositById, depositId)
   const deposit = await DB.query(Deposit.findById(depositId))
-  if (!deposit) throw new ErrorUtil.NotFoundError("Failed to find deposit")
+  if (!deposit) throw new Errors.NotFoundError("Failed to find deposit")
   return deposit
 }
 
-export async function createDeposit(deposit){
-  //get user
+export async function getYearDeposits(){
+  return await DB.query(YearDeposit.find())
+}
+
+export async function recordDeposit(deposit){
+  Validator.schema(Schemas.recordDeposit, deposit)
+
   const { userId } = deposit.depositor
   const user = await UserServiceManager.getUserById(userId)
 
@@ -61,7 +68,9 @@ export async function createDeposit(deposit){
 }
 
 export async function setDepositAmount(depositId, newAmount){
-  const deposit = await getDeposit(depositId)
+  Validator.schema(Schemas.setDepositAmount, {depositId, newAmount} )
+
+  const deposit = await getDepositById(depositId)
 
   const { _id: userId } = deposit.depositor
 
@@ -83,6 +92,8 @@ export async function setDepositAmount(depositId, newAmount){
 }
 
 export async function deleteDeposit(depositId) {
+  Validator.schema(Schemas.deleteDeposit, depositId)
+
   const deposit = await getDeposit(depositId)
   const { _id: userId } = deposit.depositor
   const { _id: cashLocationId } = deposit.cashLocation
@@ -105,7 +116,6 @@ export async function deleteDeposit(depositId) {
     message: "Your deposit has been deleted"
   })
 }
-
 
 //helper functions
 function _calculatePointsReward(depositAmount){
@@ -171,7 +181,7 @@ async function _updateYearDepositAmount(date, deltaAmount) {
   ));
 
   if (result.matchedCount === 0) {
-    throw new ErrorUtil.BadRequestError(`No year deposit record found for year ${year}`);
+    throw new Errors.BadRequestError(`No year deposit record found for year ${year}`);
   }
 }
 
@@ -193,7 +203,7 @@ async function _deleteYearDeposit(date, amount) {
   ));
 
   if (result.matchedCount === 0) {
-    throw new ErrorUtil.BadRequestError(`No year deposit record found for year ${year}`);
+    throw new Errors.BadRequestError(`No year deposit record found for year ${year}`);
   }
 }
 

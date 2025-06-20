@@ -27,7 +27,7 @@ const depositSchema = new mongoose.Schema({
     },
     type:{
       type:"String",
-      enum: ["Club Saving", "Temporary Saving"],
+      enum: ["Permanent", "Temporary"],
       required: true
     },
 
@@ -64,7 +64,8 @@ const depositSchema = new mongoose.Schema({
           required: true
         }
       }
-    }
+    },
+    automatic: Boolean,
   }, { timestamps:true }
 );
 
@@ -84,11 +85,11 @@ const yearDepositSchema = new mongoose.Schema({
 })
 
 //custom static methods on model
-depositSchema.statics.getDeposits = async function({
+depositSchema.statics.getDeposits = async function(
   filter,
   sort = {field: "date", order: 1},
   pagination = {page: 1, perPage: 20}
-}){
+){
     const pipeline = [];
 
     // match stage
