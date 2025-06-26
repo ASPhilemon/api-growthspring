@@ -148,31 +148,11 @@ loanSchema.statics.getFilteredLoans = async function({
   return loans;
 };
 
-// --- PointsSale Schema ---
-const pointsSaleSchema = new mongoose.Schema({
-  entity: {
-    id: { type: ObjectId, required: true, ref: 'User' },
-    name: { type: String, required: true }
-  },
-  date: { type: Date, required: true },
-  pointsWorth: { type: Number, required: true },
-  recordedBy: {
-    id: { type: ObjectId, required: true, ref: 'User' },
-    name: { type: String, required: true }
-  },
-  pointsInvolved: { type: Number, required: true },
-  reason: { type: String, required: true },
-  type: { type: String, required: true, enum: ["Spent", "Earned", "Bought", "Sold"] },
-}, { timestamps: true });
-
-
 // --- Models ---
 const Loan = mongoose.model('Loan', loanSchema);
-const PointsSale = mongoose.model('PointsSale', pointsSaleSchema);
 
 
 // --- Exports ---
 export {
   Loan,
-  PointsSale,
 };
