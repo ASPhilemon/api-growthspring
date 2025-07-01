@@ -16,6 +16,11 @@ const CONSTANTS = {
   LOAN_RISK: Number(process.env.LOAN_RISK),
   MEMBERS_SERVED_PERCENTAGE: Number(process.env.MEMBERS_SERVED_PERCENTAGE),
   LOAN_MULTIPLE: Number(process.env.LOAN_MULTIPLE),
+  ONE_MONTH_DAYS: Number(process.env.ONE_MONTH_DAYS),
+  GRACE_PERIOD_DAYS: Number(process.env.GRACE_PERIOD_DAYS),
+  ONE_YEAR_MONTH_THRESHOLD: Number(process.env.ONE_YEAR_MONTH_THRESHOLD),
+  TWO_YEAR_MONTH_THRESHOLD: Number(process.env.TWO_YEAR_MONTH_THRESHOLD),
+  ONE_YEAR_MONTHS: Number(process.env.ONE_YEAR_MONTHS)
 };
 
 export default CONSTANTS;
