@@ -24,7 +24,7 @@ const loanSchema = new mongoose.Schema({
   date: { type: Date }, // Renamed from loan_date in your example for consistency
   borrower: {
     id: { type: ObjectId, required: true, ref: 'User' },
-    name: { type: String, required: true } // Assuming borrower_name maps to borrower.name
+    name: { type: String, required: true } 
   },
   pointsSpent: { type: Number, default: 0 },
   principalLeft: { type: Number, required: true },
