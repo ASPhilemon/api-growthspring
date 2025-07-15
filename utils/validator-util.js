@@ -1,36 +1,11 @@
 import * as Errors from "./error-util.js"
-import Joi from "joi"
 
-export function schema(input, schema){
+export function schema(schema, input){
   const { error } =  schema.validate(input)
-  if(error) throw new Errors.ValidationError(error.details[0].message)
+  if(error) throw new Errors.BadRequestError({message: "Failed to validate input", cause: error})
 }
 
-export function required(input){
-  for (const key in input){
-    if (!input[key]) throw new Errors.ValidationError(`${key} is required.`)
-  }
+export function assert(expr, errMessage, errType){
+  if(!errType) errType = Errors.BadRequestError
+  if(!expr) throw new errType(errMessage)
 }
-
-export function assert(arg, errMessage, {errType = Errors.BadRequestError}){
-  if (!arg){
-    if (errType == Errors.InternalServerError){
-      throw new Errors.InternalServerError({cause: new Error(errMessage)})
-    }
-    else {
-      throw new errType(errMessage);
-    }
-  }
-}
-
-export function email(email){
-  const emailSchema = Joi.object({
-    email: Joi.string().email().required()
-  })
-
-  const {error } = emailSchema.validate({email})
-
-  if(error) throw new Errors.ValidationError(error.details[0].message)
-}
-
-

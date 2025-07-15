@@ -1,4 +1,4 @@
-import * as ErrorUtil from "./error-util.js"
+import * as Errors from "./error-util.js"
 import mongoose from "mongoose"
 
 export async function query(promise) {
@@ -11,12 +11,13 @@ export async function query(promise) {
 
 export async function transaction(callback) {
   try {
-    await mongoose.connection.transaction(callback);
+    //await mongoose.connection.transaction(callback);
+    await callback()
   }
   catch (err) {
-    if (err instanceof AppError) throw err;
+    if (err instanceof Errors.AppError) throw err;
     if (err instanceof mongoose.Error) _handleMongooseError(err);
-    throw new ErrorUtil.UnknownError({cause: err})
+    throw new Errors.UnknownError({cause: err})
   }
 }
 
@@ -26,9 +27,9 @@ function _handleMongooseError(err){
   if (err instanceof ValidationError ||
       err instanceof CastError ||
       err instanceof StrictModeError){
-    throw new BadRequestError("Failed to validate user input", err)
+    throw new Errors.BadRequestError("Failed to validate user input", err)
   }
   
-  throw new InternalServerError({cause: err})
+  throw new Errors.InternalServerError({cause: err})
   
 }

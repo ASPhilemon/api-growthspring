@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const { ObjectId, Buffer } = mongoose.Types 
+const { ObjectId } = mongoose.Types 
 
 //schemas
 const userSubSchema = new mongoose.Schema({
@@ -64,7 +64,9 @@ const passkeySchema = new mongoose.Schema({
 const challengeSchema = new mongoose.Schema({
   email: {
     type: String,
-    required: this.type == "registration"
+    required: function () {
+    return this.type === 'registration';
+  }
   },
   challenge: {
     type: Buffer,
@@ -72,7 +74,9 @@ const challengeSchema = new mongoose.Schema({
   },
   webAuthnUserID:{
     type: String,
-    required: this.type == "registration"
+    required: function () {
+    return this.type === 'registration';
+  }
   },
   type:{
     type: String,

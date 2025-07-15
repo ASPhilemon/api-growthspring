@@ -1,20 +1,24 @@
 import express from "express"
 
 import * as RouteController  from "./controller.js"
+import { requireUser, requireAdmin } from "../../middleware.js"
 
 const router = express.Router()
+
+router.use(requireUser)
+router.use(requireAdmin)
 
 router.get(
   "/", 
   RouteController.getDeposits
 )
 router.get(
-  "/club-deposits", 
-  RouteController.getClubDeposits
+  "/yearly-deposits", 
+  RouteController.getYearlyDeposits
 )
 router.get(
   "/:id", 
-  RouteController.getDeposit
+  RouteController.getDepositById
 )
 router.post(
   "/", 
@@ -22,12 +26,11 @@ router.post(
 )
 router.put(
   "/:id", 
-  RouteController.setDepositAmount
+  RouteController.updateDeposit
 )
 router.delete(
   "/:id", 
   RouteController.deleteDeposit
 )
-
 
 export default router

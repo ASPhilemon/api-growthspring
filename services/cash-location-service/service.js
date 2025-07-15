@@ -5,12 +5,13 @@ import * as ErrorUtil from "../../utils/error-util.js"
 import * as DB from "../../utils/db-util.js"
 
 export async function getCashLocations(){
-  return await DB.query(CashLocation.find({deleted: false}))
+  return await DB.query(CashLocation.find())
 }
 
 export async function getCashLocationById(cashLocationId){
-  const cashLocation = await DB.query(CashLocation.findOne({_id: cashLocationId, deleted: false}))
-  if (!cashLocation) throw new ErrorUtil.NotFoundError("Failed to find cash location")
+  const cashLocation = await DB.query(CashLocation.findById(cashLocationId))
+  if (!cashLocation) throw new ErrorUtil.NotFoundError("Failed to find cash location");
+  return cashLocation
 }
 
 export async function createCashLocation(cashLocation){
@@ -92,4 +93,5 @@ function _addToCashLocation(cashLocation, amount){
   if (cashLocation.amount + amount < 0) {
     throw new ErrorUtil.BadRequestError(`Insufficient balance in ${cashLocation.name}`)
   }
+  cashLocation.amount += amount
 }

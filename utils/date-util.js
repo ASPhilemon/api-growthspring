@@ -16,4 +16,19 @@ export function getDaysDifference(date1, date2) {
     const diffTime = Math.abs(utc2 - utc1);
     const diffDays = Math.ceil(diffTime / oneDay);
     return diffDays;
-  }
+}
+
+export function formatDateShortUS(date){
+  date = new Date(date)
+  const formattedDate = date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+
+  return formattedDate
+}
+
+export function getToday(){
+  return new Date()
+}

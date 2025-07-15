@@ -1,4 +1,5 @@
 export default {
-  testEnvironment: 'node',
+  preset: '@shelf/jest-mongodb',
   transform: {},
+  testMatch: ['**/*.test.js'],
 };
