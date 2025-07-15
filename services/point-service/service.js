@@ -23,12 +23,12 @@ export async function getTransactionByRefId(refId){
   return transaction
 }
 
-export async function rewardUser(userId, points, reason, refId){
+export async function awardPoints(userId, points, reason, refId){
   const user = await UserServiceManager.getUserById(userId)
   await DB.transaction(async()=>{
     await UserServiceManager.addPoints(userId, points)
     await PointTransaction.create({
-      type: "reward",
+      type: "award",
       recipient: {_id: user._id, fullName: user.fullName},
       points,
       reason,
@@ -70,11 +70,41 @@ export async function transferPoints(senderId, recipientId, points, reason){
 }
 
 export async function deleteTransactionById(transactionId){
-  const result = await DB.query(PointTransaction.findOneAndDelete({_id: transactionId}))
-  Validator.assert(result.matchedCount !== 0, "Failed to find point transaction to delete")
+  let transaction = await getTransactionById(transactionId)
+  await _deleteTransaction(transaction)
 }
 
 export async function deleteTransactionByRefId(refId){
-  const result = await DB.query(PointTransaction.findOneAndDelete({refId}))
-  Validator.assert(result.matchedCount !== 0, "Failed to find point transaction to delete")
+  let transaction = await getTransactionByRefId(refId)
+  await _deleteTransaction(transaction)
+}
+
+export async function findByRefIdAndUpdatePoints(refId, newPoints){
+  DB.transaction(async()=>{
+    let transaction = getTransactionByRefId(refId)
+    let {redeemedBy, sender, recipent} = transaction
+    let user = redeemedBy || sender || recipent
+    await PointTransaction.updateOne({refId}, {$set: {points: newPoints}})
+    UserServiceManager.addPoints(user._id, newPoints - transaction.points)
+  })
+}
+
+async function _deleteTransaction(transaction){
+  await DB.transaction(async()=>{
+    await PointTransaction.deleteOne({_id: transaction._id})
+
+    if(transaction.type === "redeem"){
+      await UserServiceManager.addPoints(transaction.redeemedBy._id, transaction.points)
+    }
+
+    if(transaction.type === "award"){
+      await UserServiceManager.deductPoints(transaction.recipient._id, transaction.points)
+    }
+    
+    if(transaction.type === "transfer"){
+      await UserServiceManager.deductPoints(transaction.recipient._id, transaction.points)
+      await UserServiceManager.addPoints(transaction.sender._id, transaction.points)
+    }
+
+  })
 }

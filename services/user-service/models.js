@@ -1,6 +1,21 @@
 import mongoose from "mongoose";
 import * as DB from "../../utils/db-util.js"
+
 //schemas
+const investmentSubSchema = new mongoose.Schema({
+  amount: {
+    type: Number,
+    required: true,
+  },
+  units: {
+    type: Number,
+    required: true,
+  },
+  unitsDate: {
+    type: Date,
+    required: true,
+  }
+}, {_id: false})
 
 const userSchema = new mongoose.Schema({
   email: {
@@ -19,12 +34,12 @@ const userSchema = new mongoose.Schema({
     type: Date,
     required: true
   },
-  investmentAmount: {
-    type: Number,
+  permanentInvestment: {
+    type: investmentSubSchema,
     required: true
   },
-  tempSavingsAmount:{
-    type: Number,
+  temporaryInvestment: {
+    type: investmentSubSchema,
     required: true
   },
   points: {

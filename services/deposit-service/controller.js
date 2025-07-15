@@ -2,37 +2,44 @@ import * as ServiceManager from "./service.js"
 import * as Response from "../../utils/http-response-util.js"
 
 export async function getDeposits(req, res){
-  const {filter, sort, pagination} = req.query
-  const deposits = await ServiceManager.getDeposits(filter, sort, pagination)
+  let {userId, year, month, sortBy, sortOrder, page, perPage} = req.query
+  let filter = {userId, year: Number(year), month: Number(month)}
+  let sort = {field: sortBy, order: Number(sortOrder)}
+  let pagination = {page: Number(page), perPage: Number(perPage)}
+  let deposits = await ServiceManager.getDeposits(filter, sort, pagination)
   Response.sendSuccess(deposits, {req, res})
 }
 
-export async function getYearDeposits(req, res){
-  const clubDeposits = await ServiceManager.getYearDeposits()
-  Response.sendSuccess(clubDeposits, {req, res})
-}
-
-export async function getDeposit(req, res){
+export async function getDepositById(req, res){
   const { id: depositId } = req.params
   const deposit = await ServiceManager.getDepositById(depositId)
   Response.sendSuccess(deposit, {req, res})
 }
 
+export async function getYearlyDeposits(req, res){
+  const yearlyDeposits = await ServiceManager.getYearlyDeposits()
+  Response.sendSuccess(yearlyDeposits, {req, res})
+}
+
 export async function recordDeposit(req, res){
-  const { deposit } = req.body
-  await ServiceManager.createDeposit(deposit)
+  const deposit = req.body
+  const {_id, fullName} = req.user
+  deposit.recordedBy = {_id, fullName}
+  await ServiceManager.recordDeposit({...deposit})
   Response.sendSuccess(null, {req, res})
 }
 
-export async function setDepositAmount(req, res){
+export async function updateDeposit(req, res){
   const { id: depositId } = req.params
-  const { amount } = req.body
-  await ServiceManager.setDepositAmount(depositId, amount)
+  const update = req.body
+  update.updatedById = req.user._id
+  await ServiceManager.updateDeposit(depositId, update)
   Response.sendSuccess(null, {req, res})
 }
 
 export async function deleteDeposit(req, res){
   const { id: depositId } = req.params
-  await ServiceManager.deleteDeposit(depositId)
+  const {cashLocationToDeductId} = req.body
+  await ServiceManager.deleteDeposit(depositId, cashLocationToDeductId)
   Response.sendSuccess(null, {req, res})
 }

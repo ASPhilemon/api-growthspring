@@ -60,46 +60,29 @@ export async function deleteUser(userId){
   await updateUser(userId, {deleted: true})
 }
 
-//permanent investment 
-export async function addPermanentInvestmentAmount(userId, amount){
-  await DB.query(User.findOneAndUpdate({_id: userId}, {$inc: {"permanentInvestment.amount": amount}}))
+export async function updatePermanentInvestment(userId, {deltaAmount, deltaUnits, newUnitsDate}){
+  let update = {$set: {}, $inc: {}}
+  if (newUnitsDate) update.$set["permanentInvestment.unitsDate"] = newUnitsDate
+  if (deltaAmount) update.$inc["permanentInvestment.amount"] = deltaAmount
+  if (deltaUnits) update.$inc["permanentInvestment.units"] = deltaUnits
+  await DB.query(User.updateOne({_id: userId}, update))
 }
 
-export async function deductPermanentInvestmentAmount(userId, amount){
-  await DB.query(User.findOneAndUpdate({_id: userId}, {$inc: {"permanentInvestment.amount": -amount}}))
+export async function updateTemporaryInvestment(userId, {deltaAmount, deltaUnits, newUnitsDate}){
+  let update = {$set: {}, $inc: {}}
+  if (newUnitsDate) update.$set["temporaryInvestment.unitsDate"] = newUnitsDate
+  if (deltaAmount) update.$inc["temporaryInvestment.amount"] = deltaAmount
+  if (deltaUnits) update.$inc["temporaryInvestment.units"] = deltaUnits
+
+  await DB.query(User.updateOne({_id: userId}, update))
 }
 
-export async function addPermanentInvestmentUnits(userId, units){
-  await DB.query(User.findOneAndUpdate({_id: userId}, {$inc: {"permanentInvestment.units": units}}))
+export async function addPoints(userId, points){
+  await DB.query(User.updateOne({_id: userId}, {$inc: {points}}))
 }
 
-export async function deductPermanentInvestmentUnits(userId, units){
-  await DB.query(User.findOneAndUpdate({_id: userId}, {$inc: {"permanentInvestment.units": -units}}))
-}
-
-export async function setPermanentInvestmentUnitsDate(userId, permanentInvestmentUnitsDate){
-  await DB.query(User.findOneAndUpdate({_id: userId}, {$set: {"permanentInvestment.unitsDate": permanentInvestmentUnitsDate}}))
-}
-
-//temporary investment 
-export async function addTemporaryInvestmentAmount(userId, amount){
-  await DB.query(User.findOneAndUpdate({_id: userId}, {$inc: {"temporaryInvestment.amount": amount}}))
-}
-
-export async function deductTemporaryInvestmentAmount(userId, amount){
-  await DB.query(User.findOneAndUpdate({_id: userId}, {$inc: {"temporaryInvestment.amount": -amount}}))
-}
-
-export async function addTemporaryInvestmentUnits(userId, units){
-  await DB.query(User.findOneAndUpdate({_id: userId}, {$inc: {"temporaryInvestment.units": units}}))
-}
-
-export async function deductTemporaryInvestmentUnits(userId, units){
-  await DB.query(User.findOneAndUpdate({_id: userId}, {$inc: {"temporaryInvestment.units": -units}}))
-}
-
-export async function setTemporaryInvestmentUnitsDate(userId, temporaryInvestmentUnitsDate){
-  await DB.query(User.findOneAndUpdate({_id: userId}, {$set: {"temporaryInvestment.unitsDate": temporaryInvestmentUnitsDate}}))
+export async function deductPoints(userId, points){
+  await DB.query(User.updateOne({_id: userId}, {$inc: {points : -points}}))
 }
 
 //helpers

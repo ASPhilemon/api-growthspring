@@ -18,7 +18,7 @@ const userSchema = new mongoose.Schema({
 const pointTransactionSchema = new mongoose.Schema({
     type: {
       type: String,
-      enum: ['reward', 'redeem', 'transfer'],
+      enum: ['award', 'redeem', 'transfer'],
       required: true,
     },
     recipient: {
@@ -49,7 +49,7 @@ const pointTransactionSchema = new mongoose.Schema({
       required: true
     },
     refId:{
-      type: ObjectId,
+      type: String,
       required: true
     }
   }, { timestamps: true }

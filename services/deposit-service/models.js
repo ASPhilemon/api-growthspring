@@ -1,21 +1,41 @@
 import mongoose from "mongoose";
+
+
+//utils
 import * as DB from "../../utils/db-util.js"
 
 const { ObjectId } = mongoose.Types
 
 //schemas
+const userSubSchema = new mongoose.Schema({
+  _id: {
+    type: ObjectId,
+    required: true
+  },
+  fullName: {
+    type: String,
+    required: true
+  },
+})
+const cashLocationSubSchema = new mongoose.Schema({
+  _id: {
+    type: ObjectId,
+    required: true
+  },
+  name: {
+    type: String,
+    required: true
+  },
+})
+
 const depositSchema = new mongoose.Schema({
+    _id: {
+      type: String,
+      required: true
+    },
     depositor: {
-      type: {
-        _id: {
-          type: ObjectId,
-          required: true
-        },
-        fullName: {
-          type: String,
-          required: true
-        }
-      }
+      type: userSubSchema,
+      required: true
     },
     date: {
       type: Date,
@@ -23,6 +43,7 @@ const depositSchema = new mongoose.Schema({
     },
     amount:{
       type: Number,
+      min: 1,
       required: true
     },
     type:{
@@ -32,44 +53,32 @@ const depositSchema = new mongoose.Schema({
     },
 
     recordedBy: {
-      type: {
-        _id: {
-          type: ObjectId,
-          required: true
-        },
-        fullName: {
-          type: String,
-          required: true
-        }
-      }
-    },
-    balanceBefore:{
-      type: Number,
-      min: 0,
+      type: userSubSchema,
       required: true
     },
-    source:{
+    source: {
       type: String,
       enum: ["Savings", "Profits", "Excess Loan Payment", "Interest"],
       required: true
     },
-    cashLocation:{
-      type: {
-        _id: {
-          type: ObjectId,
-          required: true
-        },
-        name: {
-          type: String,
-          required: true
-        }
-      }
+    cashLocation: {
+      type: cashLocationSubSchema,
+      required: true
     },
-    automatic: Boolean,
+    balanceBefore: {
+      type: Number,
+      min: 0,
+      required: true
+    },
+    pointsBefore: {
+      type: Number,
+      min: 0,
+      required: true
+    },
   }, { timestamps:true }
 );
 
-const yearDepositSchema = new mongoose.Schema({
+const yearlyDepositSchema = new mongoose.Schema({
   year: {
     type: Number,
     required: true,
@@ -127,12 +136,12 @@ depositSchema.statics.getDeposits = async function(
     })
 
     //execute pipeline
-    return await DB.query(Deposit.aggregate(pipeline))
+    return await DB.query(this.aggregate(pipeline))
 }
 
 //models
 const Deposit  = mongoose.model('deposit', depositSchema );
-const YearDeposit  = mongoose.model('year-deposit', yearDepositSchema );
+const YearlyDeposit  = mongoose.model('yearly-deposit', yearlyDepositSchema );
 
 
-export { Deposit, YearDeposit }
+export { Deposit, YearlyDeposit }

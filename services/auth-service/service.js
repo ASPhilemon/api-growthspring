@@ -9,7 +9,7 @@ import { OTP, Password, Passkey, Challenge } from "./models.js"
 //utils
 import * as DB from "../../utils/db-util.js"
 import * as Errors from "../../utils/error-util.js"
-import * as Validator from "../../utils/validator.js"
+import * as Validator from "../../utils/validator-util.js"
 
 //collaborator services
 import * as EmailServiceManager from "../email-service/service.js"
@@ -120,15 +120,21 @@ export async function resetPassword(otpCode, newPassword, cfTurnstileResponse){
 }
 
 export function verifyJWT(jwt){
-  Validator.required({jwt})
   const JWT_SECRET = process.env.JWT_SECRET
-  Validator.assert(JWT_SECRET, "Environment variable JWT_SECRET is undefined", {errorType: "server"})
   try{
     return JWT.verify(jwt, JWT_SECRET)
   }
   catch(err){
     throw new Errors.BadRequestError({message: "Failed to verify provided JWT", cause: err})
   }
+}
+
+export function createJWT(userId, fullName, isAdmin) {
+  const expiryDuration = '40d' 
+  return JWT.sign(
+    {_id: userId, fullName, isAdmin}, process.env.JWT_SECRET,
+    { expiresIn: expiryDuration }
+  )
 }
 
 //WebAuthn
@@ -276,14 +282,6 @@ export async function verifyAuthenticationWebAuthn(response, challengeId){
 }
 
 //helpers
-function _createJWT(userId, fullName, isAdmin) {
-  Validator.required({userId, fullName, isAdmin})
-  const expiryDuration = '40d' 
-  return JWT.sign(
-    {_id: userId, fullName, isAdmin}, process.env.JWT_SECRET,
-    { expiresIn: expiryDuration }
-  )
-}
 
 async function _verifyCfTurnstileResponse(cfTurnstileResponse){
   const CLOUDFLARE_TURNSTILE_API = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
