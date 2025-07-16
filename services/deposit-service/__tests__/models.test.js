@@ -4,6 +4,7 @@ import connectDB from "../../../db.js"
 
 import {Deposit, YearlyDeposit} from "../models.js"
 import * as Mocks from "./mocks.js";
+import * as UserMocks from "../../user-service/__tests__/mocks.js";
 
 beforeAll(async()=>{ 
   process.env.MONGODB_URI = process.env.MONGO_URL
@@ -19,51 +20,49 @@ afterAll(async () => {
 });
 
 describe("Deposit Model", ()=>{
-  let dbUser, dbDeposit
+  let depositor, deposit
 
   beforeEach(async()=>{
     await Deposit.deleteMany()
-    dbUser = Mocks.createDBUser()
-    dbDeposit = Mocks.createDBDeposit(dbUser, "Permanent")
-    await Deposit.create(dbDeposit)
+    depositor = UserMocks.createDBUser()
+    deposit = Mocks.createDBDeposit(depositor, "Permanent")
+    await Deposit.create(deposit)
   })
 
   test("Deposit.create should insert a new deposit in collection", async ()=>{
-    const deposit = await Deposit.findById(dbDeposit._id)
-    expect(deposit).not.toBe(null)
+    const insertedDeposit = await Deposit.findById(deposit._id)
+    expect(insertedDeposit).not.toBe(null)
   })
 
   test("Deposit.updateOne should update existing deposit", async ()=>{
-    await Deposit.updateOne({_id: dbDeposit._id}, {$set: {amount: 1000}})
-    let deposit = await Deposit.findById(dbDeposit._id)
-    expect(deposit.amount).toEqual(1000)
+    await Deposit.updateOne({_id: deposit._id}, {$set: {amount: 1_000}})
+    let updatedDeposit = await Deposit.findById(deposit._id)
+    expect(updatedDeposit.amount).toEqual(1_000)
   })
 
   test("Deposit.deleteOne should delete deposit", async ()=>{
-    await Deposit.deleteOne({_id: dbDeposit._id})
-    const deposit = await Deposit.findById(dbDeposit._id)
-    expect(deposit).toBe(null)
+    await Deposit.deleteOne({_id: deposit._id})
+    const deletedDeposit = await Deposit.findById(deposit._id)
+    expect(deletedDeposit).toBe(null)
   })
 })
 
 describe("YearlyDeposit Model", ()=>{
+  let yearlyDeposit
   beforeEach(async()=>{
     await YearlyDeposit.deleteMany()
-    await YearlyDeposit.create({
-      year: 2025,
-      total: 1_000,
-      monthTotals: [1_000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    })
+    yearlyDeposit = Mocks.createDBYearlyDeposit()
+    await YearlyDeposit.create(yearlyDeposit)
   })
 
-  test("YearlyDeposit.create should create a new yearly deposit in collection", async ()=>{
-    const yearlyDeposit = await YearlyDeposit.findOne({year: 2025})
-    expect(yearlyDeposit).not.toBe(null)
+  test("YearlyDeposit.create should insert a new yearly deposit in collection", async ()=>{
+    const insertedYearlyDeposit = await YearlyDeposit.findOne({year: yearlyDeposit.year})
+    expect(insertedYearlyDeposit).not.toBe(null)
   })
 
   test("YearlyDeposit.updateOne should update yearly deposit", async ()=>{
     await YearlyDeposit.updateOne(
-      { year: 2025 },
+      { year: yearlyDeposit.year },
       {
         $inc: {
           total: 1_000,
@@ -71,9 +70,12 @@ describe("YearlyDeposit Model", ()=>{
         },
       },
     )
-    const yearlyDeposit = await YearlyDeposit.findOne({year: 2025})
-    expect(yearlyDeposit.total).toEqual(2_000)
-    expect(yearlyDeposit.monthTotals).toEqual([2_000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ])
+    const updatedYearlyDeposit = await YearlyDeposit.findOne({year: yearlyDeposit.year})
+    const expectedUpdatedMonthTotals = [...yearlyDeposit.monthTotals]
+    expectedUpdatedMonthTotals[0] += 1_000
+
+    expect(updatedYearlyDeposit.total).toEqual(yearlyDeposit.total + 1_000)
+    expect(updatedYearlyDeposit.monthTotals).toEqual(expectedUpdatedMonthTotals)
   })
 
 })

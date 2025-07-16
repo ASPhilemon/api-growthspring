@@ -16,7 +16,7 @@ const user = Joi.object({
 
 const depositAmount = Joi.number().greater(0)
 
-const depositDate = Joi.date().greater("2022-01-01")
+const depositDate = Joi.date().greater("2020-01-01")
 
 const cashLocation = Joi.object({
   _id: objectId.required(),

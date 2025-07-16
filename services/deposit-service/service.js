@@ -97,7 +97,7 @@ export async function updateDeposit(depositId, update){
     }))
 
     await CashLocationServiceManager.addToCashLocation(update.cashLocationToAdd._id, update.amount)
-    await CashLocationServiceManager.addToCashLocation(update.cashLocationToDeduct._id, deposit.amount)
+    await CashLocationServiceManager.addToCashLocation(update.cashLocationToDeduct._id, -deposit.amount)
 
     let investmentAmount = deposit.type == "Permanent"? user.permanentInvestment.amount: user.temporaryInvestment.amount
     let unitsDate = deposit.type == "Permanent"? user.permanentInvestment.unitsDate: user.temporaryInvestment.unitsDate
@@ -202,8 +202,8 @@ async function sendDepositDeletedEmail(deposit, user){
 }
 
 //helper functions
-function _calculatePoints(depositAmount){
-  return Math.floor((depositAmount / 10000)*3)
+export function _calculatePoints(depositAmount){
+  return Math.floor((depositAmount / 10000) * 3)
 }
 
 async function _awardPoints(deposit){
@@ -246,7 +246,6 @@ async function _recordYearlyDeposit(deposit, type = "create") {
   }))
 
   if (result.matchedCount == 0){
-    console.log("zero match count here")
     let monthTotals = new Array(12).fill(0)
     monthTotals[month] = depositAmount
     YearlyDeposit.create({

@@ -1,83 +1,70 @@
 import {v4 as uuid} from "uuid"
-import mongoose from "mongoose"
+import { faker } from "@faker-js/faker"
+import * as UserMocks from "../../user-service/__tests__/mocks.js"
+import * as CashLocationMocks from "../../cash-location-service/__tests__/mocks.js"
 
-const { ObjectId } = mongoose.Types
+const MIN_DATE = "2022-01-01"
+const MAX_DATE = "2025-01-01"
 
-export function createDBUser(userType){
-  let dbUser = {
-    _id: new ObjectId().toString(),
-    fullName: "Jane Doe",
-    membershipDate: new Date("2024-01-01"),
-    points: 500,
-    temporaryInvestment: {amount: 1_000_000, units: 100, unitsDate: new Date("2025-05-01T00:00:00Z")}, // May 1, 2025
-    permanentInvestment: {amount: 2_000_000, units: 200, unitsDate: new Date("2025-04-01T00:00:00Z")}, // April 1, 2025
-    email: "janedoe@gmail.com",
-    phoneContact: "0772126710",
-    isAdmin: userType == "admin"? true: false
-  }
-  return dbUser
-}
-
-export function createInputDeposit(dbUser, depositType, cashLocation){
-  if (!cashLocation) cashLocation = createInputCashLocation()
+export function createInputDeposit(depositor, depositType, cashLocation){
+  if (!depositor) depositor = UserMocks.createDBUser();
+  if(!depositType) depositType = "Permanent";
+  if (!cashLocation) cashLocation = CashLocationMocks.createInputCashLocation();
 
   let inputDeposit = {
     _id: uuid(),
-    depositor: {_id: dbUser._id, fullName: dbUser.fullName},
-    date: "2025-03-01T00:00:00.000Z", //March 1, 2025
-    amount: 10_000,
+    depositor: {_id: depositor._id, fullName: depositor.fullName},
+    date: faker.date.between({from: MIN_DATE, to: MAX_DATE}).toISOString(),
+    amount: faker.number.int({min: 1, max: 1_000_000}),
     type: depositType,
-    recordedBy:  {_id: new ObjectId().toString(), fullName: "Admin User"},
-    source: "Savings",
+    source: faker.helpers.arrayElement(["Savings", "Profits", "Excess Loan Payment", "Interest"]),
     cashLocation,
   }
 
   return inputDeposit
 }
 
-export function createDBDeposit(dbUser, depositType, recordedBy, cashLocation){
-  if (!dbUser) dbUser = createDBUser("regular");
+export function createDBDeposit(depositor, depositType, recordedBy, cashLocation){
+  if (!depositor) depositor = UserMocks.createDBUser();
   if(!depositType) depositType = "Permanent";
-  if(!recordedBy) recordedBy = {_id: new ObjectId().toString(), fullName: "Admin User"};
-  if(!cashLocation) cashLocation = createInputCashLocation();
+  if(!recordedBy) recordedBy = UserMocks.createDBUser("admin");
+  if(!cashLocation) cashLocation = CashLocationMocks.createInputCashLocation();
 
   let dbDeposit = {
     _id: uuid(),
-    depositor: {_id: dbUser._id, fullName: dbUser.fullName},
-    date: "2025-03-01T00:00:00.000Z", //March 1, 2025
-    amount: 100_000,
+    depositor: {_id: depositor._id, fullName: depositor.fullName},
+    date: faker.date.between({from: MIN_DATE, to: MAX_DATE}),
+    amount: faker.number.int({min: 1, max: 1_000_000}),
     type: depositType,
-    balanceBefore: 1_900_000,
-    pointsBefore: 500,
+    balanceBefore: faker.number.int({min: 1, max: 1_000_000}),
+    pointsBefore: faker.number.int({min: 1, max: 1_000}),
     recordedBy,  
-    source: "Savings",
+    source: faker.helpers.arrayElement(["Savings", "Profits", "Excess Loan Payment", "Interest"]),
     cashLocation,
   }
   return dbDeposit
 }
 
-export function createDepositUpdate(){
+export function createDepositUpdate(cashLocationToAdd, cashLocationToDeduct){
+  if (!cashLocationToAdd) cashLocationToAdd = CashLocationMocks.createInputCashLocation();
+  if (!cashLocationToDeduct) cashLocationToDeduct = CashLocationMocks.createInputCashLocation()
+
   let depositUpdate = {
-    amount: 200_000,
-    date: "2025-05-31T00:00:00.000Z", //May 31, 2025
-    cashLocationToAdd: {_id: new ObjectId().toString(), name: "Standard Chartered"},
-    cashLocationToDeduct: {_id: new ObjectId().toString(), name: "Mobile Money"},
+    amount: faker.number.int({min: 1, max: 1_000_000}),
+    date: faker.date.between({from: MIN_DATE, to: MAX_DATE}).toISOString(),
+    cashLocationToAdd,
+    cashLocationToDeduct,
   }
+
   return depositUpdate
 }
 
-export function createDBCashLocation(
-  cashLocationId = new ObjectId().toString(),
-  cashLocationName = "Mobile Money"
-){
-  const cashLocation = {_id: cashLocationId, name: cashLocationName, amount: 1_000_000};
-  return cashLocation
-}
+export function createDBYearlyDeposit(){
+  let dbYearlyDeposit = {
+    year: faker.number.int({min: 2020, max: 2025}),
+    total: faker.number.int({min: 1, max: 10_000_000}),
+    monthTotals: Array.from({ length: 12 }, () => faker.number.int({ min: 0, max: 1000 })),
+  }
 
-export function createInputCashLocation(
-  cashLocationId = new ObjectId().toString(),
-  cashLocationName = "Mobile Money"
-){
-  const cashLocation = {_id: cashLocationId, name: cashLocationName};
-  return cashLocation
+  return dbYearlyDeposit
 }
