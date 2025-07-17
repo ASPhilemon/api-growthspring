@@ -34,10 +34,10 @@ beforeEach(() => {
 
 const BASE_PATH = "/deposits"
 
-const regularUser = UserMocks.createDBUser()
-const adminUser = UserMocks.createDBUser("admin")
-const deposit = Mocks.createInputDeposit()
-const depositUpdate = Mocks.createDepositUpdate()
+const regularUser = UserMocks.generateDBUser()
+const adminUser = UserMocks.generateDBUser("admin")
+const deposit = Mocks.generateInputDeposit()
+const depositUpdate = Mocks.generateDepositUpdate()
 
 const depositsQuery = {
   userId: 'user-123', year: 2024,

@@ -3,13 +3,13 @@ import { faker } from "@faker-js/faker"
 import * as UserMocks from "../../user-service/__tests__/mocks.js"
 import * as CashLocationMocks from "../../cash-location-service/__tests__/mocks.js"
 
-const MIN_DATE = "2022-01-01"
-const MAX_DATE = "2025-01-01"
+const MIN_DATE = "2023-01-01"
+const MAX_DATE = "2024-12-31"
 
-export function createInputDeposit(depositor, depositType, cashLocation){
-  if (!depositor) depositor = UserMocks.createDBUser();
+export function generateInputDeposit(depositor, depositType, cashLocation){
+  if (!depositor) depositor = UserMocks.generateDBUser();
   if(!depositType) depositType = "Permanent";
-  if (!cashLocation) cashLocation = CashLocationMocks.createInputCashLocation();
+  if (!cashLocation) cashLocation = CashLocationMocks.generateInputCashLocation();
 
   let inputDeposit = {
     _id: uuid(),
@@ -24,11 +24,26 @@ export function createInputDeposit(depositor, depositType, cashLocation){
   return inputDeposit
 }
 
-export function createDBDeposit(depositor, depositType, recordedBy, cashLocation){
-  if (!depositor) depositor = UserMocks.createDBUser();
-  if(!depositType) depositType = "Permanent";
-  if(!recordedBy) recordedBy = UserMocks.createDBUser("admin");
-  if(!cashLocation) cashLocation = CashLocationMocks.createInputCashLocation();
+export function generateInputeposits(numberOfDeposits, depositors){
+  if(!depositors){
+    let numberOfDepositors = 5
+    depositors = UserMocks.generateDBUsers(numberOfDepositors)
+  }
+
+  const inputDeposits = []
+  for (let i = 0; i < numberOfDeposits; i++){
+    let depositor = faker.helpers.arrayElement(depositors);
+    let inputDeposit = generateInputDeposit(depositor)
+    inputDeposits.push(inputDeposit)
+  }
+  return inputDeposits
+}
+
+export function generateDBDeposit(depositor, depositType, recordedBy, cashLocation){
+  if (!depositor) depositor = UserMocks.generateDBUser();
+  if(!depositType) depositType = faker.helpers.arrayElement(["Permanent", "Temporary"]);
+  if(!recordedBy) recordedBy = UserMocks.generateDBUser("admin");
+  if(!cashLocation) cashLocation = CashLocationMocks.generateInputCashLocation();
 
   let dbDeposit = {
     _id: uuid(),
@@ -38,16 +53,31 @@ export function createDBDeposit(depositor, depositType, recordedBy, cashLocation
     type: depositType,
     balanceBefore: faker.number.int({min: 1, max: 1_000_000}),
     pointsBefore: faker.number.int({min: 1, max: 1_000}),
-    recordedBy,  
+    recordedBy: {_id: recordedBy._id, fullName: recordedBy.fullName},  
     source: faker.helpers.arrayElement(["Savings", "Profits", "Excess Loan Payment", "Interest"]),
     cashLocation,
   }
   return dbDeposit
 }
 
-export function createDepositUpdate(cashLocationToAdd, cashLocationToDeduct){
-  if (!cashLocationToAdd) cashLocationToAdd = CashLocationMocks.createInputCashLocation();
-  if (!cashLocationToDeduct) cashLocationToDeduct = CashLocationMocks.createInputCashLocation()
+export function generateDBDeposits(numberOfDeposits, depositors){
+  if(!depositors){
+    let numberOfDepositors = 5
+    depositors = UserMocks.generateDBUsers(numberOfDepositors)
+  }
+
+  const dbDeposits = []
+  for (let i = 0; i < numberOfDeposits; i++){
+    let depositor = faker.helpers.arrayElement(depositors);
+    let dbDeposit = generateDBDeposit(depositor)
+    dbDeposits.push(dbDeposit)
+  }
+  return dbDeposits
+}
+
+export function generateDepositUpdate(cashLocationToAdd, cashLocationToDeduct){
+  if (!cashLocationToAdd) cashLocationToAdd = CashLocationMocks.generateInputCashLocation();
+  if (!cashLocationToDeduct) cashLocationToDeduct = CashLocationMocks.generateInputCashLocation()
 
   let depositUpdate = {
     amount: faker.number.int({min: 1, max: 1_000_000}),
@@ -59,7 +89,7 @@ export function createDepositUpdate(cashLocationToAdd, cashLocationToDeduct){
   return depositUpdate
 }
 
-export function createDBYearlyDeposit(){
+export function generateDBYearlyDeposit(){
   let dbYearlyDeposit = {
     year: faker.number.int({min: 2020, max: 2025}),
     total: faker.number.int({min: 1, max: 10_000_000}),

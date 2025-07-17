@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "test": "cross-env NODE_OPTIONS='--no-warnings' NODE_ENV=test node --experimental-vm-modules node_modules/jest/bin/jest.js --detectOpenHandles --reporters=jest-progress-bar-reporter --",
-    "test:watch": "cross-env NODE_OPTIONS='--no-warnings' NODE_ENV=test node --experimental-vm-modules node_modules/jest/bin/jest.js --detectOpenHandles --reporters=jest-progress-bar-reporter --watchAll --",
+    "test:watch": "cross-env NODE_OPTIONS='--no-warnings' NODE_ENV=test node --experimental-vm-modules node_modules/jest/bin/jest.js --detectOpenHandles --reporters=jest-progress-bar-reporter --watch --",
     "start": "cross-env NODE_ENV=production node server.js",
     "dev": "cross-env NODE_ENV=development nodemon server.js"
   },

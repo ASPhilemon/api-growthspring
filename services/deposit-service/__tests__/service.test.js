@@ -90,8 +90,8 @@ describe("getDeposits", ()=>{
   beforeEach(()=>{
     userId = new ObjectId().toString()
     deposits = [
-      Mocks.createDBDeposit("Permanent"),
-      Mocks.createDBDeposit("Temporary"),
+      Mocks.generateDBDeposit("Permanent"),
+      Mocks.generateDBDeposit("Temporary"),
     ]
     Deposit.getDeposits.mockResolvedValue(deposits)
   })
@@ -110,7 +110,7 @@ describe("getDeposits", ()=>{
 describe("getDepositById", ()=>{
   let deposit
   beforeEach(()=>{
-    deposit = Mocks.createDBDeposit()
+    deposit = Mocks.generateDBDeposit()
     Deposit.findById.mockResolvedValue(deposit)
   })
   
@@ -132,8 +132,8 @@ describe("getYearlyDeposits", ()=>{
   let yearlyDeposits
   beforeEach(()=>{
     yearlyDeposits = [
-      Mocks.createDBYearlyDeposit(),
-      Mocks.createDBYearlyDeposit(),
+      Mocks.generateDBYearlyDeposit(),
+      Mocks.generateDBYearlyDeposit(),
     ]
     YearlyDeposit.find.mockResolvedValue(yearlyDeposits)
   })
@@ -153,9 +153,9 @@ describe("recordDeposit:Permanent", ()=>{
   let depositor, recordedBy, deposit
 
   beforeEach(async ()=>{
-    depositor = UserMocks.createDBUser("regular")
-    recordedBy = UserMocks.createDBUser("admin")
-    deposit = Mocks.createInputDeposit(depositor, "Permanent")
+    depositor = UserMocks.generateDBUser("regular")
+    recordedBy = UserMocks.generateDBUser("admin")
+    deposit = Mocks.generateInputDeposit(depositor, "Permanent")
     const {_id, fullName} = recordedBy
     deposit.recordedBy = {_id,  fullName}
     UserServiceManager.getUserById.mockResolvedValue(depositor)
@@ -213,9 +213,9 @@ describe("recordDeposit:Temporary", ()=>{
   let depositor, recordedBy, deposit
 
   beforeEach(async ()=>{
-    depositor = UserMocks.createDBUser("regular")
-    recordedBy = UserMocks.createDBUser("admin")
-    deposit = Mocks.createInputDeposit(depositor, "Temporary")
+    depositor = UserMocks.generateDBUser("regular")
+    recordedBy = UserMocks.generateDBUser("admin")
+    deposit = Mocks.generateInputDeposit(depositor, "Temporary")
     const {_id, fullName} = recordedBy
     deposit.recordedBy = {_id,  fullName}
     UserServiceManager.getUserById.mockResolvedValue(depositor)
@@ -258,10 +258,10 @@ describe("updateDeposit:Permanent", ()=>{
   let depositor, recordedBy, currentDeposit, depositUpdate
 
   beforeEach(async ()=>{
-    depositor = UserMocks.createDBUser()
-    recordedBy = UserMocks.createDBUser("admin")
-    currentDeposit = Mocks.createDBDeposit(depositor, "Permanent", recordedBy)
-    depositUpdate = Mocks.createDepositUpdate()
+    depositor = UserMocks.generateDBUser()
+    recordedBy = UserMocks.generateDBUser("admin")
+    currentDeposit = Mocks.generateDBDeposit(depositor, "Permanent", recordedBy)
+    depositUpdate = Mocks.generateDepositUpdate()
     depositUpdate.updatedById = recordedBy._id
     UserServiceManager.getUserById.mockResolvedValue(depositor)
     Deposit.findById.mockResolvedValue(currentDeposit)
@@ -370,10 +370,10 @@ describe("updateDeposit:Temporary", ()=>{
   let depositor, recordedBy, currentDeposit, depositUpdate
 
   beforeEach(async ()=>{
-    depositor = UserMocks.createDBUser()
-    recordedBy = UserMocks.createDBUser("admin")
-    currentDeposit = Mocks.createDBDeposit(depositor, "Temporary", recordedBy)
-    depositUpdate = Mocks.createDepositUpdate()
+    depositor = UserMocks.generateDBUser()
+    recordedBy = UserMocks.generateDBUser("admin")
+    currentDeposit = Mocks.generateDBDeposit(depositor, "Temporary", recordedBy)
+    depositUpdate = Mocks.generateDepositUpdate()
     depositUpdate.updatedById = recordedBy._id
     UserServiceManager.getUserById.mockResolvedValue(depositor)
     Deposit.findById.mockResolvedValue(currentDeposit)
@@ -430,8 +430,8 @@ describe("deleteDeposit:Permanent", ()=>{
   let depositor, deposit, cashLocationToDeductId
   
   beforeEach(async ()=>{
-    depositor = UserMocks.createDBUser("regular")
-    deposit = Mocks.createDBDeposit(depositor, "Permanent")
+    depositor = UserMocks.generateDBUser("regular")
+    deposit = Mocks.generateDBDeposit(depositor, "Permanent")
     UserServiceManager.getUserById.mockResolvedValue(depositor)
     Deposit.findById.mockResolvedValue(deposit)
     cashLocationToDeductId = new ObjectId().toString()
@@ -498,8 +498,8 @@ describe("deleteDeposit:Temporary", ()=>{
   let depositor, deposit, cashLocationToDeductId
   
   beforeEach(async ()=>{
-    depositor = UserMocks.createDBUser()
-    deposit = Mocks.createDBDeposit(depositor, "Temporary")
+    depositor = UserMocks.generateDBUser()
+    deposit = Mocks.generateDBDeposit(depositor, "Temporary")
     UserServiceManager.getUserById.mockResolvedValue(depositor)
     Deposit.findById.mockResolvedValue(deposit)
     cashLocationToDeductId = new ObjectId().toString()

@@ -11,6 +11,7 @@ import { Deposit, YearlyDeposit } from '../models.js';
 import { CashLocation } from '../../cash-location-service/models.js';
 import { User } from '../../user-service/models.js';
 import connectDB from "../../../db.js"
+import { response } from 'express';
 
 //load environment variables
 dotenv.config()
@@ -55,6 +56,95 @@ afterAll(async () => {
 
 const BASE_PATH = "/deposits"
 
+describe("GET /deposits", ()=>{
+  let depositors, numberOfDepositors
+  let deposits, numberOfDeposits
+  let adminUser, jwt
+
+  beforeAll(async()=>{
+    //remove any existing depositors and deposits
+    await mongoose.connection.db.dropDatabase()
+
+    //insert depositors and deposits into database
+    numberOfDepositors = 2
+    numberOfDeposits = 500
+    depositors = UserMocks.generateDBUsers(numberOfDepositors)
+    deposits = Mocks.generateDBDeposits(numberOfDeposits, depositors)
+    await User.insertMany(depositors)
+    await Deposit.insertMany(deposits)
+
+    //set jwt
+    adminUser = UserMocks.generateDBUser("admin")
+    let {_id: userId, fullName, isAdmin} = adminUser
+    jwt = createJWT(userId, fullName, isAdmin)
+
+  })
+
+  test("no query params - should return the first 20 sorted deposits, sorted by date in descending order", async ()=>{
+    //send api request
+    let endpoint = BASE_PATH
+    let response = await request(app).get(endpoint)
+    .set("Cookie", cookie.serialize("jwt", jwt))
+
+    //expected deposits ids 
+    let defaultPerPage = 20
+    let expectedDepositsIds = [...deposits]
+    .sort((a, b)=>b.date - a.date)
+    .slice(0, defaultPerPage)
+    .map((deposit)=>deposit._id)
+
+    //actual deposit ids
+    let actualDepositsIds = response.body.data
+    .map((deposit)=>deposit._id)
+
+    expect(actualDepositsIds).toEqual(expectedDepositsIds)
+  })
+
+  test("all query params passed - should return the deposits based on the passed params", async ()=>{
+    //query params
+    let query = {
+      userId: depositors[0]._id,
+      year: 2024,
+      month: 1,
+      sortBy: "date",
+      sortOrder: 1,
+      page:  2,
+      perPage: 5,
+    }
+
+    let queryString = new URLSearchParams(query).toString();
+
+    //send api request
+    const endpoint = BASE_PATH + "?" + queryString
+    let response = await request(app).get(endpoint)
+    .set("Cookie", cookie.serialize("jwt", jwt))
+
+    //expected deposits ids 
+    let expectedDepositsIds = [...deposits]
+    .filter((deposit)=>{
+      const depositYear = new Date(deposit.date).getFullYear()
+      const depositMonth = new Date(deposit.date).getMonth() + 1 //1-based index to match mongodb $month operator
+      return depositYear == query.year && 
+      depositMonth == query.month &&
+      deposit.depositor._id == query.userId
+    })
+    .sort((a, b)=> query.sortOrder * (a[query.sortBy] - b[query.sortBy]))
+    .slice((query.page - 1) * query.perPage,  query.page * query.perPage)
+    .map((deposit)=>deposit._id)
+
+    //actual deposit ids
+    let actualDeposits = response.body.data
+    //actual deposit ids
+    let actualDepositsIds = actualDeposits
+    .map((deposit)=>deposit._id)
+
+    console.log(actualDeposits)
+
+    expect(actualDepositsIds).toEqual(expectedDepositsIds)
+  })
+
+})
+
 describe("POST /deposits: Permanent Deposit", ()=>{
   let currentDepositor, adminUser
   let mobileMoneyCashLocation, standardCharteredCashLocation, currentDepositCashLocation
@@ -65,14 +155,14 @@ describe("POST /deposits: Permanent Deposit", ()=>{
     //remove any existing records in database
     await mongoose.connection.db.dropDatabase()
 
-    currentDepositor = UserMocks.createDBUser()
-    mobileMoneyCashLocation = CashLocationMocks.createDBCashLocation()
-    standardCharteredCashLocation = CashLocationMocks.createDBCashLocation()
+    currentDepositor = UserMocks.generateDBUser()
+    mobileMoneyCashLocation = CashLocationMocks.generateDBCashLocation()
+    standardCharteredCashLocation = CashLocationMocks.generateDBCashLocation()
 
     //use mobile money cash location for the deposit
     currentDepositCashLocation = mobileMoneyCashLocation
     const {_id , name} = currentDepositCashLocation
-    deposit = Mocks.createInputDeposit(currentDepositor, "Permanent", {_id, name})
+    deposit = Mocks.generateInputDeposit(currentDepositor, "Permanent", {_id, name})
 
     //insert cash locations and depositor into database
     await User.create(currentDepositor)
@@ -83,7 +173,7 @@ describe("POST /deposits: Permanent Deposit", ()=>{
 
     //send api request
     endpoint = BASE_PATH
-    adminUser = UserMocks.createDBUser("admin")
+    adminUser = UserMocks.generateDBUser("admin")
     const {_id: userId, fullName, isAdmin} = adminUser
     jwt = createJWT(userId, fullName, isAdmin)
     response = await request(app).post(endpoint)
@@ -165,14 +255,14 @@ describe("POST /deposits: Temporary Deposit", ()=>{
     //remove any existing records in database
     await mongoose.connection.db.dropDatabase()
 
-    currentDepositor = UserMocks.createDBUser()
-    mobileMoneyCashLocation = CashLocationMocks.createDBCashLocation()
-    standardCharteredCashLocation = CashLocationMocks.createDBCashLocation()
+    currentDepositor = UserMocks.generateDBUser()
+    mobileMoneyCashLocation = CashLocationMocks.generateDBCashLocation()
+    standardCharteredCashLocation = CashLocationMocks.generateDBCashLocation()
 
     //use mobile money cash location for the deposit
     currentDepositCashLocation = mobileMoneyCashLocation
     const {_id , name} = currentDepositCashLocation
-    deposit = Mocks.createInputDeposit(currentDepositor, "Temporary", {_id, name})
+    deposit = Mocks.generateInputDeposit(currentDepositor, "Temporary", {_id, name})
 
     //insert cash locations and depositor into database
     await User.create(currentDepositor)
@@ -183,7 +273,7 @@ describe("POST /deposits: Temporary Deposit", ()=>{
 
     //send api request
     endpoint = BASE_PATH
-    adminUser = UserMocks.createDBUser("admin")
+    adminUser = UserMocks.generateDBUser("admin")
     const {_id: userId, fullName, isAdmin} = adminUser
     jwt = createJWT(userId, fullName, isAdmin)
     response = await request(app).post(endpoint)
@@ -234,4 +324,3 @@ describe("POST /deposits: Temporary Deposit", ()=>{
     expect(insertedYearlyDeposit).toBe(null)
   })
 })
-
