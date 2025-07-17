@@ -16,7 +16,7 @@ const user = Joi.object({
 
 const depositAmount = Joi.number().greater(0)
 
-const depositDate = Joi.date().greater("2022-01-01")
+const depositDate = Joi.date().greater("2020-01-01")
 
 const cashLocation = Joi.object({
   _id: objectId.required(),
@@ -28,7 +28,7 @@ const cashLocation = Joi.object({
 export const getDeposits = Joi.object({
   filter: Joi.object({
     userId: objectId,
-    month: Joi.number().integer().min(1).max(11),
+    month: Joi.number().integer().min(1).max(12),
     year: Joi.number().integer().min(2020).max(3000)
   }).unknown(false),
 
@@ -54,7 +54,7 @@ export const recordDeposit = Joi.object({
   type: Joi.valid("Permanent", "Temporary").required(),
   recordedBy: user,
   source: Joi.valid("Savings", "Profits", "Excess Loan Payment", "Interest").required(),
-  cashLocation: cashLocation
+  cashLocation: cashLocation,
 }).required().unknown(false)
 
 export const updateDeposit = Joi.object({

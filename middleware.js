@@ -26,9 +26,9 @@ export function errorHandler(err, req, res, next) {
   const statusCode = isAppError ? err.statusCode : 500;
   const errMessage = isAppError ? err.message : 'Sorry, an unknown error occured';
   Response.sendError(errMessage, statusCode, {req, res})
-  if (err instanceof Errors.UnknownError || err instanceof Errors.InternalServerError || !isAppError){
+  //if (err instanceof Errors.UnknownError || err instanceof Errors.InternalServerError || !isAppError){
     console.log(err);
-  }
+  //}
 }
 
 export function getUser(req, res, next) {
