@@ -40,17 +40,17 @@ const { createJWT } = await import('../../auth-service/service.js')
 //import test app
 const app = (await import("../../../app.js")).default;
 
-beforeAll(async()=>{ 
-  process.env.MONGODB_URI = process.env.MONGO_URL
-  await connectDB()
+beforeAll(async()=>{
+  const MONGODB_URI = globalThis.__MONGO_URI__
+  await connectDB(MONGODB_URI)
+})
+
+afterAll(async()=>{
+  await mongoose.disconnect()
 })
 
 beforeEach(() => {
   jest.clearAllMocks();
-});
-
-afterAll(async () => {
-  await mongoose.disconnect();
 });
 
 const BASE_PATH = "/deposits"
@@ -105,7 +105,7 @@ describe("GET /deposits", ()=>{
       userId: depositors[0]._id,
       year: 2024,
       month: 1,
-      sortBy: "date",
+      sortBy: "amount",
       sortOrder: 1,
       page:  2,
       perPage: 5,
@@ -121,8 +121,8 @@ describe("GET /deposits", ()=>{
     //expected deposits ids 
     let expectedDepositsIds = [...deposits]
     .filter((deposit)=>{
-      const depositYear = new Date(deposit.date).getFullYear()
-      const depositMonth = new Date(deposit.date).getMonth() + 1 //1-based index to match mongodb $month operator
+      const depositYear = new Date(deposit.date).getUTCFullYear()
+      const depositMonth = new Date(deposit.date).getUTCMonth() + 1 //1-based index to match mongodb $month operator
       return depositYear == query.year && 
       depositMonth == query.month &&
       deposit.depositor._id == query.userId
@@ -132,12 +132,10 @@ describe("GET /deposits", ()=>{
     .map((deposit)=>deposit._id)
 
     //actual deposit ids
-    let actualDeposits = response.body.data
-    //actual deposit ids
-    let actualDepositsIds = actualDeposits
+    let actualDepositsIds = response.body.data
     .map((deposit)=>deposit._id)
 
-    //expect(actualDepositsIds).toEqual(expectedDepositsIds)
+    expect(actualDepositsIds).toEqual(expectedDepositsIds)
   })
 
 })

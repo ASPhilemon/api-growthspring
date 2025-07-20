@@ -24,21 +24,6 @@ export function generateInputDeposit(depositor, depositType, cashLocation){
   return inputDeposit
 }
 
-export function generateInputeposits(numberOfDeposits, depositors){
-  if(!depositors){
-    let numberOfDepositors = 5
-    depositors = UserMocks.generateDBUsers(numberOfDepositors)
-  }
-
-  const inputDeposits = []
-  for (let i = 0; i < numberOfDeposits; i++){
-    let depositor = faker.helpers.arrayElement(depositors);
-    let inputDeposit = generateInputDeposit(depositor)
-    inputDeposits.push(inputDeposit)
-  }
-  return inputDeposits
-}
-
 export function generateDBDeposit(depositor, depositType, recordedBy, cashLocation){
   if (!depositor) depositor = UserMocks.generateDBUser();
   if(!depositType) depositType = faker.helpers.arrayElement(["Permanent", "Temporary"]);
@@ -67,11 +52,23 @@ export function generateDBDeposits(numberOfDeposits, depositors){
   }
 
   const dbDeposits = []
-  for (let i = 0; i < numberOfDeposits; i++){
+  //ensure dbDeposits have unique dates and amounts for deterministic sort by date and amount in mongodb
+  let recordedDepositDates = new Set()
+  let recordedDepositAmounts = new Set()
+
+  for (let i = 0; i < numberOfDeposits;){
     let depositor = faker.helpers.arrayElement(depositors);
     let dbDeposit = generateDBDeposit(depositor)
-    dbDeposits.push(dbDeposit)
+    let isUnique = !recordedDepositDates.has(dbDeposit.date.toISOString()) &&
+    !recordedDepositAmounts.has(dbDeposit.amount)
+    if (isUnique){
+      dbDeposits.push(dbDeposit)
+      recordedDepositDates.add(dbDeposit.date.toISOString())
+      recordedDepositAmounts.add(dbDeposit.amount)
+      i++
+    }
   }
+
   return dbDeposits
 }
 

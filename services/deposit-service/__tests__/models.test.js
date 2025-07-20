@@ -1,23 +1,23 @@
 import { jest } from '@jest/globals';
 import mongoose from "mongoose";
-import connectDB from "../../../db.js"
 
 import {Deposit, YearlyDeposit} from "../models.js"
 import * as Mocks from "./mocks.js";
 import * as UserMocks from "../../user-service/__tests__/mocks.js";
 import { User } from "../../user-service/models.js"
+import connectDB from '../../../db.js';
 
-beforeAll(async()=>{ 
-  process.env.MONGODB_URI = process.env.MONGO_URL
-  await connectDB()
+beforeAll(async()=>{
+  const MONGODB_URI = globalThis.__MONGO_URI__
+  await connectDB(MONGODB_URI)
+})
+
+afterAll(async()=>{
+  await mongoose.disconnect()
 })
 
 beforeEach(() => {
   jest.clearAllMocks();
-});
-
-afterAll(async () => {
-  await mongoose.disconnect();
 });
 
 //Deposit Model
@@ -64,18 +64,17 @@ describe("Deposit Model: Deposit.getDeposits", ()=>{
 
   test("no args - should sort and return the first 20 deposits sorted by date in descending order", async ()=>{
     //expected deposits ids 
-    let perPage = 20
-    let page = 1
+    let defaultPerPage = 20
     let expectedDepositsIds = [...deposits]
     .sort((a, b)=>b.date - a.date)
-    .slice((page - 1) * perPage, perPage)
-    .map((deposit)=>deposit._id)
+    .slice(0, defaultPerPage)
+    .map((deposit)=> deposit._id)
 
     //actual deposit ids
     let actualDepositsIds = (await Deposit.getDeposits())
     .map((deposit)=>deposit._id)
 
-    //expect(actualDepositsIds).toEqual(expectedDepositsIds)
+    expect(actualDepositsIds).toEqual(expectedDepositsIds)
   })
 
   test("all args passed - should return the deposits based on the filter, sort, and pagination", async ()=>{
@@ -85,32 +84,26 @@ describe("Deposit Model: Deposit.getDeposits", ()=>{
       month: 1
     }
     let sort = {field: "date", order: 1}
-    let pagination = {page: 1, perPage: 5}
+    let pagination = {page: 2, perPage: 5}
 
     //expected deposits ids 
-    let expectedDeposits = [...deposits]
+    let expectedDepositsIds = [...deposits]
     .filter((deposit)=>{
-      const depositYear = new Date(deposit.date).getFullYear()
-      const depositMonth = new Date(deposit.date).getMonth() + 1 //1-based index to match mongodb $month operator
+      const depositYear = new Date(deposit.date).getUTCFullYear()
+      const depositMonth = new Date(deposit.date).getUTCMonth() + 1 //1-based index to match mongodb $month operator
       return depositYear == filter.year && 
       depositMonth == filter.month &&
       deposit.depositor._id == filter.userId
     })
     .sort((a, b)=> sort.order * (a[sort.field] - b[sort.field]))
     .slice((pagination.page - 1) * pagination.perPage,  pagination.page * pagination.perPage)
-
-    let expectedDepositsIds = expectedDeposits
     .map((deposit)=>deposit._id)
 
     //actual deposit ids
-    let actualDeposits = (await Deposit.getDeposits(filter, sort, pagination))
-
-    let actualDepositsIds = actualDeposits
+    let actualDepositsIds = (await Deposit.getDeposits(filter, sort, pagination))
     .map((deposit)=>deposit._id)
 
-    console.log("actual", actualDeposits)
-
-    //expect(actualDepositsIds).toEqual(expectedDepositsIds)
+    expect(actualDepositsIds).toEqual(expectedDepositsIds)
   })
 
 })
