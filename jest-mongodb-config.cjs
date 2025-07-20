@@ -1,20 +1,17 @@
-// jest-mongodb-config.js
 module.exports = {
   mongodbMemoryServerOptions: {
     binary: {
-      version: '6.0.6',
+      version: '8.0.0',
       skipMD5: true,
     },
     instance: {
       dbName: 'test',
-      storageEngine: 'wiredTiger',
     },
     replSet: {
-      name: 'jestrs',
-      count: 1,
+      count: 2,
       storageEngine: 'wiredTiger',
     },
-    autoStart: true,
+    mongoURLEnvName: 'mongo',
+    autoStart: false,
   },
-  mongoURLEnvName: 'MONGODB_URI',
 };
