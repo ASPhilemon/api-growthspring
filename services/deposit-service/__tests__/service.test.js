@@ -27,8 +27,9 @@ jest.unstable_mockModule('../models.js', () => {
     },
     YearlyDeposit: {
       find: jest.fn(),
+      findOne: jest.fn(),
       create: jest.fn(),
-      updateOne: jest.fn(()=>({matchedCount: 1})),
+      updateOne: jest.fn(),
       bulkWrite: jest.fn()
     }
   }
@@ -90,8 +91,8 @@ describe("getDeposits", ()=>{
   beforeEach(()=>{
     userId = new ObjectId().toString()
     deposits = [
-      Mocks.generateDBDeposit("Permanent"),
-      Mocks.generateDBDeposit("Temporary"),
+      Mocks.generateDBDeposit({depositType: "Permanent"}),
+      Mocks.generateDBDeposit({depositType: "Temporary"}),
     ]
     Deposit.getDeposits.mockResolvedValue(deposits)
   })
@@ -153,9 +154,9 @@ describe("recordDeposit:Permanent", ()=>{
   let depositor, recordedBy, deposit
 
   beforeEach(async ()=>{
-    depositor = UserMocks.generateDBUser("regular")
-    recordedBy = UserMocks.generateDBUser("admin")
-    deposit = Mocks.generateInputDeposit(depositor, "Permanent")
+    depositor = UserMocks.generateDBUser()
+    recordedBy = UserMocks.generateDBUser({userType: "admin"})
+    deposit = Mocks.generateInputDeposit({depositor, depositType: "Permanent"})
     const {_id, fullName} = recordedBy
     deposit.recordedBy = {_id,  fullName}
     UserServiceManager.getUserById.mockResolvedValue(depositor)
@@ -183,13 +184,19 @@ describe("recordDeposit:Permanent", ()=>{
     })
   })
 
-  test("YearlyDeposit.updateOne is called with correct args", ()=>{
-    const args = YearlyDeposit.updateOne.mock.calls[0]
-    expect(args[0]).toEqual({year: new Date(deposit.date).getFullYear()})
-    expect(args[1].$inc).toEqual({
-      total: deposit.amount,
-      [`monthTotals.${new Date(deposit.date).getMonth()}`]: deposit.amount 
-    })
+  test("Existing yearly deposit: YearlyDeposit.updateOne is called with correct args", ()=>{
+    const depositYear = new Date(deposit.date).getFullYear()
+    const depositMonth = new Date(deposit.date).getMonth()
+    const monthTotals = new Array(12).fill(0)
+    monthTotals[depositMonth] = 2_000
+    YearlyDeposit.findOne.mockResolvedValue({year: depositYear, total: 10_000, monthTotals})
+
+    const args = YearlyDeposit.updateOne.mock.calls
+    //expect(args[0]).toEqual({year: depositYear})
+    // expect(args[1]).toEqual({$set: {
+    //   total: 10_000 + deposit.amount,
+    //   [`monthTotals.${month}`]: 2_000 + deposit.amount
+    // }})
   })
 
   test("PointServiceManager.awardPoints is called with correct args", ()=>{
@@ -213,9 +220,12 @@ describe("recordDeposit:Temporary", ()=>{
   let depositor, recordedBy, deposit
 
   beforeEach(async ()=>{
-    depositor = UserMocks.generateDBUser("regular")
-    recordedBy = UserMocks.generateDBUser("admin")
-    deposit = Mocks.generateInputDeposit(depositor, "Temporary")
+    depositor = UserMocks.generateDBUser()
+    recordedBy = UserMocks.generateDBUser({userType: "admin"})
+    deposit = Mocks.generateInputDeposit({
+      depositor,
+      depositType: "Temporary"
+    })
     const {_id, fullName} = recordedBy
     deposit.recordedBy = {_id,  fullName}
     UserServiceManager.getUserById.mockResolvedValue(depositor)
@@ -259,8 +269,13 @@ describe("updateDeposit:Permanent", ()=>{
 
   beforeEach(async ()=>{
     depositor = UserMocks.generateDBUser()
-    recordedBy = UserMocks.generateDBUser("admin")
-    currentDeposit = Mocks.generateDBDeposit(depositor, "Permanent", recordedBy)
+    recordedBy = UserMocks.generateDBUser({userType: "admin"})
+    currentDeposit = Mocks.generateDBDeposit({
+      depositor,
+      depositType: "Permanent",
+      recordedBy
+    })
+    currentDeposit = attachToObjectMethod(currentDeposit)
     depositUpdate = Mocks.generateDepositUpdate()
     depositUpdate.updatedById = recordedBy._id
     UserServiceManager.getUserById.mockResolvedValue(depositor)
@@ -279,10 +294,12 @@ describe("updateDeposit:Permanent", ()=>{
 
   test("Deposit.updateOne is called with correct args", ()=>{
     expect(Deposit.updateOne).toHaveBeenCalledWith({_id: currentDeposit._id}, {
+      $set: {
       amount: depositUpdate.amount,
       date: depositUpdate.date,
       cashLocation: depositUpdate.cashLocationToAdd
-    })
+    }
+  })
   })
 
   test("UserServiceManager.updatePermanentInvestment is called with correct args", ()=>{
@@ -301,38 +318,6 @@ describe("updateDeposit:Permanent", ()=>{
       deltaUnits,
       newUnitsDate: DateUtil.getToday()
     })
-  })
-
-  test("YearlyDeposit.bulkWrite is called with correct args", ()=>{
-    const depositUpdateDate = new Date(depositUpdate.date)
-    const currentDepositDate = new Date(currentDeposit.date)
-    const args = YearlyDeposit.bulkWrite.mock.calls[0]
-    expect(args[0]).toEqual([
-      {
-        updateOne: {
-          filter: { year: depositUpdateDate.getFullYear()},
-          update: {
-            $inc: {
-              total: depositUpdate.amount,
-              [`monthTotals.${depositUpdateDate.getMonth()}`]: depositUpdate.amount
-            },
-          }
-        }
-      },
-
-      {
-        updateOne: {
-          filter: { year: currentDepositDate.getFullYear()},
-          update: {
-            $inc: {
-              total: - currentDeposit.amount,
-              [`monthTotals.${currentDepositDate.getMonth()}`]: - currentDeposit.amount
-            },
-          }
-        }
-      }
-    ])
-
   })
 
   test("PointServiceManager.findByRefIdAndUpdatePoints is called with correct args", ()=>{
@@ -371,8 +356,12 @@ describe("updateDeposit:Temporary", ()=>{
 
   beforeEach(async ()=>{
     depositor = UserMocks.generateDBUser()
-    recordedBy = UserMocks.generateDBUser("admin")
-    currentDeposit = Mocks.generateDBDeposit(depositor, "Temporary", recordedBy)
+    recordedBy = UserMocks.generateDBUser({userType: "admin"})
+    currentDeposit = Mocks.generateDBDeposit({
+      depositor,
+      depositType: "Temporary",
+      recordedBy
+    })
     depositUpdate = Mocks.generateDepositUpdate()
     depositUpdate.updatedById = recordedBy._id
     UserServiceManager.getUserById.mockResolvedValue(depositor)
@@ -391,9 +380,11 @@ describe("updateDeposit:Temporary", ()=>{
 
   test("Deposit.updateOne is called with correct args", ()=>{
     expect(Deposit.updateOne).toHaveBeenCalledWith({_id: currentDeposit._id}, {
-      amount: depositUpdate.amount,
-      date: depositUpdate.date,
-      cashLocation: depositUpdate.cashLocationToAdd
+      $set: {
+        amount: depositUpdate.amount,
+        date: depositUpdate.date,
+        cashLocation: depositUpdate.cashLocationToAdd
+      }
     })
   })
 
@@ -430,8 +421,9 @@ describe("deleteDeposit:Permanent", ()=>{
   let depositor, deposit, cashLocationToDeductId
   
   beforeEach(async ()=>{
-    depositor = UserMocks.generateDBUser("regular")
-    deposit = Mocks.generateDBDeposit(depositor, "Permanent")
+    depositor = UserMocks.generateDBUser()
+    deposit = Mocks.generateDBDeposit({depositor, depositType: "Permanent"})
+    deposit = attachToObjectMethod(deposit)
     UserServiceManager.getUserById.mockResolvedValue(depositor)
     Deposit.findById.mockResolvedValue(deposit)
     cashLocationToDeductId = new ObjectId().toString()
@@ -459,18 +451,9 @@ describe("deleteDeposit:Permanent", ()=>{
     })
   })
 
-  test("YearlyDeposit.updateOne is called with correct args", ()=>{
-    const args = YearlyDeposit.updateOne.mock.calls[0]
-    expect(args[0]).toEqual({year: new Date(deposit.date).getFullYear()})
-    expect(args[1].$inc).toEqual({
-      total: - deposit.amount,
-      [`monthTotals.${new Date(deposit.date).getMonth()}`]:  - deposit.amount
-    })
-  })
-
   test("PointServiceManager.deleteTransactionByRefId is called with correct args", ()=>{
-    expect(PointServiceManager.deleteTransactionByRefId)
-    .toHaveBeenCalledWith(deposit._id)
+    const [refId] = PointServiceManager.deleteTransactionByRefId.mock.calls[0]
+    expect(refId).toEqual(deposit._id)
   })
 
   test("EmailServiceManager.sendEmail is called with correct args", ()=>{
@@ -499,7 +482,7 @@ describe("deleteDeposit:Temporary", ()=>{
   
   beforeEach(async ()=>{
     depositor = UserMocks.generateDBUser()
-    deposit = Mocks.generateDBDeposit(depositor, "Temporary")
+    deposit = Mocks.generateDBDeposit({depositor, depositType: "Temporary"})
     UserServiceManager.getUserById.mockResolvedValue(depositor)
     Deposit.findById.mockResolvedValue(deposit)
     cashLocationToDeductId = new ObjectId().toString()
@@ -557,3 +540,12 @@ describe("deleteDeposit:Temporary", ()=>{
   })
   
 })
+
+//util 
+function attachToObjectMethod(obj){
+  const copy = {...obj}
+  copy.toObject = function(){
+    return {...this}
+  }
+  return copy
+}

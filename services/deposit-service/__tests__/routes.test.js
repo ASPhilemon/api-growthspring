@@ -35,7 +35,7 @@ beforeEach(() => {
 const BASE_PATH = "/deposits"
 
 const regularUser = UserMocks.generateDBUser()
-const adminUser = UserMocks.generateDBUser("admin")
+const adminUser = UserMocks.generateDBUser({userType: "admin"})
 const deposit = Mocks.generateInputDeposit()
 const depositUpdate = Mocks.generateDepositUpdate()
 

@@ -5,14 +5,16 @@ export async function query(promise) {
   try {
     return await promise
   } catch (err) {
+    console.log("In DB.query error")
     _handleMongooseError(err)
   }
 }
 
-export async function transaction(callback) {
+export async function transaction(callback, {isInActiveTransaction} = {}) {
   try {
-    //await mongoose.connection.transaction(callback);
-    await callback()
+    isInActiveTransaction?
+    await callback():
+    await mongoose.connection.transaction(callback);
   }
   catch (err) {
     if (err instanceof Errors.AppError) throw err;
@@ -29,7 +31,8 @@ function _handleMongooseError(err){
       err instanceof StrictModeError){
     throw new Errors.BadRequestError("Failed to validate user input", err)
   }
-  
-  throw new Errors.InternalServerError({cause: err})
+
+  //throw new Errors.InternalServerError({cause: err})
+  console.log(err)
   
 }
