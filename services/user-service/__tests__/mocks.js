@@ -6,7 +6,7 @@ const { ObjectId } = mongoose.Types
 const MIN_DATE = "2022-01-01"
 const MAX_DATE = "2025-01-01"
 
-export function generateDBUser(userType = "regular"){
+export function generateDBUser({userType = "regular"} = {}){
   let firstName = faker.person.firstName()
   let lastName = faker.person.lastName()
   let dbUser = {
@@ -31,7 +31,7 @@ export function generateDBUser(userType = "regular"){
   return dbUser
 }
 
-export function generateDBUsers(numberOfUsers){
+export function generateDBUsers({numberOfUsers = 5} = {}){
   const dbUsers = []
   for (let i = 0; i < numberOfUsers; i++){
     dbUsers.push(generateDBUser())

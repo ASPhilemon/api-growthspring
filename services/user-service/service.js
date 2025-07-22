@@ -53,7 +53,7 @@ export async function createUser(user){
 }
 
 export async function updateUser(userId, update){
-  await DB.query(User.findByIdAndUpdate(userId, update))
+  await DB.query(User.updateOne({_id: userId}, update))
 }
 
 export async function deleteUser(userId){
@@ -78,11 +78,7 @@ export async function updateTemporaryInvestment(userId, {deltaAmount, deltaUnits
 }
 
 export async function addPoints(userId, points){
-  await DB.query(User.updateOne({_id: userId}, {$inc: {points}}))
-}
-
-export async function deductPoints(userId, points){
-  await DB.query(User.updateOne({_id: userId}, {$inc: {points : -points}}))
+  await User.updateOne({_id: userId}, {$inc: {points}})
 }
 
 //helpers

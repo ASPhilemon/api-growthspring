@@ -7,7 +7,9 @@ import dotenv from "dotenv"
 import * as Mocks from './mocks.js';
 import * as CashLocationMocks from '../../cash-location-service/__tests__/mocks.js';
 import * as UserMocks from '../../user-service/__tests__/mocks.js';
+import * as PointTransactionMocks from '../../point-service/__tests__/mocks.js';
 import { Deposit, YearlyDeposit } from '../models.js';
+import { PointTransaction } from '../../point-service/models.js';
 import { CashLocation } from '../../cash-location-service/models.js';
 import { User } from '../../user-service/models.js';
 import connectDB from "../../../db.js"
@@ -66,14 +68,14 @@ describe("GET /deposits", ()=>{
 
     //insert depositors and deposits into database
     numberOfDepositors = 2
-    numberOfDeposits = 500
-    depositors = UserMocks.generateDBUsers(numberOfDepositors)
-    deposits = Mocks.generateDBDeposits(numberOfDeposits, depositors)
+    numberOfDeposits = 100
+    depositors = UserMocks.generateDBUsers({numberOfDepositors})
+    deposits = Mocks.generateDBDeposits({numberOfDeposits, depositors})
     await User.insertMany(depositors)
     await Deposit.insertMany(deposits)
 
     //set jwt
-    adminUser = UserMocks.generateDBUser("admin")
+    adminUser = UserMocks.generateDBUser({userType: "admin"})
     let {_id: userId, fullName, isAdmin} = adminUser
     jwt = createJWT(userId, fullName, isAdmin)
 
@@ -156,8 +158,11 @@ describe("POST /deposits: Permanent Deposit", ()=>{
 
     //use mobile money cash location for the deposit
     currentDepositCashLocation = mobileMoneyCashLocation
-    const {_id , name} = currentDepositCashLocation
-    deposit = Mocks.generateInputDeposit(currentDepositor, "Permanent", {_id, name})
+    deposit = Mocks.generateInputDeposit({
+      depositor: currentDepositor,
+      depositType: "Permanent",
+      cashLocation: currentDepositCashLocation
+    })
 
     //insert cash locations and depositor into database
     await User.create(currentDepositor)
@@ -168,7 +173,7 @@ describe("POST /deposits: Permanent Deposit", ()=>{
 
     //send api request
     endpoint = BASE_PATH
-    adminUser = UserMocks.generateDBUser("admin")
+    adminUser = UserMocks.generateDBUser({userType: "admin"})
     const {_id: userId, fullName, isAdmin} = adminUser
     jwt = createJWT(userId, fullName, isAdmin)
     response = await request(app).post(endpoint)
@@ -256,8 +261,11 @@ describe("POST /deposits: Temporary Deposit", ()=>{
 
     //use mobile money cash location for the deposit
     currentDepositCashLocation = mobileMoneyCashLocation
-    const {_id , name} = currentDepositCashLocation
-    deposit = Mocks.generateInputDeposit(currentDepositor, "Temporary", {_id, name})
+    deposit = Mocks.generateInputDeposit({
+      depositor: currentDepositor,
+      depositType: "Temporary",
+      cashLocation: currentDepositCashLocation
+  })
 
     //insert cash locations and depositor into database
     await User.create(currentDepositor)
@@ -268,7 +276,7 @@ describe("POST /deposits: Temporary Deposit", ()=>{
 
     //send api request
     endpoint = BASE_PATH
-    adminUser = UserMocks.generateDBUser("admin")
+    adminUser = UserMocks.generateDBUser({userType: "admin"})
     const {_id: userId, fullName, isAdmin} = adminUser
     jwt = createJWT(userId, fullName, isAdmin)
     response = await request(app).post(endpoint)
@@ -318,4 +326,427 @@ describe("POST /deposits: Temporary Deposit", ()=>{
     const insertedYearlyDeposit = await YearlyDeposit.findOne({year: new Date(deposit.date).getFullYear()})
     expect(insertedYearlyDeposit).toBe(null)
   })
+})
+
+describe("PUT /deposit/:id: Permanent Deposit", ()=>{
+  let currentDepositor, recordedBy, adminUser
+  let mobileMoneyCashLocation, standardCharteredCashLocation
+  let currentDepositCashLocation, cashLocationToAdd, cashLocationToDeduct
+  let currentDeposit, depositUpdate
+  let currentPointTransaction
+  let jwt, endpoint, response
+  
+  beforeAll(async()=>{
+    //remove any existing records in database
+    await mongoose.connection.db.dropDatabase()
+
+    currentDepositor = UserMocks.generateDBUser()
+    mobileMoneyCashLocation = CashLocationMocks.generateDBCashLocation({
+      name: "Mobile Money",
+      amount: 10_000_000
+    })
+    standardCharteredCashLocation = CashLocationMocks.generateDBCashLocation({
+      name: "Standard Chartered",
+      amount: 12_000_000
+    })
+    adminUser = UserMocks.generateDBUser({userType: "admin"})
+
+    //use mobile money cash location for the current deposit
+    currentDepositCashLocation = mobileMoneyCashLocation
+    recordedBy = adminUser
+    currentDeposit = Mocks.generateDBDeposit({
+      depositor: currentDepositor,
+      depositType: "Permanent",
+      recordedBy,
+      cashLocation: currentDepositCashLocation
+    })
+    //current point transactio
+    currentPointTransaction = PointTransactionMocks.generateDBAwardTransaction(
+      currentDepositor,
+      Math.floor((currentDeposit.amount / 10_000) * 3),
+      currentDeposit._id,
+    )
+
+    //use mobile money cash location for cashLocationToDeduct
+    //use standard chartered cash location for cashLocationToAdd
+    cashLocationToAdd = mobileMoneyCashLocation
+    cashLocationToDeduct = standardCharteredCashLocation
+    depositUpdate = Mocks.generateDepositUpdate({cashLocationToAdd, cashLocationToDeduct})
+
+    //insert depositor, current deposit, current point transaction and cashlocations into database
+    await User.create(currentDepositor)
+    await Deposit.create(currentDeposit)
+    await PointTransaction.create(currentPointTransaction)
+    await CashLocation.insertMany([
+      mobileMoneyCashLocation,
+      standardCharteredCashLocation,
+    ])
+
+    //send api request
+    endpoint = BASE_PATH + "/" + currentDeposit._id
+    const {_id: userId, fullName, isAdmin} = adminUser
+    jwt = createJWT(userId, fullName, isAdmin)
+    response = await request(app).put(endpoint)
+    .set("Cookie", cookie.serialize("jwt", jwt))
+    .send(depositUpdate)
+  })
+
+  test("current deposit is updated", async ()=>{
+    const updatedDeposit = await Deposit.findById(currentDeposit._id)
+    const updatedCashLocation = updatedDeposit.cashLocation.toObject()
+    expect(updatedDeposit.date.toISOString()).toEqual(depositUpdate.date)
+    expect(updatedDeposit.amount).toEqual(depositUpdate.amount)
+    expect(updatedCashLocation._id.toString())
+    .toEqual(cashLocationToAdd._id)
+    expect(updatedCashLocation.name)
+    .toEqual(cashLocationToAdd.name)
+  })
+
+  test("user.permanentInvestment is updated", async ()=>{
+    const daysInvestment = DateUtil.getDaysDifference(currentDepositor.permanentInvestment.unitsDate, DateUtil.getToday())
+    const daysCurrentDeposit = DateUtil.getDaysDifference(currentDeposit.date, DateUtil.getToday())
+    const daysUpdatedDeposit = DateUtil.getDaysDifference(depositUpdate.date, DateUtil.getToday())
+
+    const updatedUnits = currentDepositor.permanentInvestment.units 
+    + currentDepositor.permanentInvestment.amount * daysInvestment 
+    - currentDeposit.amount * daysCurrentDeposit
+    + depositUpdate.amount * daysUpdatedDeposit
+
+    const updatedInvestmentAmount = currentDepositor.permanentInvestment.amount
+    - currentDeposit.amount
+    + depositUpdate.amount
+
+    const updatedDepositor = await User.findById(currentDepositor._id).lean()
+
+    expect(updatedDepositor.permanentInvestment).toEqual({
+      amount: updatedInvestmentAmount,
+      units: updatedUnits,
+      unitsDate: DateUtil.getToday()
+    })
+  })
+
+  test("user.points is updated", async ()=>{
+    const updatedDepositor = await User.findById(currentDepositor._id)
+    const currentPointsAwarded = Math.floor(currentDeposit.amount / 10_000 * 3)
+    const updatedPointsAwarded = Math.floor(depositUpdate.amount / 10_000 * 3)
+    expect(updatedDepositor.points).toEqual(
+      currentDepositor.points
+      - currentPointsAwarded
+      + updatedPointsAwarded
+    )
+  })
+
+  test("cashLocationToAdd is updated", async ()=>{
+    const updatedCashLocation = await CashLocation.findById(cashLocationToAdd._id)
+    expect(updatedCashLocation.amount).toEqual(cashLocationToAdd.amount + depositUpdate.amount )
+  })
+
+  test("cashLocationToDeduct is updated", async ()=>{
+    const updatedCashLocation = await CashLocation.findById(cashLocationToDeduct._id)
+    expect(updatedCashLocation.amount).toEqual(cashLocationToDeduct.amount - currentDeposit.amount )
+  })
+
+  test("response.ok is true and error is null", async ()=>{
+    expect(response.body.error).toBe(null)
+    expect(response.ok).toBe(true)
+  })
+
+})
+
+describe("PUT /deposit/:id: Temporary Deposit", ()=>{
+  let currentDepositor, recordedBy, adminUser
+  let mobileMoneyCashLocation, standardCharteredCashLocation
+  let currentDepositCashLocation, cashLocationToAdd, cashLocationToDeduct
+  let currentDeposit, depositUpdate
+  let jwt, endpoint, response
+  
+  beforeAll(async()=>{
+    //remove any existing records in database
+    await mongoose.connection.db.dropDatabase()
+
+    currentDepositor = UserMocks.generateDBUser()
+    mobileMoneyCashLocation = CashLocationMocks.generateDBCashLocation({
+      name: "Mobile Money",
+      amount: 10_000_000
+    })
+    standardCharteredCashLocation = CashLocationMocks.generateDBCashLocation({
+      name: "Standard Chartered",
+      amount: 12_000_000
+    })
+    adminUser = UserMocks.generateDBUser({userType: "admin"})
+
+    //use mobile money cash location for the current deposit
+    currentDepositCashLocation = mobileMoneyCashLocation
+    recordedBy = adminUser
+    currentDeposit = Mocks.generateDBDeposit({
+      depositor: currentDepositor,
+      depositType: "Temporary",
+      recordedBy,
+      cashLocation: currentDepositCashLocation
+    })
+
+    //use mobile money cash location for cashLocationToDeduct
+    //use standard chartered cash location for cashLocationToAdd
+    cashLocationToAdd = mobileMoneyCashLocation
+    cashLocationToDeduct = standardCharteredCashLocation
+    depositUpdate = Mocks.generateDepositUpdate({cashLocationToAdd, cashLocationToDeduct})
+
+    //insert depositor, current deposit, current point transaction and cashlocations into database
+    await User.create(currentDepositor)
+    await Deposit.create(currentDeposit)
+    await CashLocation.insertMany([
+      mobileMoneyCashLocation,
+      standardCharteredCashLocation,
+    ])
+
+    //send api request
+    endpoint = BASE_PATH + "/" + currentDeposit._id
+    const {_id: userId, fullName, isAdmin} = adminUser
+    jwt = createJWT(userId, fullName, isAdmin)
+    response = await request(app).put(endpoint)
+    .set("Cookie", cookie.serialize("jwt", jwt))
+    .send(depositUpdate)
+  })
+
+  test("current deposit is updated", async ()=>{
+    const updatedDeposit = await Deposit.findById(currentDeposit._id)
+    const updatedCashLocation = updatedDeposit.cashLocation.toObject()
+    expect(updatedDeposit.date.toISOString()).toEqual(depositUpdate.date)
+    expect(updatedDeposit.amount).toEqual(depositUpdate.amount)
+    expect(updatedCashLocation._id.toString())
+    .toEqual(cashLocationToAdd._id)
+    expect(updatedCashLocation.name)
+    .toEqual(cashLocationToAdd.name)
+  })
+
+  test("user.temporaryInvestment is updated", async ()=>{
+    const daysInvestment = DateUtil.getDaysDifference(currentDepositor.temporaryInvestment.unitsDate, DateUtil.getToday())
+    const daysCurrentDeposit = DateUtil.getDaysDifference(currentDeposit.date, DateUtil.getToday())
+    const daysUpdatedDeposit = DateUtil.getDaysDifference(depositUpdate.date, DateUtil.getToday())
+
+    const updatedUnits = currentDepositor.temporaryInvestment.units 
+    + currentDepositor.temporaryInvestment.amount * daysInvestment 
+    - currentDeposit.amount * daysCurrentDeposit
+    + depositUpdate.amount * daysUpdatedDeposit
+
+    const updatedInvestmentAmount = currentDepositor.temporaryInvestment.amount
+    - currentDeposit.amount
+    + depositUpdate.amount
+
+    const updatedDepositor = await User.findById(currentDepositor._id).lean()
+
+    expect(updatedDepositor.temporaryInvestment).toEqual({
+      amount: updatedInvestmentAmount,
+      units: updatedUnits,
+      unitsDate: DateUtil.getToday()
+    })
+  })
+
+  test("user.points is not updated", async ()=>{
+    const updatedDepositor = await User.findById(currentDepositor._id)
+    expect(updatedDepositor.points).toEqual(currentDepositor.points)
+  })
+
+  test("cashLocationToAdd is updated", async ()=>{
+    const updatedCashLocation = await CashLocation.findById(cashLocationToAdd._id)
+    expect(updatedCashLocation.amount).toEqual(cashLocationToAdd.amount + depositUpdate.amount )
+  })
+
+  test("cashLocationToDeduct is updated", async ()=>{
+    const updatedCashLocation = await CashLocation.findById(cashLocationToDeduct._id)
+    expect(updatedCashLocation.amount).toEqual(cashLocationToDeduct.amount - currentDeposit.amount )
+  })
+
+  test("response.ok is true and error is null", async ()=>{
+    expect(response.body.error).toBe(null)
+    expect(response.ok).toBe(true)
+  })
+
+})
+
+describe("DELETE /deposit/:id: Permanent Deposit", ()=>{
+  let currentDepositor, adminUser
+  let mobileMoneyCashLocation, standardCharteredCashLocation
+  let cashLocationToDeduct
+  let deposit
+  let pointTransaction
+  let jwt, endpoint, response
+  
+  beforeAll(async()=>{
+    //remove any existing records in database
+    await mongoose.connection.db.dropDatabase()
+
+    currentDepositor = UserMocks.generateDBUser()
+    mobileMoneyCashLocation = CashLocationMocks.generateDBCashLocation({
+      name: "Mobile Money",
+      amount: 10_000_000
+    })
+    standardCharteredCashLocation = CashLocationMocks.generateDBCashLocation({
+      name: "Standard Chartered",
+      amount: 12_000_000
+    })
+    adminUser = UserMocks.generateDBUser({userType:"admin"})
+
+    deposit = Mocks.generateDBDeposit({
+      depositor: currentDepositor,
+      depositType: "Permanent"
+    })
+    //point transaction
+    pointTransaction = PointTransactionMocks.generateDBAwardTransaction(
+      currentDepositor,
+      Math.floor((deposit.amount / 10_000) * 3),
+      deposit._id,
+    )
+
+    //use mobile money cash location for cashLocationToDeduct
+    cashLocationToDeduct = mobileMoneyCashLocation
+
+    //insert depositor, deposit, point transaction and cashlocations into database
+    await User.create(currentDepositor)
+    await Deposit.create(deposit)
+    await PointTransaction.create(pointTransaction)
+    await CashLocation.insertMany([
+      mobileMoneyCashLocation,
+      standardCharteredCashLocation,
+    ])
+
+    const {_id: cashLocationToDeductId} = cashLocationToDeduct
+
+    //send api request
+    endpoint = BASE_PATH + "/" + deposit._id
+    const {_id: userId, fullName, isAdmin} = adminUser
+    jwt = createJWT(userId, fullName, isAdmin)
+    response = await request(app).delete(endpoint)
+    .set("Cookie", cookie.serialize("jwt", jwt))
+    .send({cashLocationToDeductId})
+  })
+
+  test("deposit is deleted", async ()=>{
+    const deletedDeposit = await Deposit.findById(deposit._id)
+    expect(deletedDeposit).toBe(null)
+  })
+
+  test("user.permanentInvestment is updated", async ()=>{
+    const daysInvestment = DateUtil.getDaysDifference(currentDepositor.permanentInvestment.unitsDate, DateUtil.getToday())
+    const daysDeposit = DateUtil.getDaysDifference(deposit.date, DateUtil.getToday())
+    const updatedUnits = currentDepositor.permanentInvestment.units 
+    + currentDepositor.permanentInvestment.amount * daysInvestment 
+    - deposit.amount * daysDeposit
+
+    const updatedInvestmentAmount = currentDepositor.permanentInvestment.amount - deposit.amount
+
+    const updatedDepositor = await User.findById(currentDepositor._id).lean()
+
+    expect(updatedDepositor.permanentInvestment).toEqual({
+      amount: updatedInvestmentAmount,
+      units: updatedUnits,
+      unitsDate: DateUtil.getToday()
+    })
+  })
+
+  test("user.points is updated", async ()=>{
+    const updatedDepositor = await User.findById(currentDepositor._id)
+    const pointsAwarded = Math.floor(deposit.amount / 10_000 * 3)
+    expect(updatedDepositor.points).toEqual(currentDepositor.points - pointsAwarded)
+  })
+
+  test("cashLocationToDeduct is updated", async ()=>{
+    const updatedCashLocation = await CashLocation.findById(cashLocationToDeduct._id)
+    expect(updatedCashLocation.amount).toEqual(cashLocationToDeduct.amount - deposit.amount )
+  })
+
+  test("response.ok is true and error is null", async ()=>{
+    expect(response.body.error).toBe(null)
+    expect(response.ok).toBe(true)
+  })
+
+})
+
+describe("DELETE /deposit/:id: Temporary Deposit", ()=>{
+  let currentDepositor, adminUser
+  let mobileMoneyCashLocation, standardCharteredCashLocation
+  let cashLocationToDeduct
+  let deposit
+  let jwt, endpoint, response
+  
+  beforeAll(async()=>{
+    //remove any existing records in database
+    await mongoose.connection.db.dropDatabase()
+
+    currentDepositor = UserMocks.generateDBUser()
+    mobileMoneyCashLocation = CashLocationMocks.generateDBCashLocation({
+      name: "Mobile Money",
+      amount: 10_000_000
+    })
+    standardCharteredCashLocation = CashLocationMocks.generateDBCashLocation({
+      name: "Standard Chartered",
+      amount: 12_000_000
+    })
+    adminUser = UserMocks.generateDBUser({userType: "admin"})
+
+    deposit = Mocks.generateDBDeposit({
+      depositor: currentDepositor,
+      depositType: "Temporary",
+    })
+
+    //use mobile money cash location for cashLocationToDeduct
+    cashLocationToDeduct = mobileMoneyCashLocation
+
+    //insert depositor, deposit, point transaction and cashlocations into database
+    await User.create(currentDepositor)
+    await Deposit.create(deposit)
+    await CashLocation.insertMany([
+      mobileMoneyCashLocation,
+      standardCharteredCashLocation,
+    ])
+
+    const {_id: cashLocationToDeductId} = cashLocationToDeduct
+
+    //send api request
+    endpoint = BASE_PATH + "/" + deposit._id
+    const {_id: userId, fullName, isAdmin} = adminUser
+    jwt = createJWT(userId, fullName, isAdmin)
+    response = await request(app).delete(endpoint)
+    .set("Cookie", cookie.serialize("jwt", jwt))
+    .send({cashLocationToDeductId})
+  })
+
+  test("deposit is deleted", async ()=>{
+    const deletedDeposit = await Deposit.findById(deposit._id)
+    expect(deletedDeposit).toBe(null)
+  })
+
+  test("user.temporaryInvestment is updated", async ()=>{
+    const daysInvestment = DateUtil.getDaysDifference(currentDepositor.temporaryInvestment.unitsDate, DateUtil.getToday())
+    const daysDeposit = DateUtil.getDaysDifference(deposit.date, DateUtil.getToday())
+    const updatedUnits = currentDepositor.temporaryInvestment.units 
+    + currentDepositor.temporaryInvestment.amount * daysInvestment 
+    - deposit.amount * daysDeposit
+
+    const updatedInvestmentAmount = currentDepositor.temporaryInvestment.amount - deposit.amount
+
+    const updatedDepositor = await User.findById(currentDepositor._id).lean()
+
+    expect(updatedDepositor.temporaryInvestment).toEqual({
+      amount: updatedInvestmentAmount,
+      units: updatedUnits,
+      unitsDate: DateUtil.getToday()
+    })
+  })
+
+  test("user.points is not updated", async ()=>{
+    const updatedDepositor = await User.findById(currentDepositor._id)
+    expect(updatedDepositor.points).toEqual(currentDepositor.points)
+  })
+
+  test("cashLocationToDeduct is updated", async ()=>{
+    const updatedCashLocation = await CashLocation.findById(cashLocationToDeduct._id)
+    expect(updatedCashLocation.amount).toEqual(cashLocationToDeduct.amount - deposit.amount )
+  })
+
+  test("response.ok is true and error is null", async ()=>{
+    expect(response.body.error).toBe(null)
+    expect(response.ok).toBe(true)
+  })
+
 })

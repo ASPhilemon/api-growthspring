@@ -8,10 +8,9 @@ module.exports = {
       dbName: 'test',
     },
     replSet: {
-      count: 2,
+      count: 1,
       storageEngine: 'wiredTiger',
     },
-    mongoURLEnvName: 'mongo',
     autoStart: false,
   },
 };

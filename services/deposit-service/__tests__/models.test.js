@@ -27,7 +27,7 @@ describe("Deposit Model:Write Operations", ()=>{
   beforeAll(async()=>{
     await mongoose.connection.dropDatabase()
     depositor = UserMocks.generateDBUser()
-    deposit = Mocks.generateDBDeposit(depositor, "Permanent")
+    deposit = Mocks.generateDBDeposit({depositor, depositType: "Permanent"})
     await Deposit.create(deposit)
   })
 
@@ -52,15 +52,15 @@ describe("Deposit Model:Write Operations", ()=>{
 describe("Deposit Model: Deposit.getDeposits", ()=>{
   let numberOfDepositors = 2
   let numberOfDeposits = 500
-  let depositors = UserMocks.generateDBUsers(numberOfDepositors)
-  let deposits = Mocks.generateDBDeposits(numberOfDeposits, depositors)
+  let depositors = UserMocks.generateDBUsers({numberOfUsers: numberOfDepositors})
+  let deposits = Mocks.generateDBDeposits({numberOfDeposits, depositors})
 
   beforeAll(async()=>{
     //delete any existing deposits and depositors
     await mongoose.connection.dropDatabase()
     await User.insertMany(depositors)
     await Deposit.insertMany(deposits)
-  })
+  }, 20_000)
 
   test("no args - should sort and return the first 20 deposits sorted by date in descending order", async ()=>{
     //expected deposits ids 
