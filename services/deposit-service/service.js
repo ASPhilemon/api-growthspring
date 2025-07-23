@@ -152,9 +152,7 @@ export async function deleteDeposit(depositId, cashLocationToDeductId) {
     if (deposit.type == "Permanent"){
       await _updatePermanentInvestment(userId, investmentUpdates)
       await _deleteYearlyDeposit(deposit, "delete")
-      await PointServiceManager.deleteTransactionByRefId(deposit._id, {
-        isInActiveTransaction: true 
-      })
+      await PointServiceManager.deleteTransactionByRefId(deposit._id)
     }
     else{
       await _updateTemporaryInvestment(userId, investmentUpdates)

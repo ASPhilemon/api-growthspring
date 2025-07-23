@@ -72,9 +72,9 @@ export async function deleteTransactionById(transactionId){
   await _deleteTransaction(transaction)
 }
 
-export async function deleteTransactionByRefId(refId, {isInActiveTransaction}={}){
+export async function deleteTransactionByRefId(refId,){
   let transaction = await getTransactionByRefId(refId)
-  await _deleteTransaction(transaction, {isInActiveTransaction})
+  await _deleteTransaction(transaction)
 }
 
 export async function findByRefIdAndUpdatePoints(refId, newPoints){
@@ -86,7 +86,7 @@ export async function findByRefIdAndUpdatePoints(refId, newPoints){
   
 }
 
-async function _deleteTransaction(transaction, { isInActiveTransaction }={}){
+async function _deleteTransaction(transaction){
   await DB.transaction(async()=>{
     await PointTransaction.deleteOne({_id: transaction._id})
 
@@ -103,5 +103,5 @@ async function _deleteTransaction(transaction, { isInActiveTransaction }={}){
       await UserServiceManager.addPoints(transaction.sender._id, transaction.points)
     }
 
-  }, {isInActiveTransaction})
+  })
 }

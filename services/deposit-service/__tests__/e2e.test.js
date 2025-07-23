@@ -68,7 +68,7 @@ describe("GET /deposits", ()=>{
 
     //insert depositors and deposits into database
     numberOfDepositors = 2
-    numberOfDeposits = 100
+    numberOfDeposits = 500
     depositors = UserMocks.generateDBUsers({numberOfDepositors})
     deposits = Mocks.generateDBDeposits({numberOfDeposits, depositors})
     await User.insertMany(depositors)
@@ -79,7 +79,7 @@ describe("GET /deposits", ()=>{
     let {_id: userId, fullName, isAdmin} = adminUser
     jwt = createJWT(userId, fullName, isAdmin)
 
-  })
+  }, 20_000)
 
   test("no query params - should return the first 20 sorted deposits, sorted by date in descending order", async ()=>{
     //send api request
