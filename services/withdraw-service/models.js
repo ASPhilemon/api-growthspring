@@ -23,19 +23,11 @@ const cashLocationSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  amount: {
-    type: Number,
-    required: true
-  },
 })
 
 const withdrawSchema = new mongoose.Schema(
   {
     withdrawnBy: {
-      type: userSchema,
-      required: true
-    },
-    recordedBy: {
       type: userSchema,
       required: true
     },
@@ -51,7 +43,10 @@ const withdrawSchema = new mongoose.Schema(
       type: [cashLocationSchema],
       required: true
     },
-    deleted: Boolean
+    recordedBy: {
+      type: userSchema,
+      required: true
+    },
   }, 
   { timestamps:true }
 );

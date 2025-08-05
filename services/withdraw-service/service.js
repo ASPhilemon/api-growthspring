@@ -1,7 +1,7 @@
 import { Withdraw } from "./models.js"
 
 //utils
-import * as ErrorUtil from "../../utils/error-util.js"
+import * as Errors from "../../utils/error-util.js"
 import * as DB from "../../utils/db-util.js"
 
 //collaborator services
@@ -10,17 +10,17 @@ import * as UserServiceManager from "../user-service/service.js"
 import * as EmailServiceManager from "../email-service/service.js"
 
 export async function getWithdraws(){
-  return await DB.query(Withdraw.find({deleted: false}))
+  return await DB.query(Withdraw.find())
 }
 
 export async function getWithdrawById(withdrawId){
-  const withdraw = await DB.query(Withdraw.findOne({_id: withdrawId, deleted: false}))
-  if (!withdraw) throw new ErrorUtil.NotFoundError("Failed to find withdraw record");
+  const withdraw = await DB.query(Withdraw.findById(withdrawId))
+  if (!withdraw) throw new Errors.NotFoundError("Failed to find withdraw record");
   return withdraw
 }
 
 export async function recordWithdraw(withdraw, cashLocations){
-  const { _id: userId } = withdraw.withdrawBy
+  const { _id: userId } = withdraw.withdrawnBy
   const user = await UserServiceManager.getUserById(userId)
  
   _validateCashLocationsAmount(withdraw.amount, cashLocations)
@@ -85,7 +85,7 @@ export async function deleteWithdraw(withdrawId){
 function _validateWithdrawAmount(withdrawAmount, tempSavingsAmount){
   //check if user has enough temporary savings
   if (tempSavingsAmount < withdrawAmount){
-    throw new ErrorUtil.BadRequestError(`
+    throw new Errors.BadRequestError(`
     There is not enough temporary savings in the users account to complete this
     withdraw. Maximum amount for this user is ${tempSavingsAmount}`)
   }
@@ -94,7 +94,7 @@ function _validateWithdrawAmount(withdrawAmount, tempSavingsAmount){
 function _validateCashLocationsAmount(withdrawAmount, cashLocations){
   //check if total amount in cash locations equals the withdraw amount
   if (_calculateTotalInCashLocations(cashLocations) !== withdrawAmount){
-    throw new ErrorUtil.BadRequestError("Total amount in cash locations should equal the withdraw amount")
+    throw new Errors.BadRequestError("Total amount in cash locations should equal the withdraw amount")
   }
 }
 
