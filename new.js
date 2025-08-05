@@ -2748,7 +2748,7 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
         } 
 
         const updatedLoan = { 
-            principal_left,
+            principal_left,  
             interest_amount,
             loan_units,
             last_payment_date: req.body.payment_date,
