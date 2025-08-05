@@ -872,9 +872,11 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
       allLoans,
     ] = await Promise.all([
       constantsPromise, clubPromise, clubDepositsPromise, clubEarningsPromise,
-      clubUnitsRecordsPromise, discountsPromise, pointsSpentPromise, pointsEarnedPromise, allLoansPromise
+      clubUnitsRecordsPromise, discountsPromise, pointsSpentPromise, pointsEarnedPromise, allLoansPromise,
       ])
-  
+
+    const deposits = clubDeposits
+    const members = club
   
     const member = club.find((user)=>user.fullName  === req.user.fullName)
     const memberDeposits = clubDeposits.filter((deposit)=>deposit.depositor_name === req.user.fullName)
@@ -1073,7 +1075,6 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
 
         
         // Data Retrieval
-        const members = await Users.find();
         const thisYear = new Date().getFullYear();
         let allUnits = 0;
         let people = [];
@@ -1087,8 +1088,8 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
             let yearDeposits = 0;
             const investmentDays = getDaysDifference(member.investmentDate);
 
-            // Fetch member's deposits for the current year
-            const allMemberDeposits = await Deposit.find({ depositor_name: member.fullName });
+            // Filter member's deposits for the current year
+            const allMemberDeposits = deposits.filter(({depositor_name})=>depositor_name == member.fullName)
             const depositRecords = allMemberDeposits.filter(deposit =>
                 new Date(deposit.deposit_date).getFullYear() == thisYear
             );
@@ -1105,7 +1106,7 @@ thisMonth = new Date().toLocaleString('default', { month: 'long' });
         const person = people.find(item => item.name === req.user.fullName);
         const perc = person.units/allUnits;
         //console.log(person, allUnits);
-        const profitProjection = await getProfitRecords(club, constants);
+        const profitProjection = getProfitRecords(club, constants, deposits, allLoans);
         const personalProfits = 0.8 * perc * profitProjection.totalIncome;
 
         var memberDepositsRecords = [];
@@ -3558,7 +3559,7 @@ if (loan_finding.payments) {
 return payment_interest_amount
 }
 
-async function getProfitRecords(members, constants) {
+function getProfitRecords(members, constants, deposits, loans) {
   const thisYear = new Date().getUTCFullYear();
   const clubWorth = members.reduce((total, member) => total + member.investmentAmount, 0);
   let allUnits = 0;
@@ -3569,11 +3570,7 @@ async function getProfitRecords(members, constants) {
 
   const someFutureDate = new Date("2025-01-01T00:00:00Z");
 
-  const thisYearLoans = await Loans.find({
-    $expr: {
-      $gt: ["$loan_date", someFutureDate],
-    },
-  });
+  const thisYearLoans = loans.filter(({loan_date})=>loan_date > someFutureDate)
 
   let loanInterest = 0;
   let loanUnits = 0;
@@ -3626,8 +3623,8 @@ async function getProfitRecords(members, constants) {
     let yearDeposits = 0;
     const investmentDays = getDaysDifference(member.investmentDate);
 
-    // Fetch member's deposits for the current year
-    const allMemberDeposits = await Deposit.find({ depositor_name: member.fullName });
+    // Filter member's deposits for the current year
+    const allMemberDeposits = deposits.filter(({depositor_name})=>depositor_name == member.fullName)
     const depositRecords = allMemberDeposits.filter(
       (deposit) => new Date(deposit.deposit_date).getFullYear() === thisYear
     );
