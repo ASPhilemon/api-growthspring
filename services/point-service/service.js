@@ -38,7 +38,7 @@ export async function awardPoints(userId, points, reason, refId){
 export async function redeemPoints(userId, points, reason, refId){
   const user = await UserServiceManager.getUserById(userId)
   await DB.transaction(async()=>{
-    await UserServiceManager.deductPoints(userId, points)
+    await UserServiceManager.addPoints(userId, points)
     await PointTransaction.create({
       type: "redeem",
       redeemedBy: {_id: user._id, fullName: user.fullName},
@@ -55,7 +55,7 @@ export async function transferPoints(senderId, recipientId, points, reason){
     UserServiceManager.getUserById(recipientId)
   ])
   await DB.transaction(async()=>{
-    await UserServiceManager.deductPoints(senderId, points)
+    await UserServiceManager.addPoints(senderId, points)
     await UserServiceManager.addPoints(recipientId, points)
     await PointTransaction.create({
       type: "transfer",
