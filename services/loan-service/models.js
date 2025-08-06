@@ -61,13 +61,14 @@ loanSchema.statics.getFilteredLoans = async function({
   member, 
   year,
   status, 
-  page = 1,
+  page = 1, 
   month,
   order = -1, 
   sortBy = "date", 
 }) {
+  const perPage = 20; 
   const pipeline = [];
-  const matchCriteria = []; // Array to hold individual match conditions
+  const matchCriteria = []; 
 
   // --- Match Stage ---
   // Filtering by year
