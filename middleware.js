@@ -21,16 +21,6 @@ export function registerAfterAllMiddleware(app){
   app.use(errorHandler)
 }
 
-export function errorHandler(err, req, res, next) {
-  const isAppError = err instanceof Errors.AppError;
-  const statusCode = isAppError ? err.statusCode : 500;
-  const errMessage = isAppError ? err.message : 'Sorry, an unknown error occured';
-  Response.sendError(errMessage, statusCode, {req, res})
-  if (err instanceof Errors.UnknownError || err instanceof Errors.InternalServerError || !isAppError){
-    console.log(err);
-  }
-}
-
 export function getUser(req, res, next) {
   let user
   try{
@@ -56,4 +46,18 @@ export function requireAdmin(req, res, next) {
     throw new Errors.NotAllowedError()
   }
   next()
+}
+
+export function errorHandler(err, req, res, next) {
+  const isAppError = err instanceof Errors.AppError;
+  const statusCode = isAppError ? err.statusCode : 500;
+  const errMessage = isAppError ? err.message : 'Sorry, an unknown error occured';
+  Response.sendError(errMessage, statusCode, {req, res})
+
+  //log to console for debugging
+  const NODE_ENV = process.env.NODE_ENV
+  if (["debug", "debug-mongoose"].includes(NODE_ENV)){
+    console.error(err);
+  }
+
 }

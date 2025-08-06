@@ -96,44 +96,32 @@ const yearlyDepositSchema = new mongoose.Schema({
 //custom static methods on model
 depositSchema.statics.getDeposits = async function(
   filter,
-  sort = {field: "date", order: 1},
-  pagination = {page: 1, perPage: 20}
+  sort,
+  pagination
 ){
-    const pipeline = [];
+    //set args to defaults if undefined 
+    const sortField = sort?.field || "date"
+    const sortOrder = sort?.order || -1
+    const page = pagination?.page || 1
+    const perPage = pagination?.perPage || 20
 
+    const pipeline = [];
     // match stage
     const matchStage = {};
     const matchCriteria = [];
     if (filter?.year) matchCriteria.push({ $expr: { $eq: [{ $year: "$date" }, filter.year] }});
     if (filter?.month) matchCriteria.push({ $expr: { $eq: [{ $month: "$date" }, filter.month]}});
-    if (filter?.userId) matchCriteria.push({ "depositor._id": filter.userId });
+    if (filter?.userId) matchCriteria.push({ "depositor._id": new ObjectId(filter.userId) });
 
     if (matchCriteria.length > 0) matchStage.$and = matchCriteria
     pipeline.push({ $match: matchStage });
 
     // sort stage
-    pipeline.push({ $sort: { [sort.field]: sort.order } });
+    pipeline.push({ $sort: { [sortField]: sortOrder} });
 
     // skip and Limit stages for pagination
-    pipeline.push({ $skip: (pagination.page - 1) * pagination.perPage });
-    pipeline.push({ $limit: pagination.perPage });
-
-    //lookup stage to fetch depositor from users collection
-    pipeline.push({
-      $lookup: {
-        from: "users",
-        localField: "depositor._id",
-        foreignField: "_id",
-        as: "depositor"
-      },
-    })
-    
-    //add fields stage to replace depositor single element array with user object in the array
-    pipeline.push({
-      $addFields: {
-        depositor: { $arrayElemAt: ["$depositor", 0] }
-      }
-    })
+    pipeline.push({ $skip: (page - 1) * perPage });
+    pipeline.push({ $limit: perPage });
 
     //execute pipeline
     return await DB.query(this.aggregate(pipeline))

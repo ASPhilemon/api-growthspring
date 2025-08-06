@@ -3,6 +3,7 @@ import request from "supertest";
 import cookie from "cookie";
 import dotenv from "dotenv"
 import * as Mocks from "./mocks.js"
+import * as UserMocks from "../../user-service/__tests__/mocks.js"
 
 //load environment variables
 dotenv.config()
@@ -33,10 +34,10 @@ beforeEach(() => {
 
 const BASE_PATH = "/deposits"
 
-const regularUser = Mocks.createDBUser("regular")
-const adminUser = Mocks.createDBUser("admin")
-const inputDeposit = Mocks.createInputDeposit(regularUser)
-const depositUpdate = Mocks.createDepositUpdate()
+const regularUser = UserMocks.generateDBUser()
+const adminUser = UserMocks.generateDBUser({userType: "admin"})
+const deposit = Mocks.generateInputDeposit()
+const depositUpdate = Mocks.generateDepositUpdate()
 
 const depositsQuery = {
   userId: 'user-123', year: 2024,
@@ -72,10 +73,10 @@ const routes = [
   },
   {
     path: "/", method: "post",
-    body:inputDeposit,
+    body:deposit,
     allowed : ["admin"],
     serviceHandler: ServiceManager.recordDeposit,
-    serviceHandlerArgs: [{...inputDeposit, recordedBy: {_id: adminUser._id, fullName: adminUser.fullName}}]
+    serviceHandlerArgs: [{...deposit, recordedBy: {_id: adminUser._id, fullName: adminUser.fullName}}]
   },
   {
     path: "/deposit-123", method: "put", 

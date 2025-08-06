@@ -25,16 +25,14 @@ export async function getTransactionByRefId(refId){
 
 export async function awardPoints(userId, points, reason, refId){
   const user = await UserServiceManager.getUserById(userId)
-  await DB.transaction(async()=>{
-    await UserServiceManager.addPoints(userId, points)
-    await PointTransaction.create({
-      type: "award",
-      recipient: {_id: user._id, fullName: user.fullName},
-      points,
-      reason,
-      refId
-    })
-  })
+  await UserServiceManager.addPoints(userId, points)
+  await DB.query(PointTransaction.create({
+    type: "award",
+    recipient: {_id: user._id, fullName: user.fullName},
+    points,
+    reason,
+    refId
+  }))
 }
 
 export async function redeemPoints(userId, points, reason, refId){
@@ -74,19 +72,18 @@ export async function deleteTransactionById(transactionId){
   await _deleteTransaction(transaction)
 }
 
-export async function deleteTransactionByRefId(refId){
+export async function deleteTransactionByRefId(refId,){
   let transaction = await getTransactionByRefId(refId)
   await _deleteTransaction(transaction)
 }
 
 export async function findByRefIdAndUpdatePoints(refId, newPoints){
-  DB.transaction(async()=>{
-    let transaction = getTransactionByRefId(refId)
-    let {redeemedBy, sender, recipent} = transaction
-    let user = redeemedBy || sender || recipent
+    let transaction = await getTransactionByRefId(refId)
+    let {redeemedBy, sender, recipient} = transaction
+    let user = redeemedBy || sender || recipient
     await PointTransaction.updateOne({refId}, {$set: {points: newPoints}})
-    UserServiceManager.addPoints(user._id, newPoints - transaction.points)
-  })
+    await UserServiceManager.addPoints(user._id, newPoints - transaction.points)
+  
 }
 
 async function _deleteTransaction(transaction){
@@ -98,11 +95,11 @@ async function _deleteTransaction(transaction){
     }
 
     if(transaction.type === "award"){
-      await UserServiceManager.deductPoints(transaction.recipient._id, transaction.points)
+      await UserServiceManager.addPoints(transaction.recipient._id, - transaction.points)
     }
     
     if(transaction.type === "transfer"){
-      await UserServiceManager.deductPoints(transaction.recipient._id, transaction.points)
+      await UserServiceManager.addPoints(transaction.recipient._id, -transaction.points)
       await UserServiceManager.addPoints(transaction.sender._id, transaction.points)
     }
 

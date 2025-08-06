@@ -76,7 +76,6 @@ export async function recordDeposit(deposit){
 
 export async function updateDeposit(depositId, update){
   Validator.schema(Schemas.updateDeposit, {depositId, update} )
-
   let deposit, user
 
   await DB.transaction(async()=> {
@@ -90,14 +89,18 @@ export async function updateDeposit(depositId, update){
 
     user = await UserServiceManager.getUserById(userId)
 
-    await DB.query(Deposit.updateOne({_id: depositId},{
-      amount: update.amount,
-      date: update.date,
-      cashLocation: update.cashLocationToAdd
-    }))
+    await Deposit.updateOne({_id: depositId},
+      {
+        $set: {
+          amount: update.amount,
+          date: update.date,
+          cashLocation: update.cashLocationToAdd
+        }
+      }
+    )
 
     await CashLocationServiceManager.addToCashLocation(update.cashLocationToAdd._id, update.amount)
-    await CashLocationServiceManager.addToCashLocation(update.cashLocationToDeduct._id, deposit.amount)
+    await CashLocationServiceManager.addToCashLocation(update.cashLocationToDeduct._id, -deposit.amount)
 
     let investmentAmount = deposit.type == "Permanent"? user.permanentInvestment.amount: user.temporaryInvestment.amount
     let unitsDate = deposit.type == "Permanent"? user.permanentInvestment.unitsDate: user.temporaryInvestment.unitsDate
@@ -148,7 +151,7 @@ export async function deleteDeposit(depositId, cashLocationToDeductId) {
 
     if (deposit.type == "Permanent"){
       await _updatePermanentInvestment(userId, investmentUpdates)
-      await _recordYearlyDeposit(deposit, "delete")
+      await _deleteYearlyDeposit(deposit, "delete")
       await PointServiceManager.deleteTransactionByRefId(deposit._id)
     }
     else{
@@ -202,8 +205,8 @@ async function sendDepositDeletedEmail(deposit, user){
 }
 
 //helper functions
-function _calculatePoints(depositAmount){
-  return Math.floor((depositAmount / 10000)*3)
+export function _calculatePoints(depositAmount){
+  return Math.floor((depositAmount / 10000) * 3)
 }
 
 async function _awardPoints(deposit){
@@ -226,70 +229,44 @@ function _buildDeposit(deposit, user){
   return deposit
 }
 
-async function _recordYearlyDeposit(deposit, type = "create") {
+async function _recordYearlyDeposit(deposit) {
   let depositDate = new Date(deposit.date);
   const year = depositDate.getFullYear();
   const month = depositDate.getMonth();
 
-  const monthField = `monthTotals.${month}`;
+  let yearlyDeposit = await DB.query(YearlyDeposit.findOne({year}))
 
-  const depositAmount = type == "create"? deposit.amount: - deposit.amount
-
-  let result = await DB.query(YearlyDeposit.updateOne(
-    { year },
-    {
-    $inc: {
-      total: depositAmount,
-      [monthField]: depositAmount
-    },
-
-  }))
-
-  if (result.matchedCount == 0){
-    console.log("zero match count here")
+  if (yearlyDeposit){
+    await DB.query(YearlyDeposit.updateOne({ year }, {
+      $set: {
+        total: yearlyDeposit.total + deposit.amount,
+        [`monthTotals.${month}`]: yearlyDeposit.monthTotals[month] + deposit.amount
+      }
+    }))
+  }
+  else{
     let monthTotals = new Array(12).fill(0)
-    monthTotals[month] = depositAmount
-    YearlyDeposit.create({
-      year,
-      total: depositAmount,
-      monthTotals
-    })
+    monthTotals[month] = deposit.amount
+    await DB.query(
+      YearlyDeposit.create({
+        year,
+        total: deposit.amount,
+        monthTotals
+      })
+    )
   }
 
 }
 
 async function _updateYearlyDeposit(currentDeposit, depositUpdate) {
-  let currentDepositDate = new Date(currentDeposit.date);
-  let depositUpdateDate = new Date(depositUpdate.date);
+  currentDeposit = {...currentDeposit.toObject(), amount: -currentDeposit.amount}
+  await _recordYearlyDeposit(currentDeposit)
+  await _recordYearlyDeposit(depositUpdate)
+}
 
-  const monthFieldCurrent = `monthTotals.${currentDepositDate.getMonth()}`;
-  const monthFieldUpdate = `monthTotals.${depositUpdateDate.getMonth()}`;
-
-  await DB.query(YearlyDeposit.bulkWrite([
-    {
-      updateOne: {
-        filter: { year: depositUpdateDate.getFullYear()},
-        update: {
-          $inc: {
-            total: depositUpdate.amount,
-            [monthFieldUpdate]: depositUpdate.amount
-          },
-        }
-      }
-    },
-
-    {
-      updateOne: {
-        filter: { year: currentDepositDate.getFullYear()},
-        update: {
-          $inc: {
-            total: - currentDeposit.amount,
-            [monthFieldCurrent]: - currentDeposit.amount
-          },
-        }
-      }
-    }
-  ]));
+async function _deleteYearlyDeposit(deposit) {
+  deposit = {...deposit.toObject(), amount: -deposit.amount}
+  await _recordYearlyDeposit(deposit)
 }
 
 async function _updatePointTransaction(depositId, newDepositAmount){

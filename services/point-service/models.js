@@ -50,7 +50,9 @@ const pointTransactionSchema = new mongoose.Schema({
     },
     refId:{
       type: String,
-      required: true
+      required: function () {
+        return this.type != 'transfer';
+      }
     }
   }, { timestamps: true }
 );

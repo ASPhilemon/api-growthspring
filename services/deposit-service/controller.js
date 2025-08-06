@@ -3,9 +3,19 @@ import * as Response from "../../utils/http-response-util.js"
 
 export async function getDeposits(req, res){
   let {userId, year, month, sortBy, sortOrder, page, perPage} = req.query
-  let filter = {userId, year: Number(year), month: Number(month)}
-  let sort = {field: sortBy, order: Number(sortOrder)}
-  let pagination = {page: Number(page), perPage: Number(perPage)}
+  let filter = {
+    userId,
+    year: Number(year) || undefined,
+    month: Number(month) || undefined
+  }
+  let sort = {
+    field: sortBy,
+    order: Number(sortOrder) || undefined
+  }
+  let pagination = {
+    page: Number(page) || undefined,
+    perPage: Number(perPage) || undefined
+  }
   let deposits = await ServiceManager.getDeposits(filter, sort, pagination)
   Response.sendSuccess(deposits, {req, res})
 }
