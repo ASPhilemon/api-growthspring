@@ -89,7 +89,7 @@ const dbURI = process.env.dbURI || 'mongodb+srv://blaise1:blaise119976@cluster0.
 //'mongodb+srv://blaise1:blaise119976@cluster0.nmt34.mongodb.net/GrowthSpringNew?retryWrites=true&w=majority';
 
 
-mongoose.connect(dbURI, { useNewUrlParser: true, useUnifiedTopology: true })
+mongoose.connect(dbURI, { useNewUrlParser: true, useUnifiedTopology: true, minPoolSize: 20, maxPoolSize: 20 })
   .then(async (result) => {
 
     try {
