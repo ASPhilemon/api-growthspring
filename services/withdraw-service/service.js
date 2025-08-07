@@ -51,21 +51,21 @@ export async function recordWithdraw(withdraw){
 }
 
 export async function updateWithdraw(withdrawId, update){
-  Validator.schema({ withdrawId, update })
+  Validator.schema(Schemas.updateWithdraw, { withdrawId, update })
 
   let withdraw, user
 
   await DB.transaction(async()=> {
     withdraw = await getWithdrawById(withdrawId)
     user = await UserServiceManager.getUserById(withdraw.withdrawnBy._id)
-    await CashLocationServiceManager.addToCashLocation(withdraw.cashLocation._id, withdraw.amount)
-    await CashLocationServiceManager.addToCashLocation(update.cashLocation._id, -update.amount)
+    await CashLocationServiceManager.addToCashLocation(update.cashLocationToAdd._id, withdraw.amount)
+    await CashLocationServiceManager.addToCashLocation(update.cashLocationToDeduct._id, -update.amount)
 
     await Withdraw.updateOne({_id: withdrawId}, {
       $set: {
         amount: update.amount,
         date: update.date,
-        cashLocation: update.cashLocationToDeduct._id
+        cashLocation: update.cashLocationToDeduct
       }
     })
 
@@ -75,8 +75,8 @@ export async function updateWithdraw(withdrawId, update){
 
     let investmentUpdates = [
       {amount: investmentAmount, deltaAmount: 0, startDate: unitsDate, endDate: newUnitsDate},
-      {amount: withdraw.amount, deltaAmount: -withdraw.amount, startDate: withdraw.date, endDate: newUnitsDate},
-      {amount: update.amount, deltaAmount: update.amount, startDate: update.date, endDate: newUnitsDate}
+      {amount: withdraw.amount, deltaAmount: withdraw.amount, startDate: withdraw.date, endDate: newUnitsDate},
+      {amount: -update.amount, deltaAmount: -update.amount, startDate: update.date, endDate: newUnitsDate}
     ]
     
     await _updateTemporaryInvestment(user._id, investmentUpdates)
@@ -93,6 +93,7 @@ export async function deleteWithdraw(withdrawId, cashLocationToAddId){
 
   await DB.transaction(async()=>{
     withdraw = await getWithdrawById(withdrawId)
+    user = await UserServiceManager.getUserById(withdraw.withdrawnBy._id)
     await CashLocationServiceManager.addToCashLocation(cashLocationToAddId, withdraw.amount)
     await withdraw.deleteOne()
 
@@ -101,7 +102,7 @@ export async function deleteWithdraw(withdrawId, cashLocationToAddId){
     let unitsDate = user.temporaryInvestment.unitsDate
     let investmentUpdates = [
       {amount: investmentAmount, deltaAmount: 0, startDate: unitsDate, endDate: newUnitsDate},
-      {amount: withdraw.amount, deltaAmount: withdraw.amount, startDate: deposit.date, endDate: newUnitsDate},
+      {amount: withdraw.amount, deltaAmount: withdraw.amount, startDate: withdraw.date, endDate: newUnitsDate},
     ]
 
     await _updateTemporaryInvestment(user._id, investmentUpdates)
@@ -137,7 +138,7 @@ export async function sendWithdrawUpdatedEmail(currentWithdraw, updatedWithdraw,
   )
 }
 
-export async function sendWithdrawDeletedEmail(withdraw){
+export async function sendWithdrawDeletedEmail(withdraw, user){
   let emailTemplate = path.join(moduleDirectory, "email-templates/withdraw-deleted.ejs")
 
   let message = await EJSUtil.renderTemplate(emailTemplate, withdraw)

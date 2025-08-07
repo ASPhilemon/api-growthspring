@@ -28,20 +28,23 @@ export async function getWithdrawById(req, res){
 }
 
 export async function recordWithdraw(req, res){
-  const { withdraw, cashLocations } = req.body
-  await ServiceManager.recordWithdraw(withdraw, cashLocations)
+  const withdraw = req.body
+  const {_id, fullName} = req.user
+  withdraw.recordedBy = {_id, fullName}
+  await ServiceManager.recordWithdraw(withdraw)
   Response.sendSuccess(null, {req, res})
 }
 
-export async function updateWithdrawAmount(req, res){
-  const {newAmount, newCashLocations} = req.body
+export async function updateWithdraw(req, res){
   const {id: withdrawId} = req.params
-  await ServiceManager.updateWithdrawAmount(withdrawId, newAmount, newCashLocations)
+  const update = req.body
+  await ServiceManager.updateWithdraw(withdrawId, update)
   Response.sendSuccess(null, {req, res})
 }
 
 export async function deleteWithdraw(req, res){
   const {id: withdrawId} = req.params
-  await ServiceManager.deleteWithdraw(withdrawId)
+  const { cashLocationToAddId } = req.body
+  await ServiceManager.deleteWithdraw(withdrawId, cashLocationToAddId)
   Response.sendSuccess(null, {req, res})
 }

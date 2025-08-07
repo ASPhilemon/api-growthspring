@@ -66,6 +66,6 @@ export const updateWithdraw = Joi.object({
 }).required().unknown(false)
 
 export const deleteWithdraw = Joi.object({
-  withdrawIdId: uuid.required(),
+  withdrawId: uuid.required(),
   cashLocationToAddId: objectId.required()
 }).unknown(false)
