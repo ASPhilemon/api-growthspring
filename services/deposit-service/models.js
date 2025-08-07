@@ -111,7 +111,7 @@ depositSchema.statics.getDeposits = async function(
     const matchCriteria = [];
     if (filter?.year) matchCriteria.push({ $expr: { $eq: [{ $year: "$date" }, filter.year] }});
     if (filter?.month) matchCriteria.push({ $expr: { $eq: [{ $month: "$date" }, filter.month]}});
-    if (filter?.userId) matchCriteria.push({ "depositor._id": new ObjectId(filter.userId) });
+    if (filter?.userId) matchCriteria.push({ "depositor._id": ObjectId.createFromHexString(filter.userId) });
 
     if (matchCriteria.length > 0) matchStage.$and = matchCriteria
     pipeline.push({ $match: matchStage });

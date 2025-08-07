@@ -1,123 +1,178 @@
+import path from 'path';
+import { fileURLToPath } from 'url';
+
 import { Withdraw } from "./models.js"
+import * as Schemas from "./schemas.js"
 
 //utils
 import * as Errors from "../../utils/error-util.js"
 import * as DB from "../../utils/db-util.js"
+import * as EJSUtil from "../../utils/ejs-util.js"
+import * as Validator from "../../utils/validator-util.js"
+import * as DateUtil from "../../utils/date-util.js"
 
 //collaborator services
 import * as CashLocationServiceManager from "../cash-location-service/service.js"
 import * as UserServiceManager from "../user-service/service.js"
 import * as EmailServiceManager from "../email-service/service.js"
 
-export async function getWithdraws(){
-  return await DB.query(Withdraw.find())
+const modulePath = fileURLToPath(import.meta.url)
+const moduleDirectory = path.dirname(modulePath)
+
+export async function getWithdraws(filter, sort, pagination){
+  Validator.schema(Schemas.getWithdraws, {filter, sort, pagination})
+  return await DB.query(Withdraw.getWithdraws(filter, sort, pagination))
 }
 
 export async function getWithdrawById(withdrawId){
+  Validator.schema(Schemas.getWithdrawById, withdrawId)
   const withdraw = await DB.query(Withdraw.findById(withdrawId))
   if (!withdraw) throw new Errors.NotFoundError("Failed to find withdraw record");
   return withdraw
 }
 
-export async function recordWithdraw(withdraw, cashLocations){
+export async function recordWithdraw(withdraw){
+  Validator.schema(Schemas.recordWithdraw, withdraw)
   const { _id: userId } = withdraw.withdrawnBy
-  const user = await UserServiceManager.getUserById(userId)
- 
-  _validateCashLocationsAmount(withdraw.amount, cashLocations)
-  _validateWithdrawAmount(withdraw.amount, user.tempSavingsAmount)
- 
-  await DB.transaction(async()=>{
-    await DB.query(Withdraw.create(withdraw))
-    await UserServiceManager.deductTempSavingsAmount(userId, withdraw.amount)
-    await _deductFromCashLocations(cashLocations)
-  })
-
-  EmailServiceManager.sendEmail({
-    sender: "growthspring",
-    recipient: user.email,
-    subject: "Withdraw Alert",
-    message: `UGX ${withdraw.amount} has been withdrawn from your temporary savings account.`
+  let user
+  await DB.transaction(async()=> {
+    user = await UserServiceManager.getUserById(userId)
+    await CashLocationServiceManager.addToCashLocation(withdraw.cashLocation._id, - withdraw.amount)
+    await Withdraw.create(withdraw)
+    let investmentAmount = user.temporaryInvestment.amount
+    let unitsDate = user.temporaryInvestment.unitsDate
+    let newUnitsDate = DateUtil.getToday()
+    let investmentUpdates = [
+      {amount: investmentAmount, deltaAmount: 0, startDate: unitsDate, endDate: newUnitsDate},
+      {amount: -withdraw.amount, deltaAmount: -withdraw.amount, startDate: withdraw.date, endDate: newUnitsDate}
+    ]
+    await _updateTemporaryInvestment(userId, investmentUpdates)
   })
 }
 
-export async function updateWithdrawAmount(withdrawId, newAmount, newCashLocations){
-  const withdraw = await getWithdrawById(withdrawId)
-  const {_id : userId} = withdraw.withdrawnBy
-  const user = UserServiceManager.getUserById(userId)
+export async function updateWithdraw(withdrawId, update){
+  Validator.schema({ withdrawId, update })
 
-  const tempSavingsAmount = user.tempSavingsAmount + withdraw.amount
-  _validateWithdrawAmount(newAmount, tempSavingsAmount)
-  _validateCashLocationsAmount(newAmount, newCashLocations)
+  let withdraw, user
 
   await DB.transaction(async()=> {
-    await DB.query(Withdraw.findByIdAndDelete(withdrawId, {amount: newAmount, cashLocations: newCashLocations}))
-    await _updateCashLocations(withdraw.cashLocations, newCashLocations)
-    await UserServiceManager.setTempSavingsAmount(userId, tempSavingsAmount - newAmount )
+    withdraw = await getWithdrawById(withdrawId)
+    user = await UserServiceManager.getUserById(withdraw.withdrawnBy._id)
+    await CashLocationServiceManager.addToCashLocation(withdraw.cashLocation._id, withdraw.amount)
+    await CashLocationServiceManager.addToCashLocation(update.cashLocation._id, -update.amount)
+
+    await Withdraw.updateOne({_id: withdrawId}, {
+      $set: {
+        amount: update.amount,
+        date: update.date,
+        cashLocation: update.cashLocationToDeduct._id
+      }
+    })
+
+    let investmentAmount = user.temporaryInvestment.amount
+    let unitsDate = user.temporaryInvestment.unitsDate
+    let newUnitsDate = DateUtil.getToday()
+
+    let investmentUpdates = [
+      {amount: investmentAmount, deltaAmount: 0, startDate: unitsDate, endDate: newUnitsDate},
+      {amount: withdraw.amount, deltaAmount: -withdraw.amount, startDate: withdraw.date, endDate: newUnitsDate},
+      {amount: update.amount, deltaAmount: update.amount, startDate: update.date, endDate: newUnitsDate}
+    ]
+    
+    await _updateTemporaryInvestment(user._id, investmentUpdates)
+    
   })
 
-  EmailServiceManager.sendEmail({
-    sender: "growthspring",
-    recipient: user.email,
-    subject: "Withdraw Update",
-    message: `Your withdraw made on ${"date"} has been updated`
-  })
+  sendWithdrawUpdatedEmail(withdraw, update, user)
 }
 
-export async function deleteWithdraw(withdrawId){
-  const withdraw = getWithdrawById(withdrawId)
+export async function deleteWithdraw(withdrawId, cashLocationToAddId){
+  Validator.schema(Schemas.deleteWithdraw, {withdrawId, cashLocationToAddId})
+
+  let withdraw, user
 
   await DB.transaction(async()=>{
-    await Withdraw.findByIdAndUpdate(withdraw._id, {deleted: true})
-    await UserServiceManager.addTempSavingsAmount(withdraw.amount)
-    await _addToCashLocations(withdraw.cashLocations)
+    withdraw = await getWithdrawById(withdrawId)
+    await CashLocationServiceManager.addToCashLocation(cashLocationToAddId, withdraw.amount)
+    await withdraw.deleteOne()
+
+    let newUnitsDate = DateUtil.getToday()
+    let investmentAmount = user.temporaryInvestment.amount
+    let unitsDate = user.temporaryInvestment.unitsDate
+    let investmentUpdates = [
+      {amount: investmentAmount, deltaAmount: 0, startDate: unitsDate, endDate: newUnitsDate},
+      {amount: withdraw.amount, deltaAmount: withdraw.amount, startDate: deposit.date, endDate: newUnitsDate},
+    ]
+
+    await _updateTemporaryInvestment(user._id, investmentUpdates)
+
   })
 
-  EmailServiceManager.sendEmail({
-    sender: "growthspring",
-    recipient: user.email,
-    subject: "Withdraw Deleted",
-    message: `Your withdraw made on ${"date"} has been deleted`
-  })
+  sendWithdrawDeletedEmail(withdraw, user)
 }
 
+export async function sendWithdrawRecordedEmail(withdraw, user){
+  let emailTemplate = path.join(moduleDirectory, "email-templates/withdraw-recorded.ejs")
+
+  let message = await EJSUtil.renderTemplate(emailTemplate, withdraw)
+
+  EmailServiceManager.sendEmail(
+    "growthspring",
+    user.email,
+    "Withdraw Recorded",
+    message
+  )
+}
+
+export async function sendWithdrawUpdatedEmail(currentWithdraw, updatedWithdraw, user){
+  let emailTemplate = path.join(moduleDirectory, "email-templates/withdraw-updated.ejs")
+
+  let message = await EJSUtil.renderTemplate(emailTemplate, currentWithdraw, updatedWithdraw)
+
+  EmailServiceManager.sendEmail(
+    "growthspring",
+    user.email,
+    "Withdraw Updated",
+    message
+  )
+}
+
+export async function sendWithdrawDeletedEmail(withdraw){
+  let emailTemplate = path.join(moduleDirectory, "email-templates/withdraw-deleted.ejs")
+
+  let message = await EJSUtil.renderTemplate(emailTemplate, withdraw)
+
+  EmailServiceManager.sendEmail(
+    "growthspring",
+    user.email,
+    "Withdraw Deleted",
+    message
+  )
+}
 
 //helpers
-function _validateWithdrawAmount(withdrawAmount, tempSavingsAmount){
-  //check if user has enough temporary savings
-  if (tempSavingsAmount < withdrawAmount){
-    throw new Errors.BadRequestError(`
-    There is not enough temporary savings in the users account to complete this
-    withdraw. Maximum amount for this user is ${tempSavingsAmount}`)
+async function _updateTemporaryInvestment(userId, updates){
+  let newUnitsDate = updates[0].endDate
+  let {totalDeltaAmount, totalDeltaUnits} = _calculateInvestmentUpdate(updates)
+  await UserServiceManager.updateTemporaryInvestment(userId, {
+    deltaAmount: totalDeltaAmount,
+    deltaUnits: totalDeltaUnits,
+    newUnitsDate
+  })
+}
+
+function _calculateInvestmentUpdate(updates){
+  let totalDeltaUnits = 0
+  let totalDeltaAmount = 0
+  for(let update of updates){
+    let {amount, deltaAmount, startDate, endDate} = update
+    startDate = new Date(startDate)
+    endDate = new Date(endDate)
+    if (startDate > endDate) throw new Errors.InternalServerError("startDate can not be greater than endDate");
+    let days = DateUtil.getDaysDifference(startDate, endDate)
+    totalDeltaUnits +=  amount * days
+    totalDeltaAmount += deltaAmount
   }
-}
 
-function _validateCashLocationsAmount(withdrawAmount, cashLocations){
-  //check if total amount in cash locations equals the withdraw amount
-  if (_calculateTotalInCashLocations(cashLocations) !== withdrawAmount){
-    throw new Errors.BadRequestError("Total amount in cash locations should equal the withdraw amount")
-  }
-}
-
-function _calculateTotalInCashLocations(cashLocations){
-  const total = cashLocations.reduce((acc, curr)=> curr.amount + acc, 0)
-  return total
-}
-
-async function _deductFromCashLocations(cashLocations){
-  for (let cashLocation of cashLocations){
-    let {_id : cashLocationId, amount} = cashLocation
-    await CashLocationServiceManager.addToCashLocation(cashLocationId, -amount)
-  }
-}
-
-async function _addToCashLocations(cashLocations){
-  for (let cashLocation of cashLocations){
-    let {_id : cashLocationId, amount} = cashLocation
-    await CashLocationServiceManager.addToCashLocation(cashLocationId, amount)
-  }
-}
-
-async function _updateCashLocations(oldCashLocations, newCashLocations){
-  await _addToCashLocations(oldCashLocations)
-  await _deductFromCashLocations(newCashLocations)
+  return {totalDeltaAmount, totalDeltaUnits}
 }

@@ -39,8 +39,8 @@ const withdrawSchema = new mongoose.Schema(
       type: Date,
       required: true
     },
-    cashLocations: {
-      type: [cashLocationSchema],
+    cashLocation: {
+      type: cashLocationSchema,
       required: true
     },
     recordedBy: {
@@ -51,6 +51,39 @@ const withdrawSchema = new mongoose.Schema(
   { timestamps:true }
 );
 
+//custom static methods on model
+withdrawSchema.statics.getWithdraws = async function(
+  filter,
+  sort,
+  pagination
+){
+    //set args to defaults if undefined 
+    const sortField = sort?.field || "date"
+    const sortOrder = sort?.order || -1
+    const page = pagination?.page || 1
+    const perPage = pagination?.perPage || 20
+
+    const pipeline = [];
+    // match stage
+    const matchStage = {};
+    const matchCriteria = [];
+    if (filter?.year) matchCriteria.push({ $expr: { $eq: [{ $year: "$date" }, filter.year] }});
+    if (filter?.month) matchCriteria.push({ $expr: { $eq: [{ $month: "$date" }, filter.month]}});
+    if (filter?.userId) matchCriteria.push({ "depositor._id": ObjectId.createFromHexString(filter.userId) });
+
+    if (matchCriteria.length > 0) matchStage.$and = matchCriteria
+    pipeline.push({ $match: matchStage });
+
+    // sort stage
+    pipeline.push({ $sort: { [sortField]: sortOrder} });
+
+    // skip and Limit stages for pagination
+    pipeline.push({ $skip: (page - 1) * perPage });
+    pipeline.push({ $limit: perPage });
+
+    //execute pipeline
+    return await DB.query(this.aggregate(pipeline))
+}
 //models
 const Withdraw  = mongoose.model(
   'withdraw',

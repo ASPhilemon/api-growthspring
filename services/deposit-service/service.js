@@ -177,11 +177,11 @@ async function sendDepositRecordedEmail(deposit, user){
   )
 }
 
-async function sendDepositUpdatedEmail(currentDeposit, updatedDeposit, user){
+async function sendDepositUpdatedEmail(currentDeposit, depositUpdate, user){
   currentDeposit.pointsAwarded = currentDeposit.type == "Permanent"? _calculatePoints(currentDeposit.amount): 0
-  updatedDeposit.pointsAwarded = updatedDeposit.type == "Permanent"? _calculatePoints(updatedDeposit.amount): 0
+  depositUpdate.pointsAwarded = depositUpdate.type == "Permanent"? _calculatePoints(depositUpdate.amount): 0
   let emailTemplate = path.join(moduleDirectory, "email-templates/deposit-updated.ejs")
-  let message = await EJSUtil.renderTemplate(emailTemplate, currentDeposit, updateDeposit)
+  let message = await EJSUtil.renderTemplate(emailTemplate, {currentDeposit, depositUpdate})
 
   EmailServiceManager.sendEmail(
     "growthspring",

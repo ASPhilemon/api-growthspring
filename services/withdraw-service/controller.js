@@ -2,7 +2,22 @@ import * as ServiceManager from "./service.js"
 import * as Response from "../../utils/http-response-util.js"
 
 export async function getWithdraws(req, res){
-  const withdraws = await ServiceManager.getWithdraws()
+  let {userId, year, month, sortBy, sortOrder, page, perPage} = req.query
+  let filter = {
+    userId,
+    year: Number(year) || undefined,
+    month: Number(month) || undefined
+  }
+  let sort = {
+    field: sortBy,
+    order: Number(sortOrder) || undefined
+  }
+  let pagination = {
+    page: Number(page) || undefined,
+    perPage: Number(perPage) || undefined
+  }
+
+  let withdraws = await ServiceManager.getWithdraws(filter, sort, pagination)
   Response.sendSuccess(withdraws, {req, res})
 }
 
