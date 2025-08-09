@@ -44,6 +44,10 @@ const pointTransactionSchema = new mongoose.Schema({
       required: true,
       min: 1
     },
+    date: {
+      type: Date,
+      required: true,
+    },
     reason: {
       type: String,
       required: true
@@ -58,30 +62,42 @@ const pointTransactionSchema = new mongoose.Schema({
 );
 
 //custom static methods on model
-pointTransactionSchema.statics.getTransactions = async function({
+pointTransactionSchema.statics.getTransactions = async function(
   filter,
-  sort = {field: "createdAt", order: -1},
-  pagination = {page: 1, perPage: 20}
-}){
-    const pipeline = [];
+  sort,
+  pagination
+){
+    //set args to defaults if undefined 
+    const sortField = sort?.field || "date"
+    const sortOrder = sort?.order || -1
+    const page = pagination?.page || 1
+    const perPage = pagination?.perPage || 20
 
+    const pipeline = [];
     // match stage
     const matchStage = {};
     const matchCriteria = [];
-    if (filter?.recipientId) matchCriteria.push({ "recipient._id": filter.recipientId });
-    if (filter?.senderId) matchCriteria.push({ "sender._id": filter.senderId });
-    if (filter?.redeemedById) matchCriteria.push({ "redeemedBy._id": new filter.redeemedById});
-    if (filter?.type) matchCriteria.push({ "type": filter.type });
+    if (filter?.year) matchCriteria.push({ $expr: { $eq: [{ $year: "$date" }, filter.year] }});
+    if (filter?.month) matchCriteria.push({ $expr: { $eq: [{ $month: "$date" }, filter.month]}});
+    if (filter?.type) matchCriteria.push({type: filter.type})
+    if (filter?.userId) {
+      const userId = ObjectId.createFromHexString(filter.userId)
+      matchCriteria.push({$or: [
+        {"recipient._id": userId},
+        {"sender._id": userId},
+        {"redeemedBy._id": userId}
+      ]})
+    }
 
     if (matchCriteria.length > 0) matchStage.$and = matchCriteria
     pipeline.push({ $match: matchStage });
 
     // sort stage
-    pipeline.push({ $sort: { [sort.field]: sort.order } });
+    pipeline.push({ $sort: { [sortField]: sortOrder} });
 
     // skip and Limit stages for pagination
-    pipeline.push({ $skip: (pagination.page - 1) * pagination.perPage });
-    pipeline.push({ $limit: pagination.perPage });
+    pipeline.push({ $skip: (page - 1) * perPage });
+    pipeline.push({ $limit: perPage });
 
     //execute pipeline
     return await DB.query(this.aggregate(pipeline))

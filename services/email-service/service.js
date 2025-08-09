@@ -2,12 +2,12 @@ import nodemailer from "nodemailer";
 import ejs from "ejs"; 
 import path from "path"; 
 
-export async function sendEmail({
+export async function sendEmail(
   sender,
   recipient,
   subject,
   message,
-}) {
+) {
 
   const transporter = nodemailer.createTransport({
     host: "live.smtp.mailtrap.io",
