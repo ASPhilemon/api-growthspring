@@ -5,6 +5,10 @@ import * as RouteController  from "./controller.js"
 const router = express.Router()
 const cashLocationTransferRouter = express.Router()
 
+import { requireUser, requireAdmin } from "../../middleware.js"
+
+router.use(requireUser)
+router.use(requireAdmin)
 // cash location transfers routes
 cashLocationTransferRouter.get(
   "/",
@@ -20,7 +24,7 @@ cashLocationTransferRouter.post(
 )
 cashLocationTransferRouter.put(
   "/:id", 
-  RouteController.updateTransferAmount
+  RouteController.updateTransfer
 )
 cashLocationTransferRouter.delete(
   "/:id",
@@ -40,17 +44,10 @@ router.get(
   "/:id",
   RouteController.getCashLocationById
 )
-router.post(
-  "/",
-  RouteController.createCashLocation
-)
+
 router.put(
   "/:id",
-  RouteController.setCashLocationAmount
-)
-router.delete(
-  "/:id",
-  RouteController.deleteCashLocation
+  RouteController.updateCashLocation
 )
 
 export default router
