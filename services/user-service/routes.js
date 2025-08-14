@@ -4,11 +4,14 @@ import multer from "multer"
 import * as RouteController  from "./controller.js"
 
 import { requireUser, requireAdmin } from "../../middleware.js"
+import { fileURLToPath } from "url"
 
 const router = express.Router()
 
 //multer set up
-const moduleDirectory = import.meta.dirname
+const fileURL = import.meta.url
+const filePath = fileURLToPath(fileURL)
+const moduleDirectory = path.dirname(filePath)
 const uploadsDirectory = path.join(moduleDirectory, "..", "..", "uploads")
 const upload = multer({ dest: uploadsDirectory });
 const multerMiddleware = upload.single('image')

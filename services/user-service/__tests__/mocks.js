@@ -10,7 +10,7 @@ export function generateDBUser({userType = "regular"} = {}){
   let firstName = faker.person.firstName()
   let lastName = faker.person.lastName()
   let dbUser = {
-    _id: new ObjectId().toString(),
+    _id: new ObjectId().toHexString(),
     fullName: firstName + " " + lastName,
     membershipDate: faker.date.between({from: MIN_DATE, to: MAX_DATE}),
     points: faker.number.int({min: 20_000, max: 30_000}),

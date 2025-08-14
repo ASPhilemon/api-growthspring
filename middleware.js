@@ -42,7 +42,6 @@ export function requireUser(req, res, next) {
 }
 
 export function requireAdmin(req, res, next) {
-  console.log("user", req.user)
   if (!req.user?.isAdmin) {
     throw new Errors.NotAllowedError()
   }

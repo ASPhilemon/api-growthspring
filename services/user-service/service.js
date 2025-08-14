@@ -2,8 +2,11 @@ import path from "path"
 import { User } from "./models.js"
 import fs from "fs"
 import mongoose from "mongoose"
+import { fileURLToPath } from "url"
 
-const moduleDirectory = import.meta.dirname
+const fileURL = import.meta.url
+const filePath = fileURLToPath(fileURL)
+const moduleDirectory = path.dirname(filePath)
 const publicDirectory = path.join(moduleDirectory, "..", "..", "public")
 
 //utils
@@ -15,7 +18,6 @@ import * as Validator from "../../utils/validator-util.js"
 //collaborator services
 import * as AuthServiceManager from "../auth-service/service.js"
 import * as DepositServiceManager from "../deposit-service/service.js"
-import * as LoanServiceManager from "../loan-service/service.js"
 import * as PointServiceManager from "../point-service/service.js"
 import * as EmailServiceManager from "../email-service/service.js"
 
@@ -27,21 +29,21 @@ export async function getUsers(){
 }
 
 export async function getUserById(userId){
-  Validator.schema(Schemas.getUserById, userId)
+  ////Validator.schema(Schemas.getUserById, userId)
   const user = DB.query(User.findById(userId))
   if (!user) throw new Errors.NotFoundError("Failed to find user")
   return user
 }
 
 export async function getUserByEmail(email){
-  Validator.schema(Schemas.getUserByEmail, email)
+  //Validator.schema(Schemas.getUserByEmail, email)
   const user = DB.query(await User.findOne({email}))
   if (!user) throw new Errors.NotFoundError("Failed to find user")
   return user
 }
 
 export async function getUserDashboard(userId){
-  Validator.schema(Schemas.getUserDashboard, userId)
+  //Validator.schema(Schemas.getUserDashboard, userId)
   const filter = {userId}
   const [
     deposits,
@@ -58,7 +60,7 @@ export async function getUserDashboard(userId){
 }
 
 export async function createUser(user){
-  Validator.schema(Schemas.createUser, user)
+  //Validator.schema(Schemas.createUser, user)
   user = _buildUser(user)
   await User.create(user)
 
@@ -67,7 +69,7 @@ export async function createUser(user){
 }
 
 export async function updateUser(userId, update){
-  Validator.schema(Schemas.updateUser, {userId, update})
+  //Validator.schema(Schemas.updateUser, {userId, update})
   await DB.transaction(async()=>{
     const user = await getUserById(userId)
     user.set(update)
@@ -76,7 +78,7 @@ export async function updateUser(userId, update){
 }
 
 export async function updateUserPhoto(userId, tempPhotoPath){
-  Validator.schema(Schemas.updateUserPhoto, {userId, tempPhotoPath})
+  //Validator.schema(Schemas.updateUserPhoto, {userId, tempPhotoPath})
   let user
   try{
     user = await getUserById(userId)
@@ -109,7 +111,7 @@ export async function updateUserPhoto(userId, tempPhotoPath){
 }
 
 export async function deleteUserPhoto(userId){
-  Validator.schema(Schemas.deleteUserPhoto, userId)
+  //Validator.schema(Schemas.deleteUserPhoto, userId)
   const user = await getUserById(userId)
   if (!user.photoURL){
     throw new Errors.BadRequestError("Failed to delete photo, photo not found")
@@ -125,7 +127,7 @@ export async function deleteUserPhoto(userId){
 }
 
 export async function addPoints(userId, points){
-  Validator.schema(Schemas.addPoints, {userId, points})
+  //Validator.schema(Schemas.addPoints, {userId, points})
   await DB.transaction(async()=>{
     const user = await getUserById(userId)
     if (user.points + points < 0) {
@@ -137,16 +139,16 @@ export async function addPoints(userId, points){
 }
 
 export async function transferPoints(senderId, recipientId, points, reason){
-  Validator.schema(Schemas.transferPoints, {senderId, recipientId, points, reason})
+  //Validator.schema(Schemas.transferPoints, {senderId, recipientId, points, reason})
   await PointServiceManager.transferPoints(senderId, recipientId, points, reason)
 }
 
 export async function updatePermanentInvestment(userId, {deltaAmount, deltaUnits, newUnitsDate}){
-  Validator.schema(Schemas.updatePermanentInvestment, {userId, update: {
-    deltaAmount,
-    deltaUnits,
-    newUnitsDate
-  }})
+  //Validator.schema(Schemas.updatePermanentInvestment, {userId, update: {
+  //   deltaAmount,
+  //   deltaUnits,
+  //   newUnitsDate
+  // }})
 
   let update = {$set: {}, $inc: {}}
   if (newUnitsDate) update.$set["permanentInvestment.unitsDate"] = newUnitsDate
@@ -156,11 +158,11 @@ export async function updatePermanentInvestment(userId, {deltaAmount, deltaUnits
 }
 
 export async function updateTemporaryInvestment(userId, {deltaAmount, deltaUnits, newUnitsDate}){
-  Validator.schema(Schemas.updateTemporaryInvestment, {userId, update: {
-    deltaAmount,
-    deltaUnits,
-    newUnitsDate
-  }})
+  //Validator.schema(Schemas.updateTemporaryInvestment, {userId, update: {
+  //   deltaAmount,
+  //   deltaUnits,
+  //   newUnitsDate
+  // }})
 
   let update = {$set: {}, $inc: {}}
   if (newUnitsDate) update.$set["temporaryInvestment.unitsDate"] = newUnitsDate
@@ -171,7 +173,7 @@ export async function updateTemporaryInvestment(userId, {deltaAmount, deltaUnits
 }
 
 export async function deleteUser(userId){
-  Validator.schema(Schemas.deleteUser, userId)
+  //Validator.schema(Schemas.deleteUser, userId)
   await DB.query(User.updateOne({_id: userId}, {
     $set: {
       active: false
