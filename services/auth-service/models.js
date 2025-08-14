@@ -8,14 +8,14 @@ const userSubSchema = new mongoose.Schema({
     type: ObjectId,
     required: true
   },
+  fullName:{
+    type: String,
+    required: true
+  },
   email: {
     type: String,
     required: true
   },
-  fullName:{
-    type: String,
-    required: true
-  }
 })
 
 const passwordSchema = new mongoose.Schema({

@@ -34,7 +34,7 @@ export async function recordTransaction(req, res){
   Response.sendSuccess(null, {req, res})
 }
 
-export async function findByIdAndUpdatePoints(req, res){
+export async function updateTransaction(req, res){
   const { newPoints } = req.body
   const transactionId = req.params.id
   await ServiceManager.findByIdAndUpdatePoints(transactionId, newPoints)

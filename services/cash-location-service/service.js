@@ -44,10 +44,8 @@ export async function getTransferById(transferId){
 export async function recordTransfer(transfer){
   Validator.schema(Schemas.recordTransfer, transfer)
   await DB.transaction(async()=>{
-    const [source, dest] = await Promise.all([
-      getCashLocationById(transfer.source._id),
-      getCashLocationById(transfer.dest._id)
-    ])
+    const source = await getCashLocationById(transfer.source._id)
+    const dest = await getCashLocationById(transfer.dest._id)
 
     _addToCashLocation(source, -transfer.amount)
     _addToCashLocation(dest, transfer.amount)

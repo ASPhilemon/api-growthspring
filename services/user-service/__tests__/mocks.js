@@ -13,7 +13,7 @@ export function generateDBUser({userType = "regular"} = {}){
     _id: new ObjectId().toString(),
     fullName: firstName + " " + lastName,
     membershipDate: faker.date.between({from: MIN_DATE, to: MAX_DATE}),
-    points: faker.number.int({min: 0, max: 1_000}),
+    points: faker.number.int({min: 20_000, max: 30_000}),
     temporaryInvestment: {
       amount: faker.number.int({min: 0, max: 10_000_000}),
       units: faker.number.int({min: 0, max: 10_000}),
@@ -26,7 +26,8 @@ export function generateDBUser({userType = "regular"} = {}){
     },
     email: faker.internet.email({firstName, lastName}),
     phoneContact: faker.phone.number({style: "international"}),
-    isAdmin: userType == "admin"? true: false
+    isAdmin: userType == "admin"? true: false,
+    isActive: true,
   }
   return dbUser
 }

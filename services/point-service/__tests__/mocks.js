@@ -104,7 +104,7 @@ export function generateInputRedeemTransaction(redeemedBy, points, refId){
 export function generateInputTransferTransaction(recipient, sender, points){
   if (!recipient) recipient = UserMocks.generateDBUser();
   if (!sender) sender = UserMocks.generateDBUser();
-  if (!points) points = faker.number.int({min: 1, max: 100});
+  if (!points) points = faker.number.int({min: 1, max: 10_000});
 
   return {
     recipientId: recipient._id,
@@ -168,6 +168,6 @@ export function generateDBTransactions(numberOfTransactions, {users}= {}){
 
 export function generateTransactionUpdate(){
   return {
-    newPoints: faker.number.int({min: 1, max: 100})
+    newPoints: faker.number.int({min: 1, max: 10_000})
   }
 }
