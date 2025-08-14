@@ -1,8 +1,10 @@
 import JWT from "jsonwebtoken"
 import * as WebAuthn from '@simplewebauthn/server'
+import generator from 'generate-password';
+import bcrypt from 'bcryptjs';
+import zxcvbn from "zxcvbn"
 
 import { OAuth2Client } from "google-auth-library"
-import * as PasswordUtil from "../../utils/password-util.js"
 
 import { OTP, Password, Passkey, Challenge } from "./models.js"
 
@@ -16,22 +18,19 @@ import * as EmailServiceManager from "../email-service/service.js"
 import * as UserServiceManager from "../user-service/service.js"
 
 export async function signInWithPassword(email, password, cfTurnstileResponse){
-  Validator.required({ password, cfTurnstileResponse })
-  Validator.email(email)
-
   await _verifyCfTurnstileResponse(cfTurnstileResponse)
 
-  const dbPassword = await DB.query(Password.findOne({"user.email": email}))
-  Validator.assert(dbPassword, "Incorrect email or password")
+  const hashedPassword = (await DB.query(Password.findOne({"user.email": email}))).hash
+    Validator.assert(hashedPassword, "Incorrect email or password")
 
-  PasswordUtil.matchPasswordWithHash(password, dbPassword.hash)
+  await matchPasswordWithHash(password, hashedPassword)
 
-  return _createJWT(user._id, user.fullName, user.isAdmin)
+  const user = await UserServiceManager.getUserByEmail(email)
+  return createJWT(user._id, user.fullName, user.isAdmin)
 
 }
 
 export async function signInWithGoogle(googleToken){
-  Validator.required({googleToken})
   const userEmail = await _getUserEmailFromGoogleToken(googleToken)
 
   const password = await DB.query(Password.findOne({"user.email": userEmail}))
@@ -60,8 +59,6 @@ export async function signInWithGoogle(googleToken){
 }
 
 export async function createOTP(email, otpPurpose, cfTurnstileResponse){
-  Validator.required({otpPurpose, cfTurnstileResponse})
-  Validator.email(email)
   await _verifyCfTurnstileResponse(cfTurnstileResponse)
 
   const password = await DB.query(Password.findOne({"user.email": email}))
@@ -89,13 +86,12 @@ export async function createOTP(email, otpPurpose, cfTurnstileResponse){
 }
 
 export async function resetPassword(otpCode, newPassword, cfTurnstileResponse){
-  Validator.required({otpCode, newPassword, cfTurnstileResponse })
-  PasswordUtil.validatePasswordStrength(newPassword)
+  validatePasswordStrength(newPassword)
   
   const otp = await DB.query(OTP.findOne({code: otpCode, purpose: "reset-password"}))
   Validator.assert(otp, "The OTP is expired or incorrect")
 
-  const hashedPassword = PasswordUtil.hashPassword(newPassword)
+  const hashedPassword = hashPassword(newPassword)
 
   await DB.transaction(async()=>{
     await DB.query(Password.updateOne(
@@ -104,19 +100,7 @@ export async function resetPassword(otpCode, newPassword, cfTurnstileResponse){
     )
     await DB.query(OTP.deleteOne({code: otp.code}))
   })
-
-  _sendPasswordResetEmail(otp.email)
-
-  async function _sendPasswordResetEmail(email){
-    const user = await UserServiceManager.getUserByEmail(email)
-    EmailServiceManager.sendEmail({
-      sender: "growthspring",
-      recipient: user.email,
-      subject: "Password Reset Successful",
-      message: `Dear ${user.fullName}, you have successfully reset your password`
-    })
-  }
-
+  sendPasswordResetEmail(otp.email)
 }
 
 export function verifyJWT(jwt){
@@ -137,9 +121,28 @@ export function createJWT(userId, fullName, isAdmin) {
   )
 }
 
+export async function createPassword(userId, fullName, email){
+  const password = generatePassword()
+  const hash = hashPassword(password)
+  await Password.create({
+    user: {_id: userId, fullName, email},
+    hash
+  })
+  return password
+}
+
+ async function sendPasswordResetEmail(email){
+    const user = await UserServiceManager.getUserByEmail(email)
+    EmailServiceManager.sendEmail({
+      sender: "growthspring",
+      recipient: user.email,
+      subject: "Password Reset Successful",
+      message: `Dear ${user.fullName}, you have successfully reset your password`
+    })
+  }
+
 //WebAuthn
 export async function getRegistrationOptionsWebAuthn(otpCode){
-  Validator.required({otpCode})
   const otp = await DB.query(OTP.findOne({code: otpCode}))
   Validator.assert(otp, "OTP code is invalid or expired")
 
@@ -283,7 +286,35 @@ export async function verifyAuthenticationWebAuthn(response, challengeId){
 
 //helpers
 
+function generatePassword(){
+  const password = generator.generate({
+    length: 10,
+    numbers: true,
+    symbols: true,
+    uppercase: true,
+    lowercase: true,
+    strict: true
+  });
+
+  return password
+}
+
+function validatePasswordStrength(password){
+  const result = zxcvbn(password)
+  if (result.score < 3){
+    throw new Errors.BadRequestError("The password is too weak")
+  }
+}
+
+async function matchPasswordWithHash(password, hash){
+  const match = await bcrypt.compare(password, hash )
+  if (!match) throw new Errors.BadRequestError("Incorrect email or password")
+}
+
 async function _verifyCfTurnstileResponse(cfTurnstileResponse){
+  
+  if (process.env.NODE_ENV != "production") return;
+
   const CLOUDFLARE_TURNSTILE_API = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
   const response = await fetch(CLOUDFLARE_TURNSTILE_API, {
     method: 'POST',
@@ -330,4 +361,9 @@ async function _generateRestrationOptions(userEmail, userPasskeys){
   })
 
   return options
+}
+
+function hashPassword(plainPassword){
+  const salt = bcrypt.genSaltSync()
+  return bcrypt.hashSync(plainPassword, salt)
 }

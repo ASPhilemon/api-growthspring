@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import * as DB from "../../utils/db-util.js"
 
 //schemas
 const investmentSubSchema = new mongoose.Schema({
@@ -16,6 +15,21 @@ const investmentSubSchema = new mongoose.Schema({
     required: true,
   }
 }, {_id: false})
+
+const birthdaySubSchema = new mongoose.Schema({
+  month: {
+    type: Number,
+    required: true,
+    min: 1,
+    max: 12
+  },
+  day: {
+    type: Number,
+    required: true,
+    min: 1,
+    max: 31
+  }
+})
 
 const userSchema = new mongoose.Schema({
   email: {
@@ -46,10 +60,14 @@ const userSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
+  isActive: {
+    type: Boolean,
+    required: true,
+  },
+  dob: birthdaySubSchema,
   isAdmin: Boolean,
   displayName: String,
   photoURL: String,
-  deleted: Boolean
 })
 
 //models
@@ -57,20 +75,5 @@ const User  = mongoose.model(
   'user',
   userSchema
 );
-
-//custom static methods on model
-userSchema.statics.getUsers = async function(
-  sort = {field: "fullName", order: 1},
-  pagination = {page: 1, perPage: 50}
-){
-  const users = await DB.query(
-    this.find()
-    .filter({deleted:false})
-    .sort({[sort.field]: sort.order})
-    .skip( pagination.perPage*(pagination.page - 1))
-    .limit()
-  )
-  return users
-}
 
 export { User }
