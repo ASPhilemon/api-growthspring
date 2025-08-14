@@ -17,7 +17,8 @@ import mongoose from "mongoose";
 import * as DB from "../../utils/db-util.js";
 import * as ErrorUtil from "../../utils/error-util.js";
 import { getDaysDifference } from "../../utils/date-util.js";
-import CONSTANTS from "../../src/config/constants.js";
+
+import CONSTANTS from '../../src/config/constants.js'; 
 import * as Errors from "../../utils/error-util.js"
 import * as Validator from "../../utils/validator-util.js"
 
@@ -26,6 +27,7 @@ import * as UserServiceManager from "../user-service/service.js";
 import * as EmailServiceManager from "../email-service/service.js";
 import * as DepositServiceManager from "../deposit-service/service.js";
 import * as PointsServiceManager from "../point-service/service.js";
+import * as CashLocationServiceManager from '../cash-location-service/service.js';
 
 const LOAN_TEMPLATES_PATH = "./email-templates.js"; 
 
@@ -110,11 +112,11 @@ export async function initiateLoan(
   switch (loanType) {
     case "Standard":
       return await initiateStandardLoanRequest(
-        amount, duration, earliestDate, latestDate, borrowerUser, currentUser
+        amount, duration, earliestDate, latestDate, borrowerUser, currentUser, 
       );
     case "Interest-Free":
       return await initiateFreeLoanRequest(
-        amount, duration, earliestDate, latestDate, borrowerUser, currentUser
+        amount, duration, earliestDate, latestDate, borrowerUser, currentUser, 
       );
     default:
       Validator.assert(false, `Unsupported loan type for initiation: ${loanType}`, { errType: Errors.AppError });
@@ -160,7 +162,9 @@ export async function approveLoan(loanId, approvedBy, sources) {
 export async function cancelLoanRequest(loanId) {
   const loan = await getLoanById(loanId);
   Validator.assert(loan.status === "Pending Approval", "Only 'Pending Approval' loans can be cancelled.", { errType: Errors.AppError });
-  const updatedLoanResult = await updateLoanRecord(loanId, { status: "Cancelled" });
+  
+  const updatedLoanResult = await Loan.updateOne({ _id: loanId }, { status: "Cancelled" });
+
   Validator.assert(updatedLoanResult.matchedCount > 0, "Loan request not found or failed to cancel.", { errType: Errors.InternalServerError });
   return { msg: 'Loan request cancelled successfully.' };
 }
@@ -190,12 +194,12 @@ export async function processLoanPayment(loanId, paymentAmount, cashLocationId, 
   switch (loan.type) {
     case "Standard":
       await processStandardLoanPayment(
-        loan, borrowerUser, paymentAmount, cashLocationId, currentUser, paymentDate
+        loan, borrowerUser, paymentAmount, cashLocationId, currentUser, paymentDate, 
       );
       break;
     case "Interest-Free":
       await processFreeLoanPayment(
-        loan, borrowerUser, paymentAmount, cashLocationId, currentUser, paymentDate
+        loan, borrowerUser, paymentAmount, cashLocationId, currentUser, paymentDate, 
       );
       break;
     default:
@@ -213,7 +217,7 @@ export async function processLoanPayment(loanId, paymentAmount, cashLocationId, 
  * @returns {number} The total number of months due.
  */
 function calculateTotalMonthsDue(startDate, endDate) {
-  let daysDifference = getDaysDifference(startDate, endDate);
+  let daysDifference = Math.max(0, getDaysDifference(startDate, endDate));
   let months = Math.floor(daysDifference / CONSTANTS.ONE_MONTH_DAYS);
   let daysIntoMonth = daysDifference % CONSTANTS.ONE_MONTH_DAYS;
 
@@ -352,7 +356,7 @@ async function initiateStandardLoanRequest(
 //.....................HELPER_FUNCTIONS_FOR_INITIATING_STANDARD_LOANS...................................
 
 /**
- * Calculates the borrower's available standard loan limit based on their investment and existing debts.
+ * Fetches user data and calculates their available standard loan limit.
  * @param {string} borrowerId - The ID of the borrower.
  * @returns {Promise<number>} The calculated loan limit.
  */
@@ -362,32 +366,35 @@ export async function calculateStandardLoanLimit(borrowerId) {
   const user = await UserServiceManager.getUserById(borrowerId);
   Validator.assert(user, "Borrower user not found for loan limit calculation.", { errType: Errors.AppError });
 
-  // 2. Calculate total ongoing principal for standard loans
   const ongoingDebts = await DB.query(Loan.find({
-    "borrower.id": new mongoose.Types.ObjectId(borrowerId),
-    status: "Ongoing",
-    type: "Standard" 
+      "borrower.id": new mongoose.Types.ObjectId(borrowerId),
+      status: "Ongoing",
+      type: "Standard"
   }));
 
-  const totalOngoingPrincipal = ongoingDebts.reduce((total, loan) => total + loan.principalLeft, 0);
+  const today = new Date();
+  const dateAYearAgo = new Date(today.getTime() - (365 * 24 * 60 * 60 * 1000));
 
-  // 3. Define the last year's period for interest calculation
-  const MS_PER_DAY = 24 * 60 * 60 * 1000;
-  const today = new Date(); 
-  const dateAYearAgo = new Date(today.getTime() - 365 * MS_PER_DAY); 
-
-  // 4. Get aggregated interest paid in the last year
   const interestPaidInLastYear = await getAggregatedLoanInterestByPeriod({
-    memberIds: [user._id], 
-    periodStart: dateAYearAgo,
-    periodEnd: today 
+      memberIds: [user._id],
+      periodStart: dateAYearAgo,
+      periodEnd: today
   });
 
-  // 5. Calculate loan multiplier based on interest and investment
-  const loanMultiplier = getLimitMultiplier(interestPaidInLastYear, user.investmentAmount);
+  return _calculateLimit(user, ongoingDebts, interestPaidInLastYear);
+}
 
-  // 6. Return the calculated loan limit
-  // Ensure user.investmentAmount is a valid number
+/**
+ * Calculates the loan limit based on pre-fetched user data.
+ * This is a pure function for easier testing.
+ * @param {object} user - The borrower's user document.
+ * @param {Array<object>} ongoingDebts - An array of the user's ongoing loans.
+ * @param {number} interestPaidInLastYear - The total interest paid by the user in the last year.
+ * @returns {number} The calculated loan limit.
+ */
+export function _calculateLimit(user, ongoingDebts, interestPaidInLastYear) {
+  const totalOngoingPrincipal = ongoingDebts.reduce((total, loan) => total + loan.principalLeft, 0);
+  const loanMultiplier = getLimitMultiplier(interestPaidInLastYear, user.investmentAmount);
   return (user.investmentAmount || 0) * loanMultiplier - totalOngoingPrincipal;
 }
 
@@ -415,9 +422,7 @@ export async function getAggregatedLoanInterestByPeriod({ memberIds, periodStart
     "borrower.id": { $in: idsToFilter }
   };
 
-  const allLoans = await getLoans({
-    filter: loanFilter,
-  });
+  const allLoans = await getLoans({ filter: loanFilter }) || [];
 
   // Initialize arrays for each category
   const category1Loans = []; // Started & Ended within [periodStart, periodEnd]
@@ -538,58 +543,88 @@ async function getProroratedInterestForStartedBeforePeriodEndedBeforePeriod(loan
 
 
 /**
- * Categorizes 3: Loans that started AFTER `periodStart` and ended AFTER `periodEnd` (including ongoing).
- * Interest: Prorated based on days exceeding `periodEnd`, from (accrued + paid) interest.
- * Formula: (days (effectiveEndDate - periodEnd)) / (effective total duration) * (loan.interestAmount + loan.interestAmountPaid).
- * Result is 0 if effectiveEndDate is before periodEnd.
- *
+ * Categorizes 3: Fetches data for loans that started AFTER `periodStart` and ended AFTER `periodEnd` (including ongoing)
+ * and calculates their prorated interest.
  * @param {Array<object>} loans - Array of loan documents for this category.
  * @param {Date} periodEnd - The end of the overall period.
- * @param {Date} currentCalculationDate - The date up to which units should be projected for effective end date.
- * @returns {number} The sum of prorated interest.
+ * @param {Date} currentCalculationDate - The date up to which to calculate the loan duration.
+ * @returns {Promise<number>} The sum of prorated interest.
  */
 async function getProroratedInterestForStartedAfterPeriodEndedAfterPeriod(loans, periodEnd, currentCalculationDate) {
   let totalInterest = 0;
   for (const loan of loans) {
-    const {effectiveLoanEndDate, actualDurationDays} = getLoanEffectiveEndDate(loan, currentCalculationDate); 
-    const borrowerUser = await UserServiceManager.getUserById(loan.borrower.id);
-    // Get days 'newDate' (effectiveLoanEndDate) exceeds periodEnd. Will be 0 if effectiveLoanEndDate <= periodEnd.
-    const daysNewDateExceedsPeriodEnd = getDaysDifference(periodEnd, effectiveLoanEndDate);
+      // --- Step 1: Fetch all necessary data ---
+      const { effectiveLoanEndDate, actualDurationDays } = getLoanEffectiveEndDate(loan, currentCalculationDate);
+      const borrowerUser = await UserServiceManager.getUserById(loan.borrower.id);
+      const daysNewDateExceedsPeriodEnd = getDaysDifference(periodEnd, effectiveLoanEndDate);
 
-    if (actualDurationDays > 0) {
-      const baseInterest = loan.status === 'Ended'? loan.interestAmount : calculateCashInterestDueAmount(loan, periodEnd, borrowerUser.points).totalInterest;
-      const prorationFactor = (actualDurationDays - daysNewDateExceedsPeriodEnd) / actualDurationDays;
-      totalInterest += prorationFactor * baseInterest;
-    }
+      const baseInterest = loan.status === 'Ended' 
+          ? loan.interestAmount 
+          : calculateCashInterestDueAmount(loan, periodEnd, borrowerUser.points).totalInterest;
+
+      // --- Step 2: Call the pure calculation function with the fetched data ---
+      totalInterest += _calculateProratedInterestForCat3(actualDurationDays, daysNewDateExceedsPeriodEnd, baseInterest);
   }
   return totalInterest;
 }
 
 /**
- * Categorizes 4: Loans that started BEFORE `periodStart` and ended AFTER `periodEnd` (including ongoing).
- * Interest: Prorated based on days falling WITHIN `[periodStart, periodEnd]`.
- * Formula: (days (periodEnd - periodStart)) / (effective total duration) * (loan.interestAmount + loan.interestAmountPaid).
- *
+ * Calculates the prorated interest for a single loan that started after a period and ended after it.
+ * This is a pure function for easier testing.
+ * @param {number} actualDurationDays - The loan's total effective duration in days.
+ * @param {number} daysNewDateExceedsPeriodEnd - The number of days the loan's effective end date is past the period end.
+ * @param {number} baseInterest - The total interest amount to be prorated.
+ * @returns {number} The prorated interest amount.
+ */
+export function _calculateProratedInterestForCat3(actualDurationDays, daysNewDateExceedsPeriodEnd, baseInterest) {
+  if (actualDurationDays <= 0) {
+      return 0;
+  }
+  const prorationFactor = (actualDurationDays - daysNewDateExceedsPeriodEnd) / actualDurationDays;
+  return prorationFactor * baseInterest;
+}
+
+/**
+ * Categorizes 4: Fetches data for loans that started BEFORE a period and ended AFTER it (spanning the period)
+ * and calculates their prorated interest.
  * @param {Array<object>} loans - Array of loan documents for this category.
  * @param {Date} periodStart - The start of the overall period.
  * @param {Date} periodEnd - The end of the overall period.
- * @param {Date} currentCalculationDate - The date up to which units should be projected for effective end date.
- * @returns {number} The sum of prorated interest.
+ * @param {Date} currentCalculationDate - The date up to which to calculate the loan duration.
+ * @returns {Promise<number>} The sum of prorated interest.
  */
 async function getInterestForLoansSpanningPeriod(loans, periodStart, periodEnd, currentCalculationDate) {
   let totalInterest = 0;
   for (const loan of loans) {
-    const { effectiveLoanEndDate, actualDurationDays } = getLoanEffectiveEndDate(loan, currentCalculationDate);
-    const borrowerUser = await UserServiceManager.getUserById(loan.borrower.id);
-    const daysWithinPeriod = getDaysDifference(periodStart, periodEnd); 
+      // --- Step 1: Fetch all necessary data ---
+      const { actualDurationDays } = getLoanEffectiveEndDate(loan, currentCalculationDate);
+      const borrowerUser = await UserServiceManager.getUserById(loan.borrower.id);
+      const daysWithinPeriod = getDaysDifference(periodStart, periodEnd);
 
-    if (actualDurationDays > 0) {
-      const baseInterest = loan.status === 'Ended'? loan.interestAmount : calculateCashInterestDueAmount(loan, periodEnd, borrowerUser.points).totalInterest;
-      const prorationFactor = daysWithinPeriod / actualDurationDays;
-      totalInterest += prorationFactor * baseInterest;
-    }
+      const baseInterest = loan.status === 'Ended'
+          ? loan.interestAmount
+          : calculateCashInterestDueAmount(loan, periodEnd, borrowerUser.points).totalInterest;
+
+      // --- Step 2: Call the pure calculation function with the fetched data ---
+      totalInterest += _calculateProratedInterestForCat4(actualDurationDays, daysWithinPeriod, baseInterest);
   }
   return totalInterest;
+}
+
+/**
+ * Calculates the prorated interest for a single loan that spans a given period.
+ * This is a pure function for easier testing.
+ * @param {number} actualDurationDays - The loan's total effective duration in days.
+ * @param {number} daysWithinPeriod - The number of days the loan was active within the period.
+ * @param {number} baseInterest - The total interest amount to be prorated.
+ * @returns {number} The prorated interest amount.
+ */
+export function _calculateProratedInterestForCat4(actualDurationDays, daysWithinPeriod, baseInterest) {
+  if (actualDurationDays <= 0) {
+      return 0;
+  }
+  const prorationFactor = daysWithinPeriod / actualDurationDays;
+  return prorationFactor * baseInterest;
 }
 //...................................FUNCTIONS_TO_DETERMINE_INTEREST_CHARGED_IN_A_SPECIFIC_PERIOD..........
 
@@ -615,7 +650,7 @@ export function getLimitMultiplier(interestPaid, currentSavings) {
   const multiplierRange = CONSTANTS.INTEREST_MULTIPLIER_RULES.maxMultiplier - CONSTANTS.INTEREST_MULTIPLIER_RULES.minMultiplier;
   const position = (CONSTANTS.INTEREST_MULTIPLIER_RULES.maxInterestRatio - interestRatio) / ratioRange;
 
-  return CONSTANTS.INTEREST_MULTIPLIER_RULES.minMultiplier + (multiplierRange * position);
+  return Math.round(100 * (CONSTANTS.INTEREST_MULTIPLIER_RULES.minMultiplier + (multiplierRange * position))) / 100;
 }
 
 /**
@@ -681,24 +716,20 @@ export function calculateLoanPointsNeeded(loanAmount, loanDuration, borrowerPoin
  * @returns {Promise<object>} A promise that resolves to the updated loan document.
  * @throws {ErrorUtil.AppError} If loan not found, not pending, or disbursement fails.
  */
-async function approveStandardLoanRequest(loan, approvedBy, sources) {
-
+async function approveStandardLoanRequest(loan, approvedBy, sources, borrowerUser) {
   Validator.required({ loan, approvedBy, sources });
-
-  // Deduct funds from cash locations
   await Promise.all(
-    sources.map(source =>
-      CashLocationServiceManager.addToCashLocation(source.id, -source.amount)
-    )
+      sources.map(source =>
+          CashLocationServiceManager.addToCashLocation(source.id, -source.amount)
+      )
   );
-
-  // Update the loan status and details
-  const updatedLoanResult = await updateLoanRecord(loan._id, { 
-    status: "Ongoing",
-    approvedBy: { id: approvedBy.id, name: approvedBy.fullName },
-    date: new Date(),
-    sources: sources,
-    lastPaymentDate: new Date(),
+  // Use Loan.updateOne directly
+  const updatedLoanResult = await Loan.updateOne({ _id: loan._id }, {
+      status: "Ongoing",
+      approvedBy: { id: approvedBy.id, name: approvedBy.fullName },
+      date: new Date(),
+      sources: sources,
+      lastPaymentDate: new Date(),
   });
 
   await EmailServiceManager.sendEmailWithTemplate({
@@ -717,6 +748,7 @@ async function approveStandardLoanRequest(loan, approvedBy, sources) {
 
   return updatedLoanResult;
 }
+
 //....................APPROVE_STD_LOAN
 
 //............PROCESS_STD_LOAN_PYMT
@@ -803,12 +835,6 @@ async function processStandardLoanPayment(loan, borrowerUser, paymentAmount, cas
  * @returns {object} { interestPaid: number, principalPaid: number, excessAmount: number }
  */
 export function calculateStandardLoanPrincipalPaid(paymentAmount, totalInterestDue, principalLeft) {
-
-  Validator.required({ paymentAmount, totalInterestDue, principalLeft });
-  Validator.assert(paymentAmount >= 0, "Payment amount cannot be negative.", { errType: Errors.BadRequestError });
-  Validator.assert(totalInterestDue >= 0, "Total interest due cannot be negative.", { errType: Errors.InternalServerError });
-  Validator.assert(principalLeft >= 0, "Principal left cannot be negative.", { errType: Errors.InternalServerError });
-
   let interestPaid = 0;
   let principalPaid = 0;
   let excessAmount = 0;
@@ -837,12 +863,9 @@ export function calculateStandardLoanPrincipalPaid(paymentAmount, totalInterestD
  * @returns {number} The total interest due.
  */
 function calculateTotalInterestDueAmount(amount, startDate, dueDate) {
-  Validator.required({ amount, dueDate });
-
   const totalMonthsDue = calculateTotalMonthsDue(startDate, dueDate);
-  const MONTHLY_INTEREST_RATE = CONSTANTS.MONTHLY_LENDING_RATE / 100;
 
-  let totalAmount = amount * Math.pow((1 + MONTHLY_INTEREST_RATE), totalMonthsDue);
+  let totalAmount = amount * Math.pow((1 + CONSTANTS.MONTHLY_LENDING_RATE), totalMonthsDue);
   return Math.max(0, totalAmount - amount);
 
 }
@@ -855,16 +878,13 @@ function calculateTotalInterestDueAmount(amount, startDate, dueDate) {
  * @returns {number} The interest amount that must be paid with cash.
  */
 function calculateCashInterestDueAmount(loan, dueDate, availablePoints) {
-
-  Validator.required({ loan, dueDate, availablePoints });
   const startDate = loan.lastPaymentDate;
   let totalInterestDue = calculateTotalInterestDueAmount(loan.principalLeft, startDate, dueDate);
-  const pointsInterestDue = calculatePointsInterestDueAmount(loan, availablePoints, dueDate);
+  const pointsInterestDue = calculatePointsInterestDueAmount(loan, availablePoints, dueDate); 
   totalInterestDue = Math.max(0, totalInterestDue - pointsInterestDue);
   let totalInterest = totalInterestDue + loan.interestAmount;
 
-  return {totalInterestDue, totalInterest };
-
+  return { totalInterestDue, totalInterest, pointsInterestDue }; 
 }
 
 /**
@@ -873,11 +893,6 @@ function calculateCashInterestDueAmount(loan, dueDate, availablePoints) {
  * @returns {number} The number of points required.
  */
 export function calculatePointsConsumed(pointsInterestDueAmount) {
-
-  Validator.required({ pointsInterestDueAmount });
-  Validator.assert(pointsInterestDueAmount >= 0, "Points interest due amount cannot be negative.", { errType: Errors.InternalServerError });
-  Validator.assert(CONSTANTS.POINTS_VALUE_PER_UNIT > 0, "POINTS_VALUE_PER_UNIT must be positive.", { errType: Errors.InternalServerError }); // Defensive check
-
   return pointsInterestDueAmount / CONSTANTS.POINTS_VALUE_PER_UNIT;
 }
 
@@ -889,7 +904,6 @@ export function calculatePointsConsumed(pointsInterestDueAmount) {
  * @returns {number} The interest amount that can be cleared by points.
  */
 function calculatePointsInterestDueAmount(loan, availablePoints, dueDate) {
-  Validator.required({ loan, availablePoints, dueDate });
   const startDate = loan.lastPaymentDate;
   const totalInterestDue = calculateTotalInterestDueAmount(loan.principalLeft, startDate, dueDate);
   const totalMonthsDue = calculateTotalMonthsDue(loan.lastPaymentDate, dueDate);
@@ -914,8 +928,6 @@ function calculatePointsInterestDueAmount(loan, availablePoints, dueDate) {
  * @returns {number} The number of point-eligible months due.
  */
 function calculatePointsMonthsDue(loanStartDate, lastPaymentDate, currentDueDate) {
-  Validator.required({ loanStartDate, lastPaymentDate, currentDueDate });
-
   const totalPointMonthsAccrued = calculatePointMonthsAccrued(loanStartDate, currentDueDate);
   const clearedPointMonths = calculatePointMonthsAccrued(loanStartDate, lastPaymentDate);
   return Math.max(0, totalPointMonthsAccrued - clearedPointMonths);
@@ -1061,17 +1073,17 @@ async function initiateFreeLoanRequest(
 export function calculateFreeLoanEligibility(user, requestedAmount, requestedPeriod) {
 
   Validator.required({ user, requestedAmount, requestedPeriod });
-  Validator.assert(user.temporarySavingsAmount !== undefined && user.temporarySavingsUnits !== undefined,
+  Validator.assert(user.temporaryInvestment?.amount !== undefined && user.temporaryInvestment?.units !== undefined,
     "User temporary savings data is incomplete.", { errType: Errors.InternalServerError });
 
   const totalDaysSinceDeposit = getDaysDifference(user.temporaryDate, new Date());
 
   const loanPeriodLimit = requestedAmount > 0
-    ? Math.round((user.temporarySavingsAmount * totalDaysSinceDeposit + user.temporarySavingsUnits) / requestedAmount)
+    ? Math.round((user.temporaryInvestment?.amount * totalDaysSinceDeposit + user.temporaryInvestment?.units) / requestedAmount)
     : 0;
 
   const loanLimit = requestedPeriod > 0
-    ? Math.round((user.temporarySavingsAmount * totalDaysSinceDeposit + user.temporarySavingsUnits) / requestedPeriod)
+    ? Math.round((user.temporaryInvestment?.amount * totalDaysSinceDeposit + user.temporaryInvestment?.units) / requestedPeriod)
     : 0;
   return { loanLimit, loanPeriodLimit };
 }
@@ -1085,26 +1097,23 @@ export function calculateFreeLoanEligibility(user, requestedAmount, requestedPer
  * @throws {ErrorUtil.AppError} If loan not found, not pending, or disbursement fails.
  */
 async function approveFreeLoanRequest(loan, approvedBy, sources, borrowerUser) {
- 
   Validator.required({ loan, approvedBy, sources });
-
   await Promise.all(
-    sources.map(source =>
-      CashLocationServiceManager.addToCashLocation(source.id, -source.amount)
-    )
+      sources.map(source =>
+          CashLocationServiceManager.addToCashLocation(source.id, -source.amount)
+      )
   );
-
   await UserServiceManager.addTemporaryInvestmentUnits(loan.borrower.id, -loan.units);
-
-  const updatedLoanResult = await updateLoanRecord(loan._id, {
-    status: "Ongoing",
-    approvedBy: { id: approvedBy.id, name: approvedBy.fullName },
-    date: new Date(),
-    units: 0, 
-    sources: sources,
-    lastPaymentDate: new Date(),
+  
+  const updatedLoanResult = await Loan.updateOne({ _id: loan._id }, {
+      status: "Ongoing",
+      approvedBy: { id: approvedBy.id, name: approvedBy.fullName },
+      date: new Date(),
+      units: 0,
+      sources: sources,
+      lastPaymentDate: new Date(),
   });
-
+  
   await EmailServiceManager.sendEmailWithTemplate({
     sender: "growthspring",
     recipient: borrowerUser.email, 
@@ -1138,9 +1147,9 @@ async function processFreeLoanPayment(
   paymentAmount,
   paymentDate, 
   cashLocationId,
-  currentUser
+  currentUser,
+  
 ) {
-
   Validator.required({ loan, borrowerUser, paymentAmount, paymentDate, cashLocationId, currentUser });
 
   const parsedPaymentDate = new Date(paymentDate);
@@ -1210,7 +1219,6 @@ async function processFreeLoanPayment(
  * @returns {string} A message indicating any specific outcome (e.g., loan ended).
  */
 async function calculateFreeLoanPrincipleLeft(user, loan, paymentAmount, parsedPaymentDate) {
-
   Validator.required({ user, loan, paymentAmount, parsedPaymentDate });
 
   const { currentLoanUnits, cashInterest, excessUnits, currentTempSavingsUnits } = await calculateFreeLoanOverdueMetrics(loan, user, parsedPaymentDate);
@@ -1240,7 +1248,7 @@ async function calculateFreeLoanPrincipleLeft(user, loan, paymentAmount, parsedP
  * that accrues if the loan extends beyond the borrower's temporary savings/units.
  *
  * @param {object} loan - The loan document.
- * @param {object} user - The borrower's user document, containing temporarySavingsAmount and temporarySavingsUnits.
+ * @param {object} user - The borrower's user document, containing temporaryInvestment?.amount and temporaryInvestment?.units.
  * @param {Date} parsedPaymentDate - The date of the current payment/calculation.
  * @returns {object} An object containing currentLoanUnits, excessUnits, cashInterest, and cashUnits.
  */
@@ -1291,7 +1299,6 @@ function handlePartialPrincipalPayment(loan, paymentAmount) {
  * @param {Date} parsedPaymentDate - The date of the current payment.
  */
 async function handleExcessUnitsNoCashInterest(user, loan, currentTempSavingsUnits, excessUnits, parsedPaymentDate) {
-
   Validator.required({ user, loan, currentTempSavingsUnits, excessUnits, parsedPaymentDate });
   const additionalUnits = currentTempSavingsUnits - excessUnits;
 
@@ -1322,7 +1329,7 @@ async function handleCashInterestPayment(user, loan, paymentAmount, cashInterest
   );
 
   // If payment covers principal and cash interest
-  await UserServiceManager.addTemporaryInvestmentUnits(user._id, -user.temporarySavingsUnits);
+  await UserServiceManager.addTemporaryInvestmentUnits(user._id, -user.temporaryInvestment?.units);
   await UserServiceManager.setTemporaryInvestmentUnitsDate(user._id, parsedPaymentDate);
 
   loan.principalLeft = 0;

@@ -1,90 +1,137 @@
-jest.setTimeout(30000); // 30 seconds
-
 import { jest } from '@jest/globals';
 import mongoose from "mongoose";
-import connectDB from "../../../db.js";
 
 import { Loan } from "../models.js";
 import * as Mocks from "./mocks.js";
+import * as UserMocks from "../../user-service/__tests__/mocks.js";
+import { User } from "../../user-service/models.js";
+import connectDB from '../../../db.js';
 
 beforeAll(async () => {
-    process.env.MONGODB_URI = process.env.MONGO_URL;
-    await connectDB();
+  const MONGODB_URI = globalThis.__MONGO_URI__;
+  await connectDB(MONGODB_URI);
 });
 
 afterAll(async () => {
-    await Loan.deleteMany();
-    await mongoose.disconnect();
+  await mongoose.disconnect();
 });
 
-describe("Loan Model", () => {
-    let dbUser, dbAdmin, dbLoan;
-
-    beforeEach(async () => {
-        await Loan.deleteMany();
-        dbUser = Mocks.createDBUser("regular");
-        dbAdmin = Mocks.createDBUser("admin");
-        dbLoan = Mocks.createDBLoan(dbUser, dbAdmin, "Ongoing");
-        await Loan.create(dbLoan);
-    });
-
-    test("Loan.create should insert a new loan into the collection", async () => {
-        const loan = await Loan.findById(dbLoan._id);
-        expect(loan).not.toBeNull();
-        expect(loan.amount).toBe(dbLoan.amount);
-    });
-
-    test("Loan.findById should retrieve an existing loan", async () => {
-        const foundLoan = await Loan.findById(dbLoan._id);
-        expect(foundLoan).not.toBeNull();
-        expect(foundLoan._id.toString()).toEqual(dbLoan._id.toString());
-    });
-
-    test("Loan.updateOne should update an existing loan", async () => {
-        await Loan.updateOne({ _id: dbLoan._id }, { $set: { status: "Ended" } });
-        const updatedLoan = await Loan.findById(dbLoan._id);
-        expect(updatedLoan.status).toEqual("Ended");
-    });
-
-    test("Loan.deleteOne should delete a loan", async () => {
-        await Loan.deleteOne({ _id: dbLoan._id });
-        const deletedLoan = await Loan.findById(dbLoan._id);
-        expect(deletedLoan).toBeNull();
-    });
+beforeEach(() => {
+  jest.clearAllMocks();
 });
 
-describe("Loan.getFilteredLoans", () => {
-    const user1 = Mocks.createDBUser("regular");
-    user1.fullName = "User One";
-    const user2 = Mocks.createDBUser("regular");
-    user2.fullName = "User Two";
-    const admin = Mocks.createDBUser("admin");
+describe("Loan Model: Write Operations", () => {
+  let borrower, loan;
 
-    beforeAll(async () => {
-        // Seed database with a variety of loans
-        await Loan.insertMany([
-            { ...Mocks.createDBLoan(user1, admin, "Ongoing", "Standard"), date: new Date("2024-05-15T00:00:00.000Z") },
-            { ...Mocks.createDBLoan(user2, admin, "Ended", "Standard"), date: new Date("2024-08-20T00:00:00.000Z") },
-            { ...Mocks.createDBLoan(user1, admin, "Pending Approval", "Standard"), date: new Date("2025-01-10T00:00:00.000Z") },
-        ]);
-    });
+  beforeAll(async () => {
+    await mongoose.connection.dropDatabase();
+    borrower = UserMocks.generateDBUser();
+    await User.create(borrower);
+    loan = Mocks.generateDBLoan({ borrower });
+    await Loan.create(loan);
+  });
 
-    test("should filter loans by year", async () => {
-        const result = await Loan.getFilteredLoans({ year: 2024 });
-        expect(result).toHaveLength(2);
-        expect(result.every(loan => new Date(loan.date).getFullYear() === 2024)).toBe(true);
-    });
+  test("Loan.create should insert a new loan in collection", async () => {
+    const insertedLoan = await Loan.findById(loan._id);
+    expect(insertedLoan).not.toBe(null);
+  });
 
-    test("should filter loans by status", async () => {
-        const result = await Loan.getFilteredLoans({ status: "Ended" });
-        expect(result).toHaveLength(1);
-        expect(result[0].status).toBe("Ended");
-    });
-    
-    test("should filter loans by member name", async () => {
-        const result = await Loan.getFilteredLoans({ member: "User One" });
-        // It will find the 'Ongoing' and 'Ended' for the user by default filter, but not 'Pending'
-        const defaultFiltered = result.filter(r => r.status !== 'Pending Approval');
-        expect(defaultFiltered.every(loan => loan.borrower.name === "User One")).toBe(true);
-    });
+  test("Loan.updateOne should update existing loan", async () => {
+    await Loan.updateOne({ _id: loan._id }, { $set: { amount: 1000 } });
+    let updatedLoan = await Loan.findById(loan._id);
+    expect(updatedLoan.amount).toEqual(1000);
+  });
+
+  test("Loan.deleteOne should delete loan", async () => {
+    await Loan.deleteOne({ _id: loan._id });
+    const deletedLoan = await Loan.findById(loan._id);
+    expect(deletedLoan).toBe(null);
+  });
+});
+
+describe("Loan Model: Loan.getFilteredLoans", () => {
+  let numberOfBorrowers = 2;
+  let numberOfLoans = 50;
+  let borrowers = UserMocks.generateDBUsers({ numberOfUsers: numberOfBorrowers });
+  let loans = Mocks.generateDBLoans({ numberOfLoans, borrowers });
+
+  beforeAll(async () => {
+    await mongoose.connection.dropDatabase();
+    await User.insertMany(borrowers);
+    await Loan.insertMany(loans);
+  }, 20000);
+
+  test("no args - should return loans with status Ended or Ongoing, sorted by date desc, first 20", async () => {
+    let defaultPerPage = 20;
+    let expectedLoansIds = [...loans]
+      .filter(loan => loan.status === "Ended" || loan.status === "Ongoing")
+      .sort((a, b) => b.date - a.date)
+      .slice(0, defaultPerPage)
+      .map(loan => loan._id.toString());
+
+    let actualLoansIds = (await Loan.getFilteredLoans({}))
+      .map(loan => loan._id.toString());
+
+    expect(actualLoansIds).toEqual(expectedLoansIds);
+  });
+
+  test("all args passed - should return the loans based on the filter, sort, and page", async () => {
+    let member = borrowers[0]._id.toString();
+    let year = 2024;
+    let month = 1;
+    let status = "Ongoing";
+    let sortBy = "date";
+    let order = 1;
+    let page = 1;
+
+    let expectedLoansIds = [...loans]
+      .filter((loan) => {
+        const loanYear = new Date(loan.date).getUTCFullYear();
+        const loanMonth = new Date(loan.date).getUTCMonth() + 1;
+        return loanYear === year && 
+          loanMonth === month &&
+          loan.borrower.id.toString() === member &&
+          loan.status === status;
+      })
+      .sort((a, b) => order * (a[sortBy] - b[sortBy]))
+      .slice(0, 20)
+      .map(loan => loan._id.toString());
+
+    let actualLoansIds = (await Loan.getFilteredLoans({ member, year, month, status, sortBy, order, page }))
+      .map(loan => loan._id.toString());
+
+    expect(actualLoansIds).toEqual(expectedLoansIds);
+  });
+
+  test("status Overdue - should return overdue ongoing loans", async () => {
+    let overdueBorrower = UserMocks.generateDBUser();
+    await User.create(overdueBorrower);
+    let overdueLoan = Mocks.generateDBLoan({ borrower: overdueBorrower, status: "Ongoing" });
+    overdueLoan.date = new Date("2024-01-01");
+    overdueLoan.duration = 6;
+    await Loan.create(overdueLoan);
+
+    let notOverdueLoan = Mocks.generateDBLoan({ borrower: overdueBorrower, status: "Ongoing" });
+    notOverdueLoan.date = new Date("2025-01-01");
+    notOverdueLoan.duration = 12;
+    await Loan.create(notOverdueLoan);
+
+    let result = await Loan.getFilteredLoans({ status: "Overdue" });
+
+    expect(result.map(l => l._id.toString())).toContain(overdueLoan._id.toString());
+    expect(result.map(l => l._id.toString())).not.toContain(notOverdueLoan._id.toString());
+  });
+
+  test("member as name - should filter by borrower.name", async () => {
+    let member = borrowers[0].fullName;
+    let expectedIds = loans
+      .filter(l => l.borrower.name === member)
+      .sort((a, b) => b.date - a.date)
+      .slice(0, 20)
+      .map(l => l._id.toString());
+
+    let result = await Loan.getFilteredLoans({ member });
+    let actualIds = result.map(l => l._id.toString());
+    expect(actualIds).toEqual(expectedIds);
+  });
 });

@@ -1,109 +1,97 @@
-
-import { jest } from '@jest/globals';
 import { v4 as uuid } from "uuid";
+import { faker } from "@faker-js/faker";
+import * as UserMocks from "../../user-service/__tests__/mocks.js";
+import * as CashLocationMocks from "../cash-location-service/__tests__/mocks.js";
 import mongoose from "mongoose";
 
-const { ObjectId } = mongoose.Types;
+const MIN_DATE = "2023-01-01";
+const MAX_DATE = "2024-12-31";
 
-/**
- * Creates a mock user object for testing purposes.
- * @param {string} userType - Can be 'regular' or 'admin'.
- * @returns {object} A mock user object.
- */
-export function createDBUser(userType) {
-  const userId = new ObjectId().toString();
+export function generateDBLoan(options = {}) {
+  const {
+    borrower,
+    initiatedBy,
+    approvedBy,
+    status = faker.helpers.arrayElement(["Pending Approval", "Ongoing", "Ended", "Cancelled"]),
+    type = faker.helpers.arrayElement(["Standard", "Interest-Free"]),
+  } = options;
+
+  const loanBorrower = borrower || UserMocks.generateDBUser();
+  const loanInitiatedBy = initiatedBy || UserMocks.generateDBUser();
+  const loanApprovedBy = approvedBy || (status !== "Pending Approval" ? UserMocks.generateDBUser() : {});
+
+  const amount = faker.number.int({ min: 1000, max: 1000000 });
+  const duration = faker.number.int({ min: 1, max: 36 });
+  const date = faker.date.between({ from: MIN_DATE, to: MAX_DATE });
+
+  const sources = Array.from({ length: faker.number.int({ min: 1, max: 3 }) }, () => {
+    const cashLocation = CashLocationMocks.generateInputCashLocation();
+    return {
+      id: new mongoose.Types.ObjectId(cashLocation._id),
+      name: cashLocation.name,
+      amount: faker.number.int({ min: 100, max: amount }),
+    };
+  });
+
+  const payments = Array.from({ length: faker.number.int({ min: 0, max: 5 }) }, () => {
+    const updatedBy = UserMocks.generateDBUser();
+    const location = CashLocationMocks.generateInputCashLocation();
+    return {
+      date: faker.date.between({ from: date, to: new Date() }),
+      amount: faker.number.int({ min: 100, max: 10000 }),
+      updatedBy: { id: updatedBy._id, name: updatedBy.fullName },
+      location: new mongoose.Types.ObjectId(location._id),
+    };
+  });
+
   return {
-    _id: userId,
-    id: userId, // For convenience since service uses both
-    fullName: "John Doe",
-    investmentAmount: 5_000_000,
-    points: 10000,
-    email: "johndoe@example.com",
-    phoneContact: "0712345678",
-    isAdmin: userType === "admin",
-    // For Interest-Free Loan logic
-    temporaryInvestment: {
-        amount: 1_000_000,
-        units: 50_000_000, // Represents (amount * days)
-        unitsDate: new Date("2025-05-01T00:00:00.000Z"),
-    }
+    _id: new mongoose.Types.ObjectId(),
+    duration,
+    rate: faker.number.float({ min: 0.01, max: 0.3, precision: 0.01 }),
+    earliestDate: faker.date.between({ from: MIN_DATE, to: MAX_DATE }),
+    latestDate: faker.date.between({ from: MIN_DATE, to: MAX_DATE }),
+    type,
+    status,
+    initiatedBy: { id: loanInitiatedBy._id, name: loanInitiatedBy.fullName },
+    approvedBy: loanApprovedBy.id ? { id: loanApprovedBy._id, name: loanApprovedBy.fullName } : {},
+    worthAtLoan: amount,
+    amount,
+    date,
+    borrower: { id: loanBorrower._id, name: loanBorrower.fullName },
+    pointsSpent: faker.number.int({ min: 0, max: 1000 }),
+    principalLeft: amount,
+    lastPaymentDate: date,
+    units: faker.number.int({ min: 0, max: 100000 }),
+    rateAfterDiscount: faker.number.float({ min: 0.01, max: 0.3, precision: 0.01 }),
+    discount: faker.number.int({ min: 0, max: 100 }),
+    pointsWorthBought: faker.number.int({ min: 0, max: 1000 }),
+    pointsAccrued: faker.number.int({ min: 0, max: 1000 }),
+    interestAccrued: faker.number.int({ min: 0, max: 10000 }),
+    interestAmount: faker.number.int({ min: 0, max: 10000 }),
+    installmentAmount: Math.round(amount / duration),
+    sources,
+    payments,
   };
 }
 
+export function generateDBLoans(options = {}) {
+  const { numberOfLoans = 10, borrowers } = options;
+  let loanBorrowers = borrowers || UserMocks.generateDBUsers({ numberOfUsers: 5 });
 
-/**
- * Creates a mock cash location object.
- * @returns {object} A mock cash location.
- */
-export function createDBCashLocation() {
-    return {
-        _id: new ObjectId().toString(),
-        name: "Main Vault",
-        amount: 10_000_000
-    };
+  const dbLoans = [];
+  let recordedLoanDates = new Set();
+
+  for (let i = 0; i < numberOfLoans; ) {
+    let borrower = faker.helpers.arrayElement(loanBorrowers);
+    let dbLoan = generateDBLoan({ borrower });
+    let dateIso = dbLoan.date.toISOString();
+    if (!recordedLoanDates.has(dateIso)) {
+      dbLoans.push(dbLoan);
+      recordedLoanDates.add(dateIso);
+      i++;
+    }
+  }
+
+  return dbLoans;
 }
-
-/**
- * Creates a detailed mock loan object for database simulation.
- * @param {object} borrower - The mock borrower user object.
- * @param {object} initiator - The mock user who initiated the loan.
- * @param {string} status - The loan's status (e.g., 'Pending Approval', 'Ongoing').
- * @param {string} type - The loan's type (e.g., 'Standard', 'Interest-Free').
- * @returns {object} A mock loan object.
- */
-export function createDBLoan(borrower, initiator, status = "Ongoing", type = "Standard") {
-    const loanId = new ObjectId().toString();
-    const loanAmount = 500_000;
-
-    return {
-        _id: loanId,
-        id: loanId,
-        amount: loanAmount,
-        duration: 12, // months
-        rate: 5, // percent
-        type,
-        status,
-        earliestDate: new Date("2025-07-01T00:00:00.000Z"),
-        latestDate: new Date("2025-07-15T00:00:00.000Z"),
-        date: new Date("2025-07-10T00:00:00.000Z"), // Disbursement date
-        borrower: {
-            id: borrower._id,
-            name: borrower.fullName,
-        },
-        initiatedBy: {
-            id: initiator._id,
-            name: initiator.fullName,
-        },
-        approvedBy: {
-            id: initiator._id,
-            name: initiator.fullName,
-        },
-        principalLeft: loanAmount,
-        lastPaymentDate: new Date("2025-07-10T00:00:00.000Z"),
-        interestAmount: (loanAmount * 5) / 100,
-        installmentAmount: (loanAmount * 1.05) / 12,
-        worthAtLoan: borrower.investmentAmount,
-        units: 0,
-        interestAmountPaid: 0,
-        sources: [{...createDBCashLocation(), amount: loanAmount }],
-        payments: [],
-    };
-}
-
-/**
- * Creates a mock input object for initiating a loan.
- * @param {string} borrowerId - The ID of the borrower.
- * @returns {object} A mock loan initiation input object.
- */
-export function createLoanInitiationInput(borrowerId) {
-    return {
-        amount: 500_000,
-        duration: 12,
-        earliestDate: new Date("2025-07-01T00:00:00.000Z"),
-        latestDate: new Date("2025-07-15T00:00:00.000Z"),
-        borrowerId,
-        loanType: "Standard",
-    };
-}
-
 //npm test -- services/loan-service/tests/service.test.js
