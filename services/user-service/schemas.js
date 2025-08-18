@@ -1,17 +1,24 @@
 import Joi from "joi";
+import mongoose from "mongoose";
 
 //reusable fields
-let objectIdPattern = /^[a-f0-9]{24}$/i
+const objectId = Joi.custom((value, helpers) => {
+  if (typeof value === "string" && mongoose.Types.ObjectId.isValid(value)) {
+    return value;
+  }
+  if (value instanceof mongoose.Types.ObjectId) {
+    return value;
+  }
+  return helpers.message("Failed to validate objectId");
+}, "ObjectId validation");
 
-const objectId = Joi.string().pattern(objectIdPattern)
-
-const userId = objectId.required()
+const userId = objectId
 
 const investment = Joi.object({
-  amount: Joi.number().min(1),
-  units: Joi.number().min(1),
-  unitsDate: Joi.date()
-})
+  amount: Joi.number().min(1).required(),
+  units: Joi.number().min(1).required(),
+  unitsDate: Joi.date().required()
+}).unknown(false)
 
 const investmentUpdate = Joi.object({
   userId,
@@ -40,11 +47,11 @@ export const createUser = Joi.object({
   email: Joi.string().email().required(),
   phoneContact: Joi.string().required(),
   dob: birthday.required()
-})
+}).unknown(false).required(true)
 
 export const updateUser = Joi.object({
   userId,
-  update:{
+  update:Joi.object({
     fullName: Joi.string().min(1),
     email: Joi.string().email(),
     phoneContact: Joi.string(),
@@ -52,12 +59,21 @@ export const updateUser = Joi.object({
     permanentInvestment: investment,
     temporaryInvestment: investment,
     dob: birthday,
-    points: Joi.number().integer().min(1),
+    points: Joi.number().integer().min(0),
     isActive: Joi.boolean(),
     isAdmin: Joi.boolean(),
     displayName: Joi.string()
-  }
+  }).unknown(false)
 })
+
+export const updateUserRestricted = Joi.object({
+  userId,
+  update:Joi.object({
+    phoneContact: Joi.string(),
+    dob: birthday,
+    displayName: Joi.string()
+  }).unknown(false)
+}).unknown(false)
 
 export const updateUserPhoto = Joi.object({
   userId,

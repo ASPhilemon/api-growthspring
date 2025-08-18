@@ -38,8 +38,8 @@ export const getTransactionById = uuid.required()
 export const getTransactionByRefId = Joi.string().required()
 
 export const recordTransaction = Joi.object({
-  type: Joi.valid("award", "redeem", "transfer"),
-}).required()
+  type: Joi.valid("award", "redeem", "transfer").required(),
+}).required().unknown(true)
 
 export const awardPoints = Joi.object({
   userId: objectId.required(),

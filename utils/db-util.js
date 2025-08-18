@@ -15,6 +15,7 @@ export async function transaction(callback) {
   }
   catch (err) {
     if (err instanceof Errors.AppError) throw err;
+    if(err.name == "MongoServerError") _handleMongoServerError(err);
     if (err instanceof mongoose.Error) _handleMongooseError(err);
     throw new Errors.UnknownError({ cause: err });
   }
@@ -30,13 +31,20 @@ export async function query(promise) {
 
 function _handleMongooseError(err){
   const { ValidationError, CastError, StrictModeError } = mongoose.Error
-
   if (err instanceof ValidationError ||
       err instanceof CastError ||
       err instanceof StrictModeError){
     throw new Errors.BadRequestError("Failed to validate user input", err)
   }
-
   throw new Errors.InternalServerError({cause: err})
   
+}
+
+function _handleMongoServerError(err){
+  const DuplicateRecordErrorCode = 11000
+  if (err.code == DuplicateRecordErrorCode){
+    throw new Errors.BadRequestError("Failed to process request, duplicate entry")
+  }
+
+  throw new Errors.InternalServerError({cause: err})
 }

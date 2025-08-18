@@ -16,7 +16,7 @@ export async function getTransactions(filter, sort, pagination){
 }
 
 export async function getTransactionById(transactionId){
-  const transaction =  DB.query(PointTransaction.findById(transactionId))
+  const transaction =  await DB.query(PointTransaction.findById(transactionId))
   if (!transaction) throw new Errors.NotFoundError("Failed to find transaction")
   return transaction
 }
@@ -25,11 +25,10 @@ export async function getTransactionByRefId(refId){
   const transaction =  DB.query(PointTransaction.findOne({refId}))
   if (!transaction) throw new Errors.NotFoundError("Failed to find transaction")
   return transaction
-  return transaction
 }
 
 export async function recordTransaction(transaction){
-  //Validator.schema(Schemas.recordTransaction, transaction)
+  Validator.schema(Schemas.recordTransaction, transaction)
   const {type, senderId, recipientId, redeemedById, points, reason, refId} = transaction
   switch(type){
     case "award":

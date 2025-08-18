@@ -3,6 +3,7 @@ import * as WebAuthn from '@simplewebauthn/server'
 import generator from 'generate-password';
 import bcrypt from 'bcryptjs';
 import zxcvbn from "zxcvbn"
+import crypto from "crypto"
 
 import { OAuth2Client } from "google-auth-library"
 
@@ -58,45 +59,43 @@ export async function signInWithGoogle(googleToken){
   }
 }
 
-export async function createOTP(email, otpPurpose, cfTurnstileResponse){
-  await _verifyCfTurnstileResponse(cfTurnstileResponse)
-
-  const password = await DB.query(Password.findOne({"user.email": email}))
-
-  if (password){
-    let otp = _buildOTP(email, otpPurpose)
-    await DB.query(OTP.create(otp))
-    _sendOTPCreatedEmail(otp);
-  }
-  //helpers
-  function _buildOTP(email, otpPurpose){
-    const minOTPCode = 1e8
-    const maxOTPCode = 1e9
-    const code = String( crypto.randomInt(minOTPCode, maxOTPCode) )
-    return {email, purpose: otpPurpose, code}
-  }
-  function _sendOTPCreatedEmail(otp){
-    EmailServiceManager.sendEmail({
-      sender:"growthspring",
-      recipient: otp.email,
-      subject: `One Time Password - ${otp.purpose} `,
-      message: `OTP Email Link`
-    })
-  }
+export async function getPasswordByUserId(userId){
+  const password = await DB.query(Password.findOne({"user._id": userId}))
+  if (!password) throw new Errors.NotFoundError("Failed to find password");
+  return password
 }
 
+export async function getPasswordByUserEmail(userEmail){
+  const password = await DB.query(Password.findOne({"user.email": userEmail}))
+  if (!password) throw new Errors.NotFoundError("Failed to find password");
+  return password
+}
+
+export async function createOTP(email, otpPurpose, cfTurnstileResponse){
+  await _verifyCfTurnstileResponse(cfTurnstileResponse)
+  let otp = _buildOTP(email, otpPurpose)
+  try{
+    await getPasswordByUserEmail(email)
+    await DB.query(OTP.create(otp))
+    sendOTPCreatedEmail(otp);
+  }
+  catch(err){
+    if(!(err instanceof Errors.NotFoundError)) throw err
+  }
+}
+ 
 export async function resetPassword(otpCode, newPassword, cfTurnstileResponse){
   validatePasswordStrength(newPassword)
-  
-  const otp = await DB.query(OTP.findOne({code: otpCode, purpose: "reset-password"}))
-  Validator.assert(otp, "The OTP is expired or incorrect")
 
-  const hashedPassword = hashPassword(newPassword)
+  const otp = await DB.query(OTP.findOne({code: otpCode, purpose: "reset-password"}))
+  if(!otp) throw new Errors.BadRequestError("The OTP is expired or incorrect");
+
+  const hash = hashPassword(newPassword)
 
   await DB.transaction(async()=>{
     await DB.query(Password.updateOne(
       {"user.email": otp.email},
-      {$set:{password: hashedPassword}})
+      {$set:{hash}})
     )
     await DB.query(OTP.deleteOne({code: otp.code}))
   })
@@ -122,7 +121,7 @@ export function createJWT(userId, fullName, isAdmin) {
 }
 
 export async function createPassword(userId, fullName, email){
-  const password = generatePassword()
+  const password = _generatePassword()
   const hash = hashPassword(password)
   await Password.create({
     user: {_id: userId, fullName, email},
@@ -131,15 +130,24 @@ export async function createPassword(userId, fullName, email){
   return password
 }
 
- async function sendPasswordResetEmail(email){
-    const user = await UserServiceManager.getUserByEmail(email)
-    EmailServiceManager.sendEmail({
-      sender: "growthspring",
-      recipient: user.email,
-      subject: "Password Reset Successful",
-      message: `Dear ${user.fullName}, you have successfully reset your password`
-    })
-  }
+async function sendPasswordResetEmail(email){
+  const user = await UserServiceManager.getUserByEmail(email)
+  EmailServiceManager.sendEmail({
+    sender: "growthspring",
+    recipient: user.email,
+    subject: "Password Reset Successful",
+    message: `Dear ${user.fullName}, you have successfully reset your password`
+  })
+}
+
+function sendOTPCreatedEmail(otp){
+  EmailServiceManager.sendEmail({
+    sender:"growthspring",
+    recipient: otp.email,
+    subject: `One Time Password - ${otp.purpose} `,
+    message: `OTP Email Link`
+  })
+}
 
 //WebAuthn
 export async function getRegistrationOptionsWebAuthn(otpCode){
@@ -285,8 +293,14 @@ export async function verifyAuthenticationWebAuthn(response, challengeId){
 }
 
 //helpers
+function _buildOTP(email, otpPurpose){
+  const minOTPCode = 1e5
+  const maxOTPCode = 9e5
+  const code = String( crypto.randomInt(minOTPCode, maxOTPCode) )
+  return {email, purpose: otpPurpose, code}
+}
 
-function generatePassword(){
+function _generatePassword(){
   const password = generator.generate({
     length: 10,
     numbers: true,

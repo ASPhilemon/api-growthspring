@@ -7,6 +7,7 @@ const cashLocationSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true,
+    enum: ["Standard Chartered", "Mobile Money", "Unit Trust"]
   },
   amount: {
     type:  Number,
@@ -23,6 +24,7 @@ const subCashLocationSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true,
+    enum: ["Standard Chartered", "Mobile Money", "Unit Trust"]
   }
 });
 

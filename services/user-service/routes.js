@@ -13,8 +13,10 @@ const fileURL = import.meta.url
 const filePath = fileURLToPath(fileURL)
 const moduleDirectory = path.dirname(filePath)
 const uploadsDirectory = path.join(moduleDirectory, "..", "..", "uploads")
-const upload = multer({ dest: uploadsDirectory });
-const multerMiddleware = upload.single('image')
+const upload = multer({ dest: uploadsDirectory,  limits: {
+    fileSize: 15 * 1024 * 1024 // 15MB
+  } });
+const multerMiddleware = upload.single('photo')
 
 router.use(requireUser)
 router.get(
@@ -27,7 +29,7 @@ router.get(
 )
 router.put(
   "/me",
-  upload.single('image'),
+  upload.single('photo'),
   RouteController.updateMe
 )
 router.put(
@@ -56,7 +58,7 @@ router.get(
   RouteController.getUserById
 )
 router.get(
-  "/:id/dashbord",
+  "/:id/dashboard",
   RouteController.getUserDashboard
 )
 router.post(
@@ -73,7 +75,7 @@ router.put(
   RouteController.updateUserPhoto
 )
 router.delete(
-  "/me/photo",
+  "/:id/photo",
   multerMiddleware,
   RouteController.deleteUserPhoto
 )

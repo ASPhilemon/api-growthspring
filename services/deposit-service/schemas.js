@@ -1,18 +1,25 @@
 import Joi from "joi";
+import mongoose from "mongoose";
 
 //reusable fields
-let objectIdPattern = /^[a-f0-9]{24}$/i
-
 let uuidv4Pattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/
 
-const objectId = Joi.string().pattern(objectIdPattern)
+const objectId = Joi.custom((value, helpers) => {
+  if (typeof value === "string" && mongoose.Types.ObjectId.isValid(value)) {
+    return value;
+  }
+  if (value instanceof mongoose.Types.ObjectId) {
+    return value;
+  }
+  return helpers.message("Failed to validate objectId");
+}, "ObjectId validation");
 
 const uuid = Joi.string().pattern(uuidv4Pattern)
 
 const user = Joi.object({
   _id: objectId.required(),
-  fullName: Joi.string().min(1).max(100).required()
-}).required()
+  fullName: Joi.string().min(1).max(100)
+})
 
 const depositAmount = Joi.number().greater(0)
 
@@ -48,27 +55,27 @@ export const getDepositById = uuid.required()
 
 export const recordDeposit = Joi.object({
   _id: uuid.required(),
-  depositor: user,
-  amount: depositAmount,
-  date: depositDate,
+  depositor: user.required(),
+  amount: depositAmount.required(),
+  date: depositDate.required(),
   type: Joi.valid("Permanent", "Temporary").required(),
-  recordedBy: user,
+  recordedBy: user.required(),
   source: Joi.valid("Savings", "Profits", "Excess Loan Payment", "Interest").required(),
-  cashLocation: cashLocation,
+  cashLocation: cashLocation.required(),
 }).required().unknown(false)
 
 export const updateDeposit = Joi.object({
   depositId: uuid.required(),
   update: Joi.object({
-    amount: depositAmount.required(),
-    date: depositDate.required(),
-    cashLocationToAdd: cashLocation.required(),
-    cashLocationToDeduct: cashLocation.required(),
+    amount: depositAmount,
+    date: depositDate,
+    cashLocationToAdd: cashLocation,
+    cashLocationToDeduct: cashLocation,
     updatedById: objectId.required()
   })
 }).required().unknown(false)
 
 export const deleteDeposit = Joi.object({
   depositId: uuid.required(),
-  cashLocationToDeductId: objectId.required()
+  cashLocationToDeductId: objectId
 }).unknown(false)

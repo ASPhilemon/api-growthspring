@@ -17,12 +17,14 @@ export async function signInWithGoogle(req, res){
 }
 
 export async function createOTP(req, res){
-  await ServiceManager.createOTP()
+  const {email, otpPurpose} = req.body
+  await ServiceManager.createOTP(email, otpPurpose)
   Response.sendSuccess(null, {req, res})
 }
 
 export async function resetPassword(req, res){
-  await ServiceManager.resetPassword()
+  const {otpCode, newPassword} = req.body
+  await ServiceManager.resetPassword(otpCode, newPassword)
   Response.sendSuccess(null, {req, res})
 }
 
