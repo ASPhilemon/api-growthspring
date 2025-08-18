@@ -23,7 +23,7 @@ export async function getWithdraws(req, res){
 
 export async function getWithdrawById(req, res){
   const {id: withdrawId} = req.params
-  const withdraw = ServiceManager.getWithdrawById(withdrawId)
+  const withdraw = await ServiceManager.getWithdrawById(withdrawId)
   Response.sendSuccess(withdraw, {req, res})
 }
 

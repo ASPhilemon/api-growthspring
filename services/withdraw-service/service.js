@@ -27,7 +27,7 @@ export async function getWithdraws(filter, sort, pagination){
 export async function getWithdrawById(withdrawId){
   Validator.schema(Schemas.getWithdrawById, withdrawId)
   const withdraw = await DB.query(Withdraw.findById(withdrawId))
-  if (!withdraw) throw new Errors.NotFoundError("Failed to find withdraw record");
+  if (!withdraw) throw new Errors.NotFoundError("Failed to find withdraw");
   return withdraw
 }
 
@@ -57,6 +57,10 @@ export async function updateWithdraw(withdrawId, update){
 
   await DB.transaction(async()=> {
     withdraw = await getWithdrawById(withdrawId)
+    if(!update.date) update.date = withdraw.date
+    if(!update.cashLocationToAdd) update.cashLocationToAdd = withdraw.cashLocation
+    if(!update.cashLocationToDeduct) update.cashLocationToDeduct = withdraw.cashLocation
+
     user = await UserServiceManager.getUserById(withdraw.withdrawnBy._id)
     await CashLocationServiceManager.addToCashLocation(update.cashLocationToAdd._id, withdraw.amount)
     await CashLocationServiceManager.addToCashLocation(update.cashLocationToDeduct._id, -update.amount)
@@ -93,6 +97,7 @@ export async function deleteWithdraw(withdrawId, cashLocationToAddId){
 
   await DB.transaction(async()=>{
     withdraw = await getWithdrawById(withdrawId)
+    if(!cashLocationToAddId) cashLocationToAddId = withdraw.cashLocation._id;
     user = await UserServiceManager.getUserById(withdraw.withdrawnBy._id)
     await CashLocationServiceManager.addToCashLocation(cashLocationToAddId, withdraw.amount)
     await withdraw.deleteOne()

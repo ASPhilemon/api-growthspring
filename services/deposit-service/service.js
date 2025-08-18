@@ -80,6 +80,10 @@ export async function updateDeposit(depositId, update){
 
   await DB.transaction(async()=> {
     deposit = await getDepositById(depositId)
+    if(!update.amount) update.amount = deposit.amount
+    if(!update.date) update.date = deposit.date
+    if(!update.cashLocationToAdd) update.cashLocationToAdd = deposit.cashLocation
+    if(!update.cashLocationToDeduct) update.cashLocationToDeduct = deposit.cashLocation
 
     if(deposit.recordedBy._id != update.updatedById){
       throw new Errors.NotAllowedError("Can not update a deposit that was recorded by another admin")
@@ -133,6 +137,7 @@ export async function deleteDeposit(depositId, cashLocationToDeductId) {
   
   await DB.transaction(async ()=> {
     deposit = await getDepositById(depositId)
+    if (!cashLocationToDeductId) cashLocationToDeductId = deposit.cashLocation._id
 
     const { _id: userId } = deposit.depositor
     user = await UserServiceManager.getUserById(userId)

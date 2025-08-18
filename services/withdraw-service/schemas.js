@@ -1,11 +1,18 @@
 import Joi from "joi";
+import mongoose from "mongoose";
 
 //reusable fields
-let objectIdPattern = /^[a-f0-9]{24}$/i
+const objectId = Joi.custom((value, helpers) => {
+  if (typeof value === "string" && mongoose.Types.ObjectId.isValid(value)) {
+    return value;
+  }
+  if (value instanceof mongoose.Types.ObjectId) {
+    return value;
+  }
+  return helpers.message("Failed to validate objectId");
+}, "ObjectId validation");
 
 let uuidv4Pattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/
-
-const objectId = Joi.string().pattern(objectIdPattern)
 
 const uuid = Joi.string().pattern(uuidv4Pattern)
 
@@ -58,14 +65,14 @@ export const recordWithdraw = Joi.object({
 export const updateWithdraw = Joi.object({
   withdrawId: uuid.required(),
   update: Joi.object({
-    amount: withdrawAmount.required(),
-    date: withdrawDate.required(),
-    cashLocationToAdd: cashLocation.required(),
-    cashLocationToDeduct: cashLocation.required(),
+    amount: withdrawAmount,
+    date: withdrawDate,
+    cashLocationToAdd: cashLocation,
+    cashLocationToDeduct: cashLocation,
   })
 }).required().unknown(false)
 
 export const deleteWithdraw = Joi.object({
   withdrawId: uuid.required(),
-  cashLocationToAddId: objectId.required()
-}).unknown(false)
+  cashLocationToAddId: objectId
+}).unknown(false).required()

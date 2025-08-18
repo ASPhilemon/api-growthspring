@@ -3,7 +3,7 @@ import * as Response from "../../utils/http-response-util.js"
 
 //all users
 export async function getMe(req, res){
-  const user = req.user
+  const user = await ServiceManager.getUserById(req.user._id)
   Response.sendSuccess(user, {req, res})
 }
 
@@ -16,18 +16,18 @@ export async function getMyDashboard(req, res){
 export async function updateMe(req, res){
   const userId = req.user._id
   const update = req.body
-  await ServiceManager.updateUser(userId, update)
+  await ServiceManager.updateUserRestricted(userId, update)
   Response.sendSuccess(null, {req, res})
 }
 
 export async function updateMyPhoto(req, res){
   const userId = req.user._id
-  const photoPath = req.file?.path
-  await ServiceManager.updateUserPhoto(userId, photoPath)
+  const tempPhotoPath = req.file?.path
+  await ServiceManager.updateUserPhoto(userId, tempPhotoPath)
   Response.sendSuccess(null, {req, res})
 }
 
-export async function deleteMyPhoto(){
+export async function deleteMyPhoto(req, res){
   const userId = req.user._id
   await ServiceManager.deleteUserPhoto(userId)
   Response.sendSuccess(null, {req, res})
@@ -56,7 +56,7 @@ export async function getUserById(req, res){
 }
 
 export async function getUserDashboard(req, res){
-  const {_id : userId } = req.params
+  const {id : userId } = req.params
   const dashboard = await ServiceManager.getUserDashboard(userId)
   Response.sendSuccess(dashboard, {req, res})
 }
@@ -76,12 +76,12 @@ export async function updateUser(req, res){
 
 export async function updateUserPhoto(req, res){
   const {id: userId} = req.params
-  const photoPath = req.file?.path
-  await ServiceManager.updateUserPhoto(userId, photoPath)
+  const tempPhotoPath = req.file?.path
+  await ServiceManager.updateUserPhoto(userId, tempPhotoPath)
   Response.sendSuccess(null, {req, res})
 }
 
-export async function deleteUserPhoto(){
+export async function deleteUserPhoto(req, res){
   const {id: userId} = req.params
   await ServiceManager.deleteUserPhoto(userId)
   Response.sendSuccess(null, {req, res})

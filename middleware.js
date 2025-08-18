@@ -7,6 +7,7 @@ import cookieParser from "cookie-parser";
 
 export function registerBeforeAllMiddleware(app){
   app.use(cors({origin: true , credentials: true}))
+  app.use(express.static("public"))
   app.use(cookieParser())
   app.use(express.json())
   app.use((req, res, next)=>{
@@ -53,7 +54,7 @@ export function errorHandler(err, req, res, next) {
   const statusCode = isAppError ? err.statusCode : 500;
   const errMessage = isAppError ? err.message : 'Sorry, an unknown error occured';
   Response.sendError(errMessage, statusCode, {req, res})
-
+  
   //log to console for debugging
   const NODE_ENV = process.env.NODE_ENV
   if (["debug", "debug-mongoose"].includes(NODE_ENV)){

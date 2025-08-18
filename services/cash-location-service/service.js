@@ -38,7 +38,10 @@ export async function getTransfers(){
 
 export async function getTransferById(transferId){
   Validator.schema(Schemas.getTransferById, transferId)
-  return await DB.query(CashLocationTransfer.findOne({_id : transferId}))
+  const transfer = await DB.query(CashLocationTransfer.findOne({_id : transferId}))
+  if(!transfer) throw new Errors.NotFoundError("Failed to find transfer");
+
+  return transfer
 }
 
 export async function recordTransfer(transfer){
@@ -59,17 +62,13 @@ export async function recordTransfer(transfer){
 export async function updateTransfer(transferId, update){
   Validator.schema(Schemas.updateTransfer, {transferId, update})
   await DB.transaction(async()=>{
-    const transfer = await CashLocationTransfer.findById(transferId)
-    const [source, dest] = await Promise.all([
-      CashLocation.findById(transfer.source._id),
-      CashLocation.findById(transfer.dest._id),
-    ])
+    const transfer = await getTransferById(transferId)
 
-    const sourceId = source._id.toHexString()
-    const destId = dest._id.toHexString()
+    const source = await getCashLocationById(transfer.source._id)
+    const dest = await getCashLocationById(transfer.dest._id)
 
-    await addToCashLocation(sourceId, transfer.amount - update.amount)
-    await addToCashLocation(destId, update.amount - transfer.amount)
+    await addToCashLocation(source._id, transfer.amount - update.amount)
+    await addToCashLocation(dest._id, update.amount - transfer.amount)
 
     transfer.amount = update.amount
     await transfer.save()
@@ -78,7 +77,7 @@ export async function updateTransfer(transferId, update){
 
 export async function deleteTransfer(transferId){
   Validator.schema(Schemas.deleteTransfer, transferId)
-  const transfer = await CashLocationTransfer.findById(transferId)
+  const transfer = await getTransferById(transferId)
 
   const [source, dest] = await Promise.all([
     CashLocation.findById(transfer.source._id),
