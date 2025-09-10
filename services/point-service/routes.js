@@ -2,11 +2,10 @@ import express from "express"
 
 import * as RouteController  from "./controller.js"
 
-import { requireUser, requireAdmin } from "../../middleware.js"
+import { requireAdmin } from "../../middleware.js"
 
 const router = express.Router()
 
-router.use(requireUser)
 router.use(requireAdmin)
 
 router.get(

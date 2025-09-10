@@ -5,10 +5,10 @@ import * as RouteController  from "./controller.js"
 const router = express.Router()
 const cashLocationTransferRouter = express.Router()
 
-import { requireUser, requireAdmin } from "../../middleware.js"
+import { requireAdmin } from "../../middleware.js"
 
-router.use(requireUser)
 router.use(requireAdmin)
+
 // cash location transfers routes
 cashLocationTransferRouter.get(
   "/",

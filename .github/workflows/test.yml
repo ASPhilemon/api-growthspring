@@ -9,7 +9,8 @@ on:
       - v2
       
 jobs:
-  test:
+  tests:
+    name: Jest Tests   
     runs-on: ubuntu-latest
 
     env:
@@ -17,9 +18,14 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20.12.2'
-      - run: npm install
-      - run: npm test
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests
+        run: npm test
