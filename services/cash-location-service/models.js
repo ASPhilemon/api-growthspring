@@ -26,21 +26,9 @@ const subCashLocationSchema = new mongoose.Schema({
   }
 });
 
-//user sub schema
-
-const subUserScmema = new mongoose.Schema({
-  _id: {
-    type: ObjectId,
-    required: true
-  },
-  fullName: {
-    type: String,
-    required: true
-  }
-})
-
 //cash-location-transfer schema
 const cashLocationTransferSchema = new mongoose.Schema({
+  _id: String,
   source: {
     type: subCashLocationSchema,
     required: true
@@ -49,16 +37,8 @@ const cashLocationTransferSchema = new mongoose.Schema({
     type: subCashLocationSchema,
     required: true
   },
-  recordedBy : {
-    type: subUserScmema,
-    required: true
-  },
   amount: {
     type:  Number,
-    required: true,
-  },
-  date: {
-    type: Date,
     required: true,
   },
 }, { timestamps:true });

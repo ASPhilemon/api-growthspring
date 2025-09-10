@@ -1,12 +1,17 @@
 
 import mongoose from "mongoose";
-import * as DB from "../../utils/db-util.js"; // Assuming db-util.js is available
+import * as DB from "../../utils/db-util.js"; 
 
 const { ObjectId } = mongoose.Types;
 
 const MonthlyInterestRecordSchema = new mongoose.Schema({
   monthYear: { type: String, required: true, unique: true }, // Format: "YYYY-MM"
   totalCashInterestAccrued: { type: Number, required: true, default: 0 },
+  source: {
+    type: String,
+    enum: ["Loans", "Unit Trusts"], 
+    required: true
+  },
 }, { timestamps: true });
 
 MonthlyInterestRecordSchema.index({ monthYear: 1 });
@@ -37,7 +42,7 @@ const earningsSchema = new mongoose.Schema({
   },
   source: {
     type: String,
-    enum: ["Profits"], 
+    enum: ["Permanent Savings", "Temporary Savings"], 
     required: true
   },
   status: {
@@ -49,10 +54,10 @@ const earningsSchema = new mongoose.Schema({
 
 
 // --- Custom Static Methods for Earnings ---
-earningsSchema.statics.getEarnings = async function({
+earningsSchema.statics.getFilteredEarnings = async function({
   filter,
   sort = { field: "date", order: -1 }, // Default sort by date descending
-  pagination = { page: 1, perPage: 20 }
+  pagination = { page: 1, perPage: 200 }
 }) {
   const pipeline = [];
 
@@ -68,6 +73,9 @@ earningsSchema.statics.getEarnings = async function({
   }
   if (filter?.destination) {
     matchCriteria.push({ destination: filter.destination });
+  }  
+  if (filter?.source) {
+    matchCriteria.push({ source: filter.source });
   }
 
   if (matchCriteria.length > 0) {

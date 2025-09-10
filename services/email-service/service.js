@@ -2,12 +2,15 @@ import nodemailer from "nodemailer";
 import ejs from "ejs"; 
 import path from "path"; 
 
-export async function sendEmail({
+export async function sendEmail(
   sender,
   recipient,
   subject,
   message,
-}) {
+) {
+
+  //Dont send email in non production environment
+  if (process.env.NODE_ENV != "production") return;
 
   const transporter = nodemailer.createTransport({
     host: "live.smtp.mailtrap.io",
@@ -53,6 +56,10 @@ export async function sendEmailWithTemplate({
   templateData,
   templatesPath, 
 }) {
+  
+  //Dont send email in non production environment
+  if (process.env.NODE_ENV != "production") return;
+
   try {
     // 1. Validate templatesPath
     if (!templatesPath) {

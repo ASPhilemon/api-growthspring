@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import * as DB from "../../utils/db-util.js"
 
 //schemas
 const investmentSubSchema = new mongoose.Schema({
@@ -16,6 +15,21 @@ const investmentSubSchema = new mongoose.Schema({
     required: true,
   }
 }, {_id: false})
+
+const birthdaySubSchema = new mongoose.Schema({
+  month: {
+    type: Number,
+    required: true,
+    min: 1,
+    max: 12
+  },
+  day: {
+    type: Number,
+    required: true,
+    min: 1,
+    max: 31
+  }
+})
 
 const userSchema = new mongoose.Schema({
   email: {
@@ -46,11 +60,37 @@ const userSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
+  isActive: {
+    type: Boolean,
+    required: true,
+  },
+  dob: birthdaySubSchema,
   isAdmin: Boolean,
   displayName: String,
   photoURL: String,
-  deleted: Boolean
 })
+
+// --- Schema for Dashboard Appearance ---
+
+const appearanceSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User', 
+    required: true
+  },
+  layout: {
+    type: String,
+    required: true,
+    enum: ["Layout 1", "Layout 2"],
+    default: "Layout 1"
+  },
+  color: {
+    type: String,
+    required: true,
+    enum: ["blue", "gold"],
+    default: "gold"
+  },
+}, { timestamps: true });
 
 //models
 const User  = mongoose.model(
@@ -58,19 +98,9 @@ const User  = mongoose.model(
   userSchema
 );
 
-//custom static methods on model
-userSchema.statics.getUsers = async function(
-  sort = {field: "fullName", order: 1},
-  pagination = {page: 1, perPage: 50}
-){
-  const users = await DB.query(
-    this.find()
-    .filter({deleted:false})
-    .sort({[sort.field]: sort.order})
-    .skip( pagination.perPage*(pagination.page - 1))
-    .limit()
-  )
-  return users
-}
+const Appearance  = mongoose.model(
+  'appearance',
+  appearanceSchema
+);
 
-export { User }
+export { User, Appearance }

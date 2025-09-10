@@ -5,9 +5,9 @@
   "main": "app.js",
   "type": "module",
   "scripts": {
-    "test": "cross-env NODE_OPTIONS='--no-warnings' NODE_ENV=test MONGO_MEMORY_SERVER_FILE='jest-mongodb-config.cjs' node --experimental-vm-modules node_modules/jest/bin/jest.js --detectOpenHandles",
-    "test:watch": "cross-env NODE_OPTIONS='--no-warnings' NODE_ENV=debug MONGO_MEMORY_SERVER_FILE='jest-mongodb-config.cjs' node --experimental-vm-modules node_modules/jest/bin/jest.js --detectOpenHandles --watch",
-    "test:debug-mongoose": "cross-env NODE_OPTIONS='--no-warnings' NODE_ENV=debug-mongoose MONGO_MEMORY_SERVER_FILE='jest-mongodb-config.cjs' node --experimental-vm-modules node_modules/jest/bin/jest.js --detectOpenHandles --watch",
+    "test": "cross-env NODE_OPTIONS='--no-warnings' NODE_ENV=test MONGO_MEMORY_SERVER_FILE='jest-mongodb-config.cjs' node --experimental-vm-modules node_modules/jest/bin/jest.js --detectOpenHandles --",
+    "test:watch": "cross-env NODE_OPTIONS='--no-warnings' NODE_ENV=debug MONGO_MEMORY_SERVER_FILE='jest-mongodb-config.cjs' node --experimental-vm-modules node_modules/jest/bin/jest.js --detectOpenHandles  --watch --",
+    "test:debug-mongoose": "cross-env NODE_OPTIONS='--no-warnings' NODE_ENV=debug-mongoose MONGO_MEMORY_SERVER_FILE='jest-mongodb-config.cjs' node --experimental-vm-modules node_modules/jest/bin/jest.js --detectOpenHandles --watch --",
     "start": "cross-env NODE_ENV=production node server.js",
     "dev": "cross-env NODE_ENV=debug nodemon server.js"
   },
@@ -33,7 +33,9 @@
     "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.14.3",
-    "nodemailer": "^6.9.15",
+    "multer": "^2.0.2",
+    "nodemailer": "^7.0.3",
+    "path": "^0.12.7",
     "uuid": "^11.1.0",
     "zxcvbn": "^4.4.2"
   },
