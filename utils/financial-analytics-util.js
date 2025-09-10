@@ -61,3 +61,148 @@ export function categorizeAmounts(memberTotals, ranges) {
         count: categoryCounts[label]
     }));
 }
+
+// GET_TOTALS_FROM_RECORDS (auto-detect depositor key, backward-compatible)
+export function getTotalSumsAndSort(records, givenDate, ...rest) {
+    if (!Array.isArray(records) || records.length === 0) {
+      return {
+        totalSumAll: {},
+        yearsSums: {},
+        recordsByYear: {},
+        monthlySums: {},
+        sortedRecords: [],
+      };
+    }
+  
+    // If last arg is options object, pop it
+    let options = {};
+    if (rest.length && typeof rest[rest.length - 1] === 'object' && !Array.isArray(rest[rest.length - 1])) {
+      options = rest.pop();
+    }
+  
+    const fields = rest; // e.g. 'amount'
+    const explicitUniqueBy = options.uniqueBy; // e.g. 'depositor_id' or 'depositor_name' or function(record)
+    const uniqueByFn = typeof explicitUniqueBy === 'function' ? explicitUniqueBy : null;
+  
+    // helper: try to detect depositor field name from a sample record
+    function detectDepositorKey(sample) {
+      if (!sample || typeof sample !== 'object') return null;
+      const candidates = [
+        'depositor_id', 'depositorId', 'depositor._id', 'depositorId',
+        'depositor_name', 'depositorName', 'depositor', 'userId', 'user_id', 'memberId', 'member_id', 'ownerId'
+      ];
+      for (const key of candidates) {
+        // support nested paths like 'depositor._id'
+        if (key.includes('.')) {
+          const val = key.split('.').reduce((o, k) => (o ? o[k] : undefined), sample);
+          if (val !== undefined && val !== null) return key;
+        } else {
+          if (Object.prototype.hasOwnProperty.call(sample, key) && sample[key] !== undefined && sample[key] !== null) return key;
+        }
+      }
+      return null;
+    }
+  
+    // resolve depositor key (string path) if explicit provided
+    function resolveKeyFromRecord(record, key) {
+      if (!key) return undefined;
+      if (typeof key === 'function') return key(record);
+      if (key.includes('.')) {
+        return key.split('.').reduce((o, k) => (o ? o[k] : undefined), record);
+      }
+      return record[key];
+    }
+  
+    // If no explicit uniqueBy, try auto-detect from first few records
+    let uniqueByKey = null;
+    if (!explicitUniqueBy) {
+      for (let i = 0; i < Math.min(10, records.length); i++) {
+        const k = detectDepositorKey(records[i]);
+        if (k) { uniqueByKey = k; break; }
+      }
+    } else if (typeof explicitUniqueBy === 'string') {
+      uniqueByKey = explicitUniqueBy;
+    } // if explicitUniqueBy is function we use uniqueByFn
+  
+    const totalSumAll = {};
+    const yearsSums = {};
+    const recordsByYear = {};
+    const monthlySums = {};
+    const monthlyDepositorSets = {}; // { year: { monthName: Set } }
+  
+    const sortedRecords = records.slice().sort((a, b) => new Date(b[givenDate]) - new Date(a[givenDate]));
+  
+    sortedRecords.forEach(record => {
+      const date = new Date(record[givenDate]);
+      const year = date.getFullYear();
+      const monthName = date.toLocaleString('default', { month: 'long' });
+  
+      // ensure containers
+      if (!yearsSums[year]) yearsSums[year] = {};
+      if (!recordsByYear[year]) recordsByYear[year] = [];
+      if (!monthlySums[year]) monthlySums[year] = {};
+      if (!monthlySums[year][monthName]) monthlySums[year][monthName] = {};
+      if (!monthlyDepositorSets[year]) monthlyDepositorSets[year] = {};
+      if (!monthlyDepositorSets[year][monthName]) monthlyDepositorSets[year][monthName] = new Set();
+  
+      // accumulate fields
+      fields.forEach(field => {
+        if (!totalSumAll[field]) totalSumAll[field] = 0;
+        totalSumAll[field] += Number(record[field] || 0);
+  
+        if (!yearsSums[year][field]) yearsSums[year][field] = 0;
+        yearsSums[year][field] += Number(record[field] || 0);
+  
+        if (!monthlySums[year][monthName][field]) monthlySums[year][monthName][field] = 0;
+        monthlySums[year][monthName][field] += Number(record[field] || 0);
+      });
+  
+      recordsByYear[year].push(record);
+  
+      // depositor key handling (explicit function, explicit key, or auto-detected key)
+      let depositorKeyValue;
+      if (uniqueByFn) {
+        depositorKeyValue = uniqueByFn(record);
+      } else if (uniqueByKey) {
+        depositorKeyValue = resolveKeyFromRecord(record, uniqueByKey);
+      } else {
+        // no depositor detection available -> try some common fields as fallback
+        depositorKeyValue =
+          record.depositor_id ?? record.depositorId ?? record.depositor?._id ?? record.depositor_name ?? record.depositorName ?? record.userId ?? record.memberId ?? null;
+      }
+      if (depositorKeyValue !== undefined && depositorKeyValue !== null) {
+        monthlyDepositorSets[year][monthName].add(String(depositorKeyValue));
+      }
+    });
+  
+    // attach depositor counts per month
+    for (const yr of Object.keys(monthlyDepositorSets)) {
+      for (const mn of Object.keys(monthlyDepositorSets[yr])) {
+        if (!monthlySums[yr]) monthlySums[yr] = {};
+        if (!monthlySums[yr][mn]) monthlySums[yr][mn] = {};
+        monthlySums[yr][mn].depositors = monthlyDepositorSets[yr][mn].size;
+      }
+    }
+  
+    // filter months with nothing
+    for (const year in monthlySums) {
+      for (const month in monthlySums[year]) {
+        let hasNonZeroValue = false;
+        for (const field in monthlySums[year][month]) {
+          if (monthlySums[year][month][field] !== 0) {
+            hasNonZeroValue = true; break;
+          }
+        }
+        if (!hasNonZeroValue) delete monthlySums[year][month];
+      }
+    }
+  
+    return {
+      totalSumAll,
+      yearsSums,
+      recordsByYear,
+      monthlySums,
+      sortedRecords,
+    };
+  }
+  

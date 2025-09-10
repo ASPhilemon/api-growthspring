@@ -46,7 +46,10 @@ router.post(
   "/me/point-transactions",
   RouteController.transferPoints
 )
-
+router.get(
+  "/me/admin-dashboard",
+  RouteController.getAdminDashboard
+)
 //admin only
 router.use(requireAdmin)
 router.get(
@@ -60,6 +63,10 @@ router.get(
 router.get(
   "/:id/dashboard",
   RouteController.getUserDashboard
+)
+router.get(
+  "/admin-dashbord",
+  RouteController.getAdminDashboard
 )
 router.post(
   "/",
