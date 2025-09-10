@@ -23,29 +23,23 @@ export function registerAfterAllMiddleware(app){
 }
 
 export function getUser(req, res, next) {
-  let user
   try{
-    let jwt = req.cookies.jwt
-    user = verifyJWT(jwt)
+    req.user = verifyJWT(req.cookies.jwt)
   }
   catch(err){
-    user = null
+    req.user = null
   }
-  req.user = user
   next()
 }
 
 export function requireUser(req, res, next) {
-  if (!req.user) {
-    throw new Errors.NotAuthenticatedError()
-  }
+  if (!req.user) throw new Errors.NotAuthenticatedError();
   next()
 }
 
 export function requireAdmin(req, res, next) {
-  if (!req.user?.isAdmin) {
-    throw new Errors.NotAllowedError()
-  }
+  if (!req.user) throw new Errors.NotAuthenticatedError();
+  if (!req.user.isAdmin) throw new Errors.NotAllowedError();
   next()
 }
 
@@ -57,8 +51,6 @@ export function errorHandler(err, req, res, next) {
   
   //log to console for debugging
   const NODE_ENV = process.env.NODE_ENV
-  if (["debug", "debug-mongoose"].includes(NODE_ENV)){
-    console.error(err);
-  }
-
+  const DEBUG = NODE_ENV == "debug" || NODE_ENV == "debug-mongoose"
+  DEBUG &&  console.error(err);
 }

@@ -18,7 +18,9 @@ const upload = multer({ dest: uploadsDirectory,  limits: {
   } });
 const multerMiddleware = upload.single('photo')
 
+//logged in user only
 router.use(requireUser)
+
 router.get(
   "/me",
   RouteController.getMe
@@ -50,6 +52,7 @@ router.get(
   "/me/admin-dashboard",
   RouteController.getAdminDashboard
 )
+
 //admin only
 router.use(requireAdmin)
 router.get(
