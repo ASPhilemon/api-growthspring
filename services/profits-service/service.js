@@ -7,8 +7,7 @@ import * as Validator from "../../utils/validator-util.js";
 import * as DB from "../../utils/db-util.js";
 
 // Models 
-import MonthlyInterestRecord from "./models/MonthlyInterestRecord.js";
-import { Earnings, Units, FundTransactions, MonthlyInterestRecord } from "./model.js"; 
+import { Earnings, Units, FundTransactions, MonthlyInterestRecord } from "./models.js"; 
 
 // Collaborator Services
 import * as UserServiceManager from "../user-service/service.js";
@@ -17,6 +16,20 @@ import * as LoanServiceManager from "../loan-service/service.js";
 import * as EmailServiceManager from "../email-service/service.js";
 
 const LOAN_TEMPLATES_PATH = "./email-templates.js"; 
+
+/**
+ * Retrieves a list of earnings based on filter, sort, and pagination criteria.
+ * @param {object} params - Object containing filter, sort, and pagination.
+ * @returns {Promise<Array>} A promise that resolves to an array of earnings documents.
+ */
+export async function getEarnings({ filter, sort, pagination }) {
+  return await Earnings.getFilteredEarnings({ filter, sort, pagination }); 
+}
+
+
+export async function getUnits({ filter}) {
+  return await DB.query(Units.find({filter })); 
+}
 
 /**
  * Fetches and processes earning records to categorize members based on their total earning amounts,
@@ -83,7 +96,7 @@ function isLoanCurrentlyUtilizingPoints(loanStartDate, currentDate) {
  * @returns {Promise<object>} A promise that resolves to the created monthly interest record.
  * @throws {ErrorUtil.AppError} If required data is missing or database operations fail.
  */
-async function recordMonthlyAccruedInterest(currentMonthStartDate) {
+export async function recordMonthlyAccruedInterest(currentMonthStartDate) {
   Validator.required({ currentMonthStartDate });
   Validator.assert(currentMonthStartDate instanceof Date && !isNaN(currentMonthStartDate),
     "Invalid currentMonthStartDate provided.", { errType: Errors.BadRequestError });

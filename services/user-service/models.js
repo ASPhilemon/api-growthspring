@@ -70,10 +70,37 @@ const userSchema = new mongoose.Schema({
   photoURL: String,
 })
 
+// --- Schema for Dashboard Appearance ---
+
+const appearanceSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User', 
+    required: true
+  },
+  layout: {
+    type: String,
+    required: true,
+    enum: ["Layout 1", "Layout 2"],
+    default: "Layout 1"
+  },
+  color: {
+    type: String,
+    required: true,
+    enum: ["blue", "gold"],
+    default: "gold"
+  },
+}, { timestamps: true });
+
 //models
 const User  = mongoose.model(
   'user',
   userSchema
 );
 
-export { User }
+const Appearance  = mongoose.model(
+  'appearance',
+  appearanceSchema
+);
+
+export { User, Appearance }

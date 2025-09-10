@@ -13,6 +13,13 @@ export async function getMyDashboard(req, res){
   Response.sendSuccess(dashboard, {req, res})
 }
 
+export async function getAdminDashboard(req, res){
+  console.log(req.user);
+  const {_id : userId } = req.user
+  const dashboard = await ServiceManager.getAdminDashboard(userId)
+  Response.sendSuccess(dashboard, {req, res})
+}
+
 export async function updateMe(req, res){
   const userId = req.user._id
   const update = req.body

@@ -40,7 +40,6 @@ const loanSchema = new mongoose.Schema({
 
   sources: [{
     id: { type: ObjectId, required: true, ref: 'CashLocation' },
-    name: { type: String, required: true },
     amount: { type: Number, required: true }
   }],
   payments: [{
@@ -58,16 +57,18 @@ const loanSchema = new mongoose.Schema({
 
 // Define a static method for filtered loan retrieval
 loanSchema.statics.getFilteredLoans = async function({
-  member, 
+  userId, 
   year,
   status, 
-  page = 1,
+  page = 1, 
   month,
+  type,
   order = -1, 
   sortBy = "date", 
 }) {
+  const perPage = 2000; 
   const pipeline = [];
-  const matchCriteria = []; // Array to hold individual match conditions
+  const matchCriteria = []; 
 
   // --- Match Stage ---
   // Filtering by year
@@ -77,6 +78,10 @@ loanSchema.statics.getFilteredLoans = async function({
   // Filtering by month
   if (month) {
     matchCriteria.push({ $expr: { $eq: [{ $month: "$date" }, month] } });
+  }
+  // Filtering by type
+  if (type) {
+    matchCriteria.push({ type: type });
   }
 
   if (!status) {
@@ -89,13 +94,13 @@ loanSchema.statics.getFilteredLoans = async function({
     }
   }
 
-  if (member) {
-    // Check if 'member' is a valid ObjectId string. If so, filter by ID.
+  if (userId) {
+    // Check if 'userId' is a valid ObjectId string. If so, filter by ID.
     // Otherwise, assume it's a name and filter by name.
-    if (mongoose.Types.ObjectId.isValid(member)) {
-      matchCriteria.push({ "borrower.id": new ObjectId(member) });
+    if (mongoose.Types.ObjectId.isValid(userId)) {
+      matchCriteria.push({ "borrower.id": new ObjectId(userId) });
     } else {
-      matchCriteria.push({ "borrower.name": member });
+      matchCriteria.push({ "borrower.name": userId });
     }
   }
 
@@ -131,7 +136,7 @@ loanSchema.statics.getFilteredLoans = async function({
   pipeline.push({ $skip: (page - 1) * perPage });
   pipeline.push({ $limit: perPage });
 
-  const loans = await DB.tryMongoose(this.aggregate(pipeline));
+  const loans = await DB.query(this.aggregate(pipeline));
 
   // --- Post-query filter for "Overdue" status ---
   if (status === "Overdue") {
