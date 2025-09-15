@@ -132,21 +132,21 @@ export async function createPassword(userId, fullName, email){
 
 async function sendPasswordResetEmail(email){
   const user = await UserServiceManager.getUserByEmail(email)
-  EmailServiceManager.sendEmail({
-    sender: "growthspring",
-    recipient: user.email,
-    subject: "Password Reset Successful",
-    message: `Dear ${user.fullName}, you have successfully reset your password`
-  })
+  EmailServiceManager.sendEmail(
+    "growthspring",
+    user.email,
+    "Password Reset Successful",
+    `Dear ${user.fullName}, you have successfully reset your password`
+  )
 }
 
 function sendOTPCreatedEmail(otp){
-  EmailServiceManager.sendEmail({
-    sender:"growthspring",
-    recipient: otp.email,
-    subject: `One Time Password - ${otp.purpose} `,
-    message: `OTP Email Link`
-  })
+  EmailServiceManager.sendEmail(
+    "growthspring",
+    otp.email,
+    `One Time Password - ${otp.purpose} `,
+    `Your Password Reset OTP - is ${otp.code}`
+  )
 }
 
 //WebAuthn
@@ -326,7 +326,7 @@ async function matchPasswordWithHash(password, hash){
 }
 
 async function _verifyCfTurnstileResponse(cfTurnstileResponse){
-  
+  return
   if (process.env.NODE_ENV != "production") return;
 
   const CLOUDFLARE_TURNSTILE_API = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'

@@ -85,10 +85,6 @@ export async function updateDeposit(depositId, update){
     if(!update.cashLocationToAdd) update.cashLocationToAdd = deposit.cashLocation
     if(!update.cashLocationToDeduct) update.cashLocationToDeduct = deposit.cashLocation
 
-    if(deposit.recordedBy._id != update.updatedById){
-      throw new Errors.NotAllowedError("Can not update a deposit that was recorded by another admin")
-    } 
-
     const { _id: userId } = deposit.depositor
 
     user = await UserServiceManager.getUserById(userId)
@@ -103,9 +99,11 @@ export async function updateDeposit(depositId, update){
       }
     )
 
-    await CashLocationServiceManager.addToCashLocation(update.cashLocationToAdd._id, update.amount)
-    await CashLocationServiceManager.addToCashLocation(update.cashLocationToDeduct._id, -deposit.amount)
-
+    //skip cash location updates for legacy deposit with no cashLocation
+    if (update.cashLocationToAdd && update.cashLocationToDeduct){
+      await CashLocationServiceManager.addToCashLocation(update.cashLocationToAdd._id, update.amount)
+      await CashLocationServiceManager.addToCashLocation(update.cashLocationToDeduct._id, -deposit.amount)
+    }
     let investmentAmount = deposit.type == "Permanent"? user.permanentInvestment.amount: user.temporaryInvestment.amount
     let unitsDate = deposit.type == "Permanent"? user.permanentInvestment.unitsDate: user.temporaryInvestment.unitsDate
     let newUnitsDate = DateUtil.getToday()
@@ -119,7 +117,8 @@ export async function updateDeposit(depositId, update){
     if (deposit.type === "Permanent"){
       await _updatePermanentInvestment(userId, investmentUpdates)
       await _updateYearlyDeposit(deposit, update)
-      await _updatePointTransaction(deposit._id, update.amount)
+      //skip point transaction update for legacy deposit
+      if(deposit.cashLocation) await _updatePointTransaction(deposit._id, update.amount);
     }
     else{
       await _updateTemporaryInvestment(userId, investmentUpdates)

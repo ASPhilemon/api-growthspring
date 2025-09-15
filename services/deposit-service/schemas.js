@@ -16,6 +16,12 @@ const objectId = Joi.custom((value, helpers) => {
 
 const uuid = Joi.string().pattern(uuidv4Pattern)
 
+const depositId = Joi.alternatives().try(
+  uuid.required(),
+  objectId.required()
+);
+
+
 const user = Joi.object({
   _id: objectId.required(),
   fullName: Joi.string().min(1).max(100)
@@ -51,10 +57,10 @@ export const getDeposits = Joi.object({
 
 }).unknown(false)
 
-export const getDepositById = uuid.required()
+export const getDepositById = depositId
 
 export const recordDeposit = Joi.object({
-  _id: uuid.required(),
+  _id: depositId,
   depositor: user.required(),
   amount: depositAmount.required(),
   date: depositDate.required(),
@@ -65,7 +71,7 @@ export const recordDeposit = Joi.object({
 }).required().unknown(false)
 
 export const updateDeposit = Joi.object({
-  depositId: uuid.required(),
+  depositId: depositId,
   update: Joi.object({
     amount: depositAmount,
     date: depositDate,
@@ -76,6 +82,6 @@ export const updateDeposit = Joi.object({
 }).required().unknown(false)
 
 export const deleteDeposit = Joi.object({
-  depositId: uuid.required(),
+  depositId: depositId,
   cashLocationToDeductId: objectId
 }).unknown(false)
