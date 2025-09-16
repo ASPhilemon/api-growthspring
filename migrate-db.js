@@ -16,10 +16,14 @@ async function migrateDatabase(){
   const clientNewDB = new MongoClient(NEW_DB_URI)
 
   console.log(`connecting to old database, [${OLD_DB_NAME}] ...`)
-  const oldDB = (await clientOldDB.connect()).db(OLD_DB_NAME)
-
   console.log(`connecting to new database, [${NEW_DB_NAME}] ...`)
-  const newDB = (await clientNewDB.connect()).db(NEW_DB_NAME)
+  
+  const [oldDBConn, newDBConn] = await Promise.all([
+    clientOldDB.connect(),
+    clientNewDB.connect()
+  ])
+  const oldDB = oldDBConn.db(OLD_DB_NAME)
+  const newDB = newDBConn.db(NEW_DB_NAME)
 
   //Drop New Database 
   const dropDB = process.argv.includes("-d");
@@ -28,15 +32,20 @@ async function migrateDatabase(){
     await newDB.dropDatabase();
   }
 
-  const [oldUsers, oldDeposits, oldLoans] = await Promise.all([
+  console.log("starting migration ...")
+  const [oldUsers, oldDeposits, oldLoans, oldPointTransactions] = await Promise.all([
     oldDB.collection("users").find().toArray(),
     oldDB.collection("deposits").find().toArray(),
     oldDB.collection("loans").find().toArray(),
+    oldDB.collection("pointssales").find().toArray()
   ])
 
-  await migrateUsers(oldUsers, newDB)
-  await migrateDeposits(oldUsers, oldDeposits, newDB)
-  await migrateLoans(oldDB, newDB)
+  await Promise.all([
+    migrateUsers(oldUsers, newDB),
+    migrateDeposits(oldUsers, oldDeposits, newDB),
+    migrateLoans(oldLoans, oldUsers, newDB),
+    migratePointTransactions(oldPointTransactions, oldUsers, newDB)
+  ])
 
   console.log("\nDATABASE MIGRARTION  SUCCEEDED ✔ ")
   migrationResults.forEach((result)=>console.log(result))
@@ -45,7 +54,6 @@ async function migrateDatabase(){
 }
 
 async function migrateUsers(oldUsers, newDB){
-  console.log("migrating users ...")
 
   const newUsers = oldUsers.map((user)=> transformUser(user))
   const userOps = newUsers.map((newUser)=>{
@@ -82,7 +90,6 @@ async function migrateUsers(oldUsers, newDB){
 }
 
 async function migrateDeposits(oldUsers, oldDeposits, newDB){
-  console.log("migrating Deposits ...")
   const newDeposits = oldDeposits.map((deposit)=>transformDeposit(deposit, oldUsers))
   const depositOps = newDeposits.map((newDeposit)=>{
     return {
@@ -112,8 +119,37 @@ async function migrateDeposits(oldUsers, oldDeposits, newDB){
   migrationResults.push(`${depositResult.upsertedCount} deposits migrated`)
 }
 
-async function migrateLoans(oldDB, newDB){
-  console.log("migrating Loans ...")
+async function migrateLoans(oldLoans, oldUsers, newDB){
+  const newLoans = oldLoans.map((oldLoan)=>transformLoan(oldLoan, oldUsers))
+  const loanOps = newLoans.map((newLoan)=>{
+    return {
+      updateOne: {
+      filter: { _id: newLoan._id },
+      update: { $setOnInsert: newLoan },
+      upsert: true
+    }
+  }})
+
+  const result = await newDB.collection("loans").bulkWrite(loanOps)
+  migrationResults.push(`${result.upsertedCount} loans migrated`)
+}
+
+async function migratePointTransactions(oldTransactions, oldUsers, newDB){
+  const newTransactions = oldTransactions
+  .map((transaction)=>transformPointTransaction(transaction, oldUsers))
+  .filter((transaction)=>transaction.points > 0)
+
+  const transactionOps = newTransactions.map((newTransaction)=>{
+    return {
+      updateOne: {
+      filter: { _id: newTransaction._id },
+      update: { $setOnInsert: newTransaction },
+      upsert: true
+    }
+  }})
+
+  const result = await newDB.collection("point-transactions").bulkWrite(transactionOps)
+  migrationResults.push(`${result.upsertedCount} point transactions migrated`)
 }
 
 //helper functions
@@ -169,6 +205,91 @@ function calculateYearlyDeposits(deposits) {
   });
 
   return Array.from(yearlyDeposits.values());
+}
+
+function transformLoan(loan, users){
+  const adminBlaise = users.find((user)=>user.fullName == "Mwebe Blaise Adrian")
+  const borrower = users.find((user)=>user.fullName == loan.borrower_name )
+  const initiatedBy = users.find((user)=>user.fullName == loan.initiated_by ) || adminBlaise
+  const approvedBy = users.find((user)=>user.fullName == loan.approved_by) || adminBlaise
+  return {
+    _id: loan._id,
+    duration: loan.loan_duration,
+    rate: loan.loan_rate,
+    earliestDate: loan.earliest_date,
+    latestDate: loan.latest_date,
+    type: "Standard",
+    status: loan.loan_status,
+    initiatedBy: {
+      id: initiatedBy._id,
+      name: initiatedBy.fullName
+    },
+    approvedBy: {
+      id: approvedBy._id,
+      name: approvedBy.fullName
+    },
+    worthAtLoan: loan.worth_at_loan,
+    amount: loan.loan_amount,
+    date: loan.loan_date,
+    borrower: {
+      id: borrower._id,
+      name: borrower.fullName
+    },
+    pointsSpent: loan.points_spent,
+    principalLeft: loan.principal_left,
+    lastPaymentDate: loan.last_payment_date,
+    units: loan.loan_units,
+    rateAfterDiscount: loan.rate_after_discount,
+    discount: loan.discount,
+    pointsWorthBought: loan.points_worth_bought,
+    pointsAccrued: loan.points_accrued,
+    interestAccrued: loan.interest_accrued,
+    interestAmount: loan.interest_amount,
+    installmentAmount: loan.installment_amount,
+    sources: [],
+    payments: loan.payments.map((payment)=>{
+      let updatedBy = users.find((user)=>user.fullName == payment.updated_by) || adminBlaise
+      return {
+        date: payment.payment_date,
+        amount: payment.payment_amount,
+        updatedBy: {id: updatedBy._id, name: updatedBy.fullName },
+        location: null
+      }
+    }),
+  }
+}
+
+function transformPointTransaction(transaction, users){
+  const transformedTransaction = transaction.type == "Spent" ?
+  transformRedeemPointTransaction(transaction, users) :
+  transformAwardPointTransaction(transaction, users)
+  return transformedTransaction
+}
+
+function transformRedeemPointTransaction(transaction, users){
+  const redeemedBy = users.find((user)=>user.fullName == transaction.name)
+  return {
+    _id: transaction._id,
+    type: "redeem",
+    redeemedBy: { _id: redeemedBy._id, fullName: redeemedBy.fullName},
+    points: transaction.points_involved,
+    date: transaction.transaction_date,
+    reason: transaction.reason,
+    refId: null
+  }
+}
+
+function transformAwardPointTransaction(transaction, users){
+  const recipient = users.find((user)=>user.fullName == transaction.name)
+  return {
+    _id: transaction._id,
+    type: "award",
+    recipient: { _id: recipient._id, fullName: recipient.fullName},
+    points: transaction.points_involved,
+    date: transaction.transaction_date,
+    reason: transaction.reason,
+    refId: null
+  }
 }
 
 //perform migration
