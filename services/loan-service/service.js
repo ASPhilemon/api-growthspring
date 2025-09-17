@@ -100,14 +100,13 @@ export async function getLoanPayment(loanId, paymentId) {
 export async function initiateLoan(
   amount,
   duration,
-  earliestDate,
-  latestDate,
+  date,
   borrowerId,
   currentUser,
   loanType
 ) {
 
-  Validator.required({ amount, duration, earliestDate, latestDate, borrowerId, currentUser, loanType });
+  Validator.required({ amount, duration, date, borrowerId, currentUser, loanType });
   const borrowerUser = await UserServiceManager.getUserById(borrowerId);
   Validator.assert(borrowerUser, "Borrower not found.", Errors.AppError);
 
@@ -115,11 +114,11 @@ export async function initiateLoan(
   switch (loanType) {
     case "Standard":
       return await initiateStandardLoanRequest(
-        amount, duration, earliestDate, latestDate, borrowerUser, currentUser, 
+        amount, duration, earliestDate = date, latestDate = date, borrowerUser, currentUser, 
       );
     case "Interest-Free":
       return await initiateFreeLoanRequest(
-        amount, duration, earliestDate, latestDate, borrowerUser, currentUser, 
+        amount, duration, earliestDate =cdate, latestDatec= date, borrowerUser, currentUser, 
       );
     default:
       Validator.assert(false, `Unsupported loan type for initiation: ${loanType}`, Errors.AppError );

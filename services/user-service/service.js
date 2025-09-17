@@ -660,10 +660,12 @@ export async function getAdminDashboard(userId) {
     allDeposits,
     allLoans,
     allMembers,
+    cashLocations,
   ] = await Promise.all([
     DepositServiceManager.getDeposits(filterAll),
     LoansServiceManager.getLoans(filterAll),
     getUsers(),
+    CashLocationServiceManager.getCashLocations()
   ]);
 
   // ---------- Helpers ----------
@@ -930,8 +932,9 @@ export async function getAdminDashboard(userId) {
       },
     },
     allDeposits: processArray(allDeposits, (arr) => getTotalSumsAndSort(arr, "date", "amount")),
-    allUsers: allMembers.map(m => m.fullName),
+    allUsers: allMembers.map(m => ({name: m.fullName, id: m._id })),
     allLoans: await buildMemberLoanRecords(allLoans, "", formatDate),
+    cashLocations: cashLocations
   };
 
   return response;
