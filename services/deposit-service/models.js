@@ -51,7 +51,6 @@ const depositSchema = new mongoose.Schema({
       enum: ["Permanent", "Temporary"],
       required: true
     },
-
     recordedBy: {
       type: userSubSchema,
       required: true

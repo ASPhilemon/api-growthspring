@@ -37,7 +37,7 @@ export async function getUsers(){
 
 export async function getUserById(userId){
   Validator.schema(Schemas.getUserById, userId)
-  const user = DB.query(User.findById(userId))
+  const user = await DB.query(User.findById(userId))
   if (!user) throw new Errors.NotFoundError("Failed to find user")
   return user
 }
@@ -521,7 +521,7 @@ export async function updateUserPhoto(userId, tempPhotoPath){
     //remove uploaded photo if user was not found
     if (err instanceof Errors.NotFoundError){
       fs.unlink(tempPhotoPath, (err)=>{
-        throw new Errors.InternalServerError("An error occured deleting uploaded photo", err)
+        if(err) throw new Errors.InternalServerError("An error occured deleting uploaded photo", err);
       })
     }
 
