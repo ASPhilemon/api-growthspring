@@ -22,14 +22,32 @@ const LOAN_TEMPLATES_PATH = "./email-templates.js";
  * @param {object} params - Object containing filter, sort, and pagination.
  * @returns {Promise<Array>} A promise that resolves to an array of earnings documents.
  */
-export async function getEarnings({ filter, sort, pagination }) {
-  return await Earnings.getFilteredEarnings({ filter, sort, pagination }); 
+export async function getEarnings(filter) {
+  // No filter? Return everything.
+  if (!filter) {
+    return await DB.query(Earnings.find({}));
+  }
+
+  // Filter provided: resolve user and query by fullName.
+  const user = await UserServiceManager.getUserById(filter);
+  if (!user) return []; // user id not found → no earnings
+
+  return await DB.query(Earnings.find({ fullName: user.fullName }));
 }
 
+export async function getUnits(filter) {
+  // No filter? Return everything.
+  if (!filter) {
+    return await DB.query(Units.find({}));
+  }
 
-export async function getUnits({ filter}) {
-  return await DB.query(Units.find({filter })); 
+  // Filter provided: resolve user and query by fullName (NOT userName).
+  const user = await UserServiceManager.getUserById(filter);
+  if (!user) return []; // user id not found → no units
+
+  return await DB.query(Units.find({ fullName: user.fullName }));
 }
+
 
 /**
  * Fetches and processes earning records to categorize members based on their total earning amounts,

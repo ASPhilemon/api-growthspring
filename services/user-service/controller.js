@@ -14,7 +14,6 @@ export async function getMyDashboard(req, res){
 }
 
 export async function getAdminDashboard(req, res){
-  console.log(req.user);
   const {_id : userId } = req.user
   const dashboard = await ServiceManager.getAdminDashboard(userId)
   Response.sendSuccess(dashboard, {req, res})
@@ -44,6 +43,13 @@ export async function transferPoints(req, res){
   const senderId = req.user._id
   const {recipientId, points, reason} = req.body
   await ServiceManager.transferPoints(senderId, recipientId, points, reason)
+  Response.sendSuccess(null, {req, res})
+}
+
+export async function changeAppearance(req, res){
+  const userId = req.user._id
+  const {layOut, color} = req.body
+  await ServiceManager.changeUserDashboardAppearance(userId, layOut, color)
   Response.sendSuccess(null, {req, res})
 }
 

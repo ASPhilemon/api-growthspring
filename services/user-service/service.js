@@ -55,16 +55,46 @@ export async function getUserDashboardAppearance(userId){
   return dashboards.find(d => d.userId == userId)  
 }
 
+export async function changeUserDashboardAppearance(userId, layOut, color) {
+  const appearance = await getUserDashboardAppearance(userId);
+  appearance.layout = layOut;
+  appearance.color = color;
+  await appearance.save();
+}
+
+
 export async function getUserDashboard(userId){
   const currentYear = new Date().getFullYear();
   const year = currentYear;
   const status = "Ongoing"
+  const pagination = { page: 1, perPage: 100000 }; 
+  const sort = { field: "date", order: -1 };
+
+  // pagination-utils.js (or near your dashboard code)
+const MAX_PER_PAGE = 100; // must match your Joi/schema cap
+
+async function fetchAllDeposits(filter = {}, sort = { field: "date", order: -1 }) {
+  let page = 1;
+  const all = [];
+
+  while (true) {
+    const chunk = await DepositServiceManager.getDeposits(filter, sort, { page, perPage: MAX_PER_PAGE });
+    if (!chunk || chunk.length === 0) break;
+
+    all.push(...chunk);
+
+    // last page when we got fewer than the cap
+    if (chunk.length < MAX_PER_PAGE) break;
+
+    page += 1;
+  }
+
+  return all;
+}
+
 
   const filter1 = {userId};
   const filter2 = {}//All records for all members
-  const filter3 = {year}
-  const filter4 = {userId, year}
-  const filter5 = {userId, status}
 
   const [
     member,
@@ -86,20 +116,20 @@ export async function getUserDashboard(userId){
     getUserById(userId),
     getUserDashboardAppearance(userId),
     getUsers(),
-    DepositServiceManager.getDeposits(filter1),
-    DepositServiceManager.getDeposits(filter2),
+    fetchAllDeposits({ userId } , sort, pagination ),
+    fetchAllDeposits({}, sort, pagination),
     PointServiceManager.getTransactions(filter1),
-    EarningsServiceManager.getEarnings(filter1),
-    EarningsServiceManager.getEarnings(filter2),
-    LoansServiceManager.getLoans(filter1),
-    LoansServiceManager.getLoans(filter5),
-    LoansServiceManager.getLoans(filter4),
-    LoansServiceManager.getLoans(filter2),
-    LoansServiceManager.getLoans(filter3),
-    EarningsServiceManager.getUnits(filter2),
+    EarningsServiceManager.getEarnings(userId),
+    EarningsServiceManager.getEarnings(),
+    LoansServiceManager.getLoans({ userId, sort, pagination }),
+    LoansServiceManager.getLoans({ userId, status: "Ongoing", sort, pagination }),
+    LoansServiceManager.getLoans({ userId, year, sort, pagination }),
+    LoansServiceManager.getLoans({ sort, pagination }),
+    LoansServiceManager.getLoans({ year, sort, pagination }),
+    EarningsServiceManager.getUnits(),
     DepositServiceManager.getYearlyDeposits()
   ])
-
+ 
   // ---- helpers ----
   function processArray(array, transformFn, noDataValue = 'No Data Available') {
     if (!Array.isArray(array) || array.length === 0) return noDataValue;
@@ -113,6 +143,7 @@ export async function getUserDashboard(userId){
   }
 
   const monthsPassedThisYear = (new Date().getMonth() + 1); // 1..12
+  const monthsForSaving = member.membershipDate < new Date(new Date().getFullYear(), 0, 1) ? monthsPassedThisYear : getDaysDifference(member.membershipDate, new Date()) / 30;
   const formatCurrency = (amount) => {
     const safe = Number(amount || 0);
     return 'UGX ' + Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(safe);
@@ -134,9 +165,9 @@ export async function getUserDashboard(userId){
   const totalSavingsEarnings = memberEarnings.filter(t => t.source === "Temporary Savings").reduce((t, l) => t + (l.amount || 0), 0);
   const thisYearSavingsEarningsSum = (savingsEarningsProcessed?.yearsSums?.[currentYear]?.amount) || 0;
 
-  //Past years units
-  const memberUnits = allUnits.filter(t => t.name === member.fullName);
-  const totalMemberUnits = memberUnits.reduce((t, l) => t + (l.units || 0), 0);
+  //units and returns
+  const memberUnits = allUnits.filter(t => t.fullName === member.fullName);
+  let yearlyRates = [];
 
   // Calculate Member Ownership
   let allCurrentUnits = 0;
@@ -153,12 +184,16 @@ export async function getUserDashboard(userId){
   }
 
   const currentMemberInfo = people.find(item => item.name === member.fullName);
+  const now = new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const currentInvestmentAmount = currentMemberInfo.units / (getDaysDifference(startOfYear, new Date()));
+  const currentClubInvestmentAmount = allCurrentUnits / (getDaysDifference(startOfYear, new Date()));
   const ownershipPercentage = currentMemberInfo.units/allCurrentUnits;
 
   // points & credits
   const pointsRecordsProcessed = processArray(pointsTransactions, arr => getTotalSumsAndSort(arr, 'date', 'amount'));
   const pointsSpentTransactions = pointsTransactions.filter(t => t.type === "redeem");
-  const totalPointsRedeemed = pointsSpentTransactions.reduce((t, l) => t + (l.points || 0), 0);
+  const totalPointsRedeemed = Math.round(pointsSpentTransactions.reduce((t, l) => t + (l.points || 0), 0));
   const pointsEarnedTransactions = pointsTransactions.filter(t => t.type !== "redeem");
   const totalPointsEarned = pointsEarnedTransactions.reduce((t, l) => t + (l.points || 0), 0);
 
@@ -172,7 +207,7 @@ export async function getUserDashboard(userId){
   const pointsWorth = Math.round(pointUnitValue * (member.points || 0));
   
   // member debt totals & loans
-  const totalStandardLoanDebt = ongoingMemberLoans.filter(t => t.type === "Permanent").reduce((t, l) => {
+  const totalStandardLoanDebt = ongoingMemberLoans.filter(t => t.type === "Standard").reduce((t, l) => {
     const interestDue = LoansServiceManager.calculateCashInterestDueAmount(l, new Date(), member.points)?.totalInterestDue || 0;
     return t + (Number(l.principalLeft || 0) + Number(interestDue));
   }, 0);
@@ -182,7 +217,7 @@ export async function getUserDashboard(userId){
   }, 0);
   const thisYearMemberStandardLoansSum = thisYearMemberLoans.filter(t => t.type === "Standard").reduce((t, l) => t + (l.amount || 0), 0);
   const thisYearMemberFreeLoansSum = thisYearMemberLoans.filter(t => t.type === "Interest-Free").reduce((t, l) => t + (l.amount || 0), 0);
-  const totalStandardLoansInterestDue = ongoingMemberLoans.filter(t => t.type === "Standard").reduce((t, l) => t + (LoansServiceManager.calculateCashInterestDueAmount(l, new Date(), member.points)?.totalInterestDue || 0), 0);
+  const totalStandardLoansInterestDue = ongoingMemberLoans.filter(t => t.type === "Standard").reduce((t, l) => t + (LoansServiceManager.calculateCashInterestDueAmount(l, new Date(), member.points).totalInterestDue || 0), 0);
   const totalFreeLoansInterestDue = 0; //ongoingMemberLoans.filter(t => t.type === "Interest-Free").reduce((t, l) => t + (LoansServiceManager.calculateCashInterestDueAmount(l, new Date(), member.points)?.totalInterestDue || 0), 0);
   const totalStandardLoansEver = memberLoans.filter(t => t.type === "Standard").reduce((t, l) => t + (l.amount || 0), 0);
   const totalFreeLoansEver = memberLoans.filter(t => t.type === "Interest-Free").reduce((t, l) => t + (l.amount || 0), 0);
@@ -198,7 +233,9 @@ export async function getUserDashboard(userId){
   const currentParticipants = allMembers.filter(m => m.temporaryInvestment?.amount !== 0);
   
   const clubEarningsArray = processArray(allEarnings.filter(t => t.source === "Permanent Savings"), arr => getTotalSumsAndSort(arr, 'date', 'amount'));
+  const clubUnits = processArray(allUnits, arr => getTotalSumsAndSort(arr, 'year', 'units'));
   const thisYearClubEarnings = (clubEarningsArray?.yearsSums?.[currentYear]?.amount) || 0;
+  const clubEarnings = formatClubEarnings(clubEarningsArray, clubUnits);
 
   const clubLoansArray = processArray(allLoans, arr => getTotalSumsAndSort(arr, 'date', 'amount'));
   
@@ -208,10 +245,13 @@ export async function getUserDashboard(userId){
   //Limits and other figures
   const {loanMultiplier, loanLimit, interestPaidInLastYear} = await LoansServiceManager.calculateStandardLoanLimit(userId);
 
-  //
-  const largestContribution = memberDeposits.filter(t => t.type === "Temporary").reduce(
-    (max, current) => (current.amount > max.amount ? current : max)
-  );
+  const temporaryDeposits = memberDeposits.filter(t => t.type === "Temporary");
+
+  const largestContribution = temporaryDeposits != [] ? temporaryDeposits.reduce(
+    (max, current) => (current.amount > max.amount ? current : max), 
+    0 // Safe initial value
+  ) : 0;
+
   const requestedAmount = 0.4 * largestContribution;
   const temporaryLoanLimit = await LoansServiceManager.calculateFreeLoanEligibility(member, requestedAmount, 365);//Default is one year
   const savingsDays = Math.round(member.temporaryInvestment.units / member.temporaryInvestment.amount);
@@ -243,6 +283,99 @@ export async function getUserDashboard(userId){
   const userRank = sortedMembersByAmount.findIndex(m => (m._id || m.id || '').toString() === (member._id || member.id || '').toString());
   const userRankDisplay = userRank === -1 ? 'N/A' : (userRank + 1);
 
+  
+
+function formatRecordsForYears(processedObj, dateFormatter) {
+  if (!processedObj || processedObj === 'No Data Available') return [];
+  const entries = Object.entries(processedObj.yearsSums || {});
+  // sort descending by year
+  entries.sort((a, b) => b[0] - a[0]);
+  return entries.map(([year, sum]) => {
+    const records = processedObj.recordsByYear?.[year] || [];
+    const values = records.map(r => [dateFormatter(r.date), Math.round(r.amount || r.points || 0), r.source || r.reason || '']);
+    const avg = year != new Date().getFullYear() ? Math.round(sum.amount / 12) : Math.round(sum.amount / (new Date().getMonth() + 1));
+    return { year, total: Math.round(sum.amount || sum.points || 0), avgMonthyDeposit: avg, values };
+  });
+}
+
+function formatClubDeposits(clubDepositsArray) {
+  if (!clubDepositsArray || clubDepositsArray === 'No Data Available') return [];
+
+  return Object.entries(clubDepositsArray.yearsSums)
+    .sort((a, b) => b[0] - a[0])
+    .map(([year, sum]) => {
+      const monthly = Object.entries(clubDepositsArray.monthlySums?.[year] || {}).map(([month, mRec]) => {
+        const amount = Math.round(mRec.amount);
+
+        // Robust retrieval of unique depositor count (savers). Try common keys, default 0.
+        const saversRaw = mRec.depositors ?? mRec.savers ?? mRec.depositorCount ?? mRec.depositor_count ?? 0;
+        const savers = Math.max(0, Math.round(Number(saversRaw || 0)));
+
+        return [month, amount, savers];
+      });
+
+      const avg = year != new Date().getFullYear()
+        ? Math.round((sum.amount ?? sum.deposit_amount ?? 0) / 12)
+        : Math.round((sum.amount ?? sum.deposit_amount ?? 0) / (new Date().getMonth() + 1));
+
+      return { year, total: Math.round(sum.amount ?? sum.deposit_amount ?? 0), avgMonthyDeposit: avg, values: monthly };
+    });
+}
+
+
+function formatClubEarnings(clubEarningsArray, clubUnits) {
+  if (!clubEarningsArray || clubEarningsArray === 'No Data Available') return [];
+  if (!clubUnits || clubUnits === 'No Data Available') return [];
+
+  return Object.entries(clubEarningsArray.yearsSums)
+    .sort((a, b) => Number(b[0]) - Number(a[0])) // sort by year desc
+    .map(([year, sum]) => {
+      // totals
+      const totalEarn = Math.round(sum.amount ?? sum.earnings_amount ?? 0);
+
+      // annualized ROI (%): (earnings / units) * 365 * 100
+      const unitsForYear = Number(clubUnits.yearsSums?.[year]?.units || 0);
+      const roiAnnualPct = unitsForYear > 0 ? Math.round((totalEarn * 36500) / unitsForYear) : 0;
+      yearlyRates.push({year, roiAnnualPct});
+
+      // monthly values: [month, amount]
+      const monthly = Object.entries(clubEarningsArray.monthlySums?.[year] || {}).map(
+        ([month, mRec]) => [month, Math.round(mRec.amount ?? 0), "Savings"]
+      );
+
+      // optional: average monthly earnings (handles partial current year like deposits)
+      const monthsSoFar = (Number(year) !== new Date().getFullYear())
+        ? 12
+        : (new Date().getMonth() + 1);
+      const avgMonthlyEarnings = monthsSoFar > 0 ? Math.round(totalEarn / monthsSoFar) : 0;
+
+      return {
+        year,
+        total: totalEarn,
+        avgMonthlyEarnings,
+        roiAnnualPct,        // annualized % for the year
+        values: monthly      
+      };
+    });
+}
+
+
+function meanRoiForMemberYears(yearRates, memberUnits) {
+  const yearsSet = new Set(
+    (memberUnits || [])
+      .map(u => Number(u?.year))
+      .filter(y => Number.isFinite(y))
+  );
+
+  const vals = (yearRates || [])
+    .filter(r => yearsSet.has(Number(r?.year)))
+    .map(r => Number(r?.roiAnnualPct))
+    .filter(v => Number.isFinite(v));
+
+  if (vals.length === 0) return 0;
+  return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
   // ---- build response with real values (no dummy strings) ----
   const user = member; // keep property name consistent in response
 
@@ -263,7 +396,7 @@ export async function getUserDashboard(userId){
           title: "Savings",
           rows: [
             ["Savings this year", formatCurrency(thisYearDepositsSum)],
-            ["Avg. monthly savings", formatCurrency(Math.round(thisYearDepositsSum / Math.max(1, monthsPassedThisYear)))],
+            ["Avg. monthly savings", formatCurrency(Math.round(thisYearDepositsSum / Math.max(1, monthsForSaving)))],
             ["Category", memberCategoryLabel],
             ["Your Category Membership", String(categoryMembershipCount)],
           ],
@@ -271,10 +404,10 @@ export async function getUserDashboard(userId){
         {
           title: "Earnings",
           rows: [
-            ["Projected Earnings", formatCurrency(Math.round(0.15 * member.permanentInvestment.amount))],//replace later with more accurate calculations
+            ["Projected Earnings", formatCurrency(Math.round(0.15 * currentInvestmentAmount))],//replace later with more accurate calculations
             ["Your Percentage", `${(ownershipPercentage * 100).toFixed(2)}` + "%"],
-            ["Avg. monthly earnings", formatCurrency(Math.round(0.0125 * member.permanentInvestment.amount))],
-            ["Avg. annual earnings rate", memberUnits ? `${(((totalEarnings * memberUnits.length * 365) / totalMemberUnits) * 100).toFixed(2)}` + "%": "N/A"],
+            ["Avg. monthly earnings", formatCurrency(Math.round(0.15 * currentInvestmentAmount / Math.max(1, monthsForSaving)))],
+            ["Avg. annual earnings rate",  meanRoiForMemberYears(yearlyRates, memberUnits) + "%"],
           ],
         },
         {
@@ -299,9 +432,9 @@ export async function getUserDashboard(userId){
           title: "Club Figures",
           rows: [
             ["Savings this year", formatCurrency(thisYearClubDeposits)],
-            ["Projected Earnings", formatCurrency(0.16 * clubWorth)],//update with accurate calculations
+            ["Projected Earnings", formatCurrency(0.16 * currentClubInvestmentAmount)],//update with accurate calculations
             ["Loans this year", formatCurrency(thisYearClubLoans)],
-            ["Members", String((allMembers || []).length)],
+            ["Members", String((allMembers || []).length - 2)],
           ],
         },
       ],
@@ -320,7 +453,7 @@ export async function getUserDashboard(userId){
           title: "Savings",
           rows: [
             ["Total Contributions Ever", formatCurrency(totalTemporarySavingsEver)],
-            ["Savings this year", formatCurrency(thisYearDepositsSum)],
+            ["Savings this year", formatCurrency(thisYearTemporaryDepositsSum)],
             ["Largest Contribution", formatCurrency(largestContribution)],
             ["Current Savings Period", `${(savingsDays || 0)} Days`],
           ],
@@ -330,7 +463,7 @@ export async function getUserDashboard(userId){
           rows: [
             ["Loans this year", formatCurrency(thisYearMemberFreeLoansSum)],
             ["Loan limit Amount", formatCurrency(temporaryLoanLimit.loanLimit)],
-            ["Loan limit Period", formatCurrency(temporaryLoanLimit.loanPeriodLimit)],
+            ["Loan limit Period", `${(temporaryLoanLimit.loanPeriodLimit)} Days`],
             ["Total Loans Ever", formatCurrency(totalFreeLoansEver)],
           ],
         },
@@ -353,10 +486,8 @@ export async function getUserDashboard(userId){
     memberSavingsEarnings: formatRecordsForYears(savingsEarningsProcessed, formatDate),
     clubDeposits: formatClubDeposits(clubDepositsArray),
     clubTemporaryFigures: formatClubDeposits(clubTemporaryDepositsArray),//combine with withdrawals, loans and extra table column for transaction type
-    clubEarnings: formatClubEarnings(clubEarningsArray, /* clubUnits */ undefined),
+    clubEarnings: clubEarnings,
     memberLoans: await buildMemberLoanRecords(memberLoans.filter(t => t.type === "Standard"), user, formatDate),
-    ongoingMemberLoans: await buildMemberLoanRecords(ongoingMemberLoans.filter(t => t.type !== 'Ongoing'), user, formatDate),
-    endedMemberLoans: await buildMemberLoanRecords(memberLoans.filter(t => t.status === 'Ended'), user, formatDate),
     memberFreeLoans: await buildMemberLoanRecords(memberLoans.filter(t => t.type === "Interest-Free"), user, formatDate),
     memberTemporarySavingsWithdrawals: [],
 
@@ -372,116 +503,62 @@ export async function getUserDashboard(userId){
   return response;
 }
 
-/* ----- small helper formatting functions (pure, testable) ----- */
-function generateSavingsAccountStandings(userRecords) {
-  const memberDepositTotalsById = {}; // Aggregate by ID
-  const memberInfoMap = {};           // Map to store member's name
+async function buildMemberLoanRecords(memberLoans, ctx, dateFormatter) {
+  const isSingleUser = ctx && !ctx.usersById && ctx._id; // looks like a user doc
+  const usersById = ctx && ctx.usersById ? ctx.usersById : null;
 
-  userRecords.forEach(record => {
-      const memberId = record._id.toString(); 
-      const memberName = record.fullName;
-
-      if (!memberDepositTotalsById[memberId]) {
-        memberDepositTotalsById[memberId] = 0;
-          memberInfoMap[memberId] = memberName;
-      }
-      memberDepositTotalsById[memberId] += record.permanentInvestment.amount;
-  });
-
-  const memberDepositTotals = Object.keys(memberDepositTotalsById).map(memberId => ({
-      id: memberId,
-      name: memberInfoMap[memberId],
-      total: memberDepositTotalsById[memberId]
-  }));
-
-  const depositStandings = categorizeAmounts(memberDepositTotalsById, ACCOUNT_BALANCE_RANGES);
-
-  return {
-      standings: depositStandings,
-      memberTotals: memberDepositTotals
+  const getBorrowerId = (b) => b?._id || b?.id || null;
+  const getBorrowerDoc = (b) => {
+    if (isSingleUser) return ctx; // single user passed in
+    const id = getBorrowerId(b);
+    return usersById && id ? (usersById[String(id)] || b || {}) : (b || {});
   };
-}
+  const getBorrowerName = (b) => b?.fullName || b?.name || "";
 
-function formatRecordsForYears(processedObj, dateFormatter) {
-  if (!processedObj || processedObj === 'No Data Available') return [];
-  const entries = Object.entries(processedObj.yearsSums || {});
-  // sort descending by year
-  entries.sort((a, b) => b[0] - a[0]);
-  return entries.map(([year, sum]) => {
-    const records = processedObj.recordsByYear?.[year] || [];
-    const values = records.map(r => [dateFormatter(r.date || r.date || r.date || r.date), Math.round(r.amount || r.points_involved || 0), r.source || r.reason || '']);
-    const avg = year != new Date().getFullYear() ? Math.round(sum.amount / 12) : Math.round(sum.amount / (new Date().getMonth() + 1));
-    return { year, total: Math.round(sum.amount || sum.points_involved || 0), avgMonthyDeposit: avg, values };
+  return (memberLoans || []).map((record) => {
+    const borrowerDoc = getBorrowerDoc(record.borrower);
+
+    // prefer `date`, fallback to `earliestDate`
+    const issue = record.date || record.earliestDate || null;
+    const issueDateStr = issue ? dateFormatter(issue) : "";
+
+    const paymentHistory = Array.isArray(record.payments)
+      ? record.payments.map((p) => [
+          p?.date ? dateFormatter(p.date) : "",
+          Math.round(Number(p?.amount || 0)),
+        ])
+      : [];
+
+    // Use borrower points if available (0 otherwise)
+    const points = Number(borrowerDoc?.points || 0);
+    const interestDue =
+      LoansServiceManager.calculateCashInterestDueAmount(
+        record,
+        new Date(),
+        points
+      )?.totalInterestDue ?? 0;
+
+    const principalLeft = Number(record.principalLeft || 0);
+    const amountLeft = principalLeft + Number(interestDue || 0);
+
+    return {
+      loanId: record._id,
+      borrower: getBorrowerName(borrowerDoc),
+      borrowerId: record.borrower._id,
+      issueDate: issueDateStr,
+      loanAmount: Math.round(Number(record.amount || 0)),
+      amountLeft: Math.round(amountLeft),
+      unclearedInterest: Math.round(Number(interestDue || 0)),
+      paid_interest: Math.round(Number(record.interestAmount || 0)),
+      agreedLoanDuration: `${Math.round(Number(record.duration || 0))} months`,
+      pointsSpent: Math.round(Number(record.pointsSpent || record.pointSpent || 0)),
+      loan_status: record.status,
+      comment: record.comment ? record.comment : "",
+      paymentHistory,
+    };
   });
 }
 
-function formatClubDeposits(clubDepositsArray) {
-  if (!clubDepositsArray || clubDepositsArray === 'No Data Available') return [];
-
-  return Object.entries(clubDepositsArray.yearsSums)
-    .sort((a, b) => b[0] - a[0])
-    .map(([year, sum]) => {
-      const monthly = Object.entries(clubDepositsArray.monthlySums?.[year] || {}).map(([month, mRec]) => {
-        // Robust retrieval of amount (supports different field names)
-        const amount = Math.round(mRec.amount ?? mRec.deposit_amount ?? 0);
-
-        // Robust retrieval of unique depositor count (savers). Try common keys, default 0.
-        const saversRaw = mRec.depositors ?? mRec.savers ?? mRec.depositorCount ?? mRec.depositor_count ?? 0;
-        const savers = Math.max(0, Math.round(Number(saversRaw || 0)));
-
-        return [month, amount, savers];
-      });
-
-      const avg = year != new Date().getFullYear()
-        ? Math.round((sum.amount ?? sum.deposit_amount ?? 0) / 12)
-        : Math.round((sum.amount ?? sum.deposit_amount ?? 0) / (new Date().getMonth() + 1));
-
-      return { year, total: Math.round(sum.amount ?? sum.deposit_amount ?? 0), avgMonthyDeposit: avg, values: monthly };
-    });
-}
-
-
-function formatClubEarnings(clubEarningsArray, clubUnits) {
-  if (!clubEarningsArray || clubEarningsArray === 'No Data Available') return [];
-  console.log(clubEarningsArray);
-  if (!clubUnits || clubUnits === 'No Data Available') return [];
-  const out = [];
-  Object.entries(clubEarningsArray.yearsSums).forEach(([year, rec]) => {
-    const unitsRec = clubUnits.yearsSums?.[year];
-    if (!unitsRec) return;
-    const actualInvestment = unitsRec.units / 365;
-    const roi = year != new Date().getFullYear() ? Math.round(rec.amount * 100 / actualInvestment) : 0;
-    out.push([year, Math.round(rec.amount), roi]);
-  });
-  return out;
-}
-
-async function buildMemberLoanRecords(memberLoans, member, dateFormatter) {
-
-  const loanRecordPromises = memberLoans.map(async record => {
-    let memberInfo = member ? member : await getUserById(record.borrower._id);
-    
-    const paymentHistory = (record.payments || []).map(p => [dateFormatter(p.date), Math.round(p.amount)]);
-    const interestDue = LoansServiceManager.calculateCashInterestDueAmount(record, new Date(), memberInfo.points)?.totalInterestDue
-    const amountLeft = record.principalLeft + interestDue;
-
-    return {
-      loanId: record._id,
-      borrower: record.borrower.fullName,
-      issueDate: dateFormatter(record.date),
-      loanAmount: record.amount,
-      amountLeft,
-      unclearedInterest: interestDue,
-      paid_interest : Math.round(record.interestAmount),
-      agreedLoanDuration: `${Math.round(record.duration)} months`,
-      pointsSpent: Math.round(record.pointSpent || 0),
-      loan_status: record.status,
-      paymentHistory
-    };
-  });
-  
-  return await Promise.all(loanRecordPromises);
-}
 
 export async function createUser(user){
   Validator.schema(Schemas.createUser, user)
@@ -655,6 +732,29 @@ function _buildUser(user){
 
 export async function getAdminDashboard(userId) {
   const filterAll = {};
+  const pagination = { page: 1, perPage: 100000 }; 
+  const sort = { field: "date", order: -1 };
+
+const MAX_PER_PAGE = 100; 
+
+async function fetchAllDeposits(filter = {}, sort = { field: "date", order: -1 }) {
+  let page = 1;
+  const all = [];
+
+  while (true) {
+    const chunk = await DepositServiceManager.getDeposits(filter, sort, { page, perPage: MAX_PER_PAGE });
+    if (!chunk || chunk.length === 0) break;
+
+    all.push(...chunk);
+
+    // last page when we got fewer than the cap
+    if (chunk.length < MAX_PER_PAGE) break;
+
+    page += 1;
+  }
+
+  return all;
+}
 
   const [
     allDeposits,
@@ -662,8 +762,8 @@ export async function getAdminDashboard(userId) {
     allMembers,
     cashLocations,
   ] = await Promise.all([
-    DepositServiceManager.getDeposits(filterAll),
-    LoansServiceManager.getLoans(filterAll),
+    fetchAllDeposits({}, sort, pagination),
+    LoansServiceManager.getLoans({ sort, pagination }),
     getUsers(),
     CashLocationServiceManager.getCashLocations()
   ]);
@@ -743,13 +843,7 @@ export async function getAdminDashboard(userId) {
   }
 
   // ---------- Resolve location IDs to names (batch) ----------
-  let locations = [];
-  try {
-    locations = await CashLocationServiceManager.getCashLocations();
-  } catch (err) {
-    // fail silently; locations remains an empty array
-    locations = [];
-  }
+  let locations = cashLocations || [];
 
   function resolveLocationName(value) {
     if (!value) return null;
@@ -921,6 +1015,31 @@ export async function getAdminDashboard(userId) {
   const totalOutflow = Object.values(monthlyRecordsInternal).reduce((s, m) => s + (m.totalOutflow || 0), 0);
   const netFlow = totalInflow - totalOutflow;
 
+  // Collect unique borrower ids from loans
+const borrowerIds = Array.from(
+  new Set(
+    (allLoans || [])
+      .map(l => l?.borrower?._id || l?.borrower?.id)
+      .filter(Boolean)
+      .map(String)
+  )
+);
+
+// Parallel fetch & build a map
+const borrowers = await Promise.all(
+  borrowerIds.map(id =>
+    getUserById(id).catch(() => null) 
+  )
+);
+
+const usersById = Object.fromEntries(
+  borrowers.filter(Boolean).map(u => [String(u._id), u])
+);
+
+// Now pass the map into the builder (see updated builder below)
+const adminLoans = await buildMemberLoanRecords(allLoans, { usersById }, formatDate);
+
+
   // Build response
   const response = {
     adminOverview: {
@@ -933,7 +1052,7 @@ export async function getAdminDashboard(userId) {
     },
     allDeposits: processArray(allDeposits, (arr) => getTotalSumsAndSort(arr, "date", "amount")),
     allUsers: allMembers.map(m => ({name: m.fullName, id: m._id })),
-    allLoans: await buildMemberLoanRecords(allLoans, "", formatDate),
+    allLoans: adminLoans,
     cashLocations: cashLocations
   };
 
