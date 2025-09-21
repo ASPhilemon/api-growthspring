@@ -33,6 +33,7 @@ const loanSchema = new mongoose.Schema({
   rateAfterDiscount: { type: Number, default: 0 },
   discount: { type: Number, default: 0 },
   pointsWorthBought: { type: Number, default: 0 },
+  comment: { type: String },
   pointsAccrued: { type: Number, default: 0 },
   interestAccrued: { type: Number, default: 0 },
   interestAmount: { type: Number, required: true },
@@ -65,38 +66,27 @@ loanSchema.statics.getFilteredLoans = async function({
   type,
   order = -1, 
   sortBy = "date", 
+  perPage = 2000, // keep your default
 }) {
-  const perPage = 2000; 
+  if (typeof year === "string") year = Number(year);
+
   const pipeline = [];
-  const matchCriteria = []; 
+  const matchCriteria = [];
 
-  // --- Match Stage ---
-  // Filtering by year
-  if (year) {
-    matchCriteria.push({ $expr: { $eq: [{ $year: "$date" }, year] } });
-  }
-  // Filtering by month
-  if (month) {
-    matchCriteria.push({ $expr: { $eq: [{ $month: "$date" }, month] } });
-  }
-  // Filtering by type
-  if (type) {
-    matchCriteria.push({ type: type });
-  }
+  // Basic matches
+  if (type) matchCriteria.push({ type });
 
-  if (!status) {
-    matchCriteria.push({ status: { $in: ["Ended", "Ongoing"] } });
-  } else {
+  if (status) {
     if (status === "Overdue") {
-      matchCriteria.push({ status: "Ongoing" });
+      matchCriteria.push({ status: "Ongoing" }); // refine later if you support overdue
     } else {
-      matchCriteria.push({ status: status });
+      matchCriteria.push({ status });
     }
+  } else {
+    matchCriteria.push({ status: { $in: ["Ended", "Ongoing", "Pending Approval"] } });
   }
 
   if (userId) {
-    // Check if 'userId' is a valid ObjectId string. If so, filter by ID.
-    // Otherwise, assume it's a name and filter by name.
     if (mongoose.Types.ObjectId.isValid(userId)) {
       matchCriteria.push({ "borrower.id": new ObjectId(userId) });
     } else {
@@ -104,54 +94,49 @@ loanSchema.statics.getFilteredLoans = async function({
     }
   }
 
-  // Add the combined match criteria to the pipeline if any conditions exist
-  if (matchCriteria.length > 0) {
-    pipeline.push({ $match: { $and: matchCriteria } });
-  }
+  if (matchCriteria.length) pipeline.push({ $match: { $and: matchCriteria } });
 
-  // --- Lookup and AddFields for Borrower Details ---
-  // This fetches the full user document for the borrower
-  pipeline.push({
-    $lookup: {
-      from: "users", // Name of the users collection
-      localField: "borrower.id",
-      foreignField: "_id",
-      as: "borrowerFullDetails" // Temporary field name
-    }
-  });
-  // Replace the 'borrower' field with the first element of the lookup result
+  // Consistent date for filtering/sorting
   pipeline.push({
     $addFields: {
-      borrower: { $arrayElemAt: ["$borrowerFullDetails", 0] }
+      _effectiveDate: { $ifNull: ["$date", "$earliestDate"] }
     }
   });
-  // Project out the temporary lookup field
+
+  // Year / month filters (if provided)
+  const timeExprs = [];
+  if (year)  timeExprs.push({ $eq: [ { $year: "$_effectiveDate" }, year ] });
+  if (month) timeExprs.push({ $eq: [ { $month: "$_effectiveDate" }, month ] });
+  if (timeExprs.length) pipeline.push({ $match: { $expr: { $and: timeExprs } } });
+
+  // Lookup borrower (keep behavior)
+  pipeline.push({
+    $lookup: {
+      from: "users",
+      localField: "borrower.id",
+      foreignField: "_id",
+      as: "borrowerFullDetails"
+    }
+  });
+  pipeline.push({
+    $addFields: {
+      borrower: { $ifNull: [ { $arrayElemAt: ["$borrowerFullDetails", 0] }, "$borrower" ] }
+    }
+  });
   pipeline.push({ $project: { borrowerFullDetails: 0 } });
 
-  // --- Sort Stage ---
-  // Using dynamic field names based on sortBy and order
-  pipeline.push({ $sort: { [sortBy]: order } });
+  // Sort (map "date" to internal field)
+  const sortFieldMap = { date: "_effectiveDate" };
+  const sortField = sortFieldMap[sortBy] || sortBy;
+  pipeline.push({ $sort: { [sortField]: order } });
 
-  // --- Pagination Stages ---
+  // Paginate
   pipeline.push({ $skip: (page - 1) * perPage });
   pipeline.push({ $limit: perPage });
 
-  const loans = await DB.query(this.aggregate(pipeline));
-
-  // --- Post-query filter for "Overdue" status ---
-  if (status === "Overdue") {
-    const currentDate = new Date();
-
-    return loans.filter((loan) => {
-      const loanEndDate = new Date(loan.date);
-      loanEndDate.setMonth(loanEndDate.getMonth() + loan.duration);
-
-      return loanEndDate < currentDate && loan.status === "Ongoing";
-    });
-  }
-
-  return loans;
+  return DB.query(this.aggregate(pipeline));
 };
+
 
 // --- Models ---
 const Loan = mongoose.model('Loan', loanSchema);

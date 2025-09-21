@@ -48,6 +48,10 @@ router.post(
   "/me/point-transactions",
   RouteController.transferPoints
 )
+router.post(
+  "/me/appearance",
+  RouteController.changeAppearance
+)
 router.get(
   "/me/admin-dashboard",
   RouteController.getAdminDashboard

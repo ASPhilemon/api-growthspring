@@ -13,7 +13,7 @@ export function getDaysDifference(date1, date2) {
     const utc2 = Date.UTC(d2.getFullYear(), d2.getMonth(), d2.getDate());
   
     const oneDay = 1000 * 60 * 60 * 24; // milliseconds in a day
-    const diffTime = Math.abs(utc2 - utc1);
+    const diffTime = Math.max(0, (utc2 - utc1));
     const diffDays = Math.ceil(diffTime / oneDay);
     return diffDays;
 }

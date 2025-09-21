@@ -44,16 +44,17 @@ export async function getLoanPayment(req, res) {
 }
 
 export async function initiateLoan(req, res) {
-  const { amount, duration, earliestDate, latestDate, borrowerId, loanType } = req.body;
+  const { amount, duration, earliestDate, borrowerId, loanType, comment } = req.body;
   const currentUser = req.user;
+
   const createdLoan = await ServiceManager.initiateLoan(
     amount,
     duration,
     earliestDate,
-    latestDate,
     borrowerId,
     currentUser,
-    loanType
+    loanType, 
+    comment
   );
   Response.sendSuccess(createdLoan, { req, res });
 }
