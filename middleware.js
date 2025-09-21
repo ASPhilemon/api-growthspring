@@ -68,9 +68,8 @@ export function requireUser(req, res, next) {
 }
 
 export function requireAdmin(req, res, next) {
-  if (!req.user?.isAdmin) {
-    throw new Errors.NotAllowedError();
-  }
+  if (!req.user) throw new Errors.NotAuthenticatedError();
+  if (!req.user.isAdmin) throw new Errors.NotAllowedError();
   next();
 }
 
