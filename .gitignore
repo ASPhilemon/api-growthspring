@@ -1,6 +1,6 @@
 /node_modules
 /.vscode
 /uploads
-/public
+/public/img/profile-photos
 .env
 .env.production

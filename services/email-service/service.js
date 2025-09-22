@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import ejs from "ejs"; 
 import path from "path"; 
+import * as Errors from "../../utils/error-util.js"
 
 export async function sendEmail(
   sender,
@@ -8,7 +9,6 @@ export async function sendEmail(
   subject,
   message,
 ) {
-
   //Dont send email in non production environment
   if (process.env.NODE_ENV != "production") return;
 
@@ -29,7 +29,7 @@ export async function sendEmail(
   };
 
   transporter.sendMail(mailOptions, (err)=>{
-    if (err) throw new Error(err.message)
+    if (err) throw new Errors.InternalServerError("Failed to send email", err)
   });
 
 }

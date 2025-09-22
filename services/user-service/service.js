@@ -606,7 +606,7 @@ export async function updateUserPhoto(userId, tempPhotoPath){
   }
 
   const currentTime = DateUtil.getToday().getTime()
-  const fileName = `img/${user.fullName}-${currentTime}.jpg`;
+  const fileName = `img/profile-photos/${user.fullName}-${currentTime}.jpg`;
   const permPhotoPath = path.join(publicDirectory, fileName);
 
   //move photo to the public directory
