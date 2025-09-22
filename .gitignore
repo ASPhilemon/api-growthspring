@@ -1,2 +1,4 @@
 /node_modules
 password.js
+.env
+.env.production
