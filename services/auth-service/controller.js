@@ -84,7 +84,7 @@ function _setCookie(res, {name, value, duration }){
     httpOnly: true,
     maxAge:duration,
     secure: true,
-    domain:"growthspringers.com"
+    domain:".growthspringers.com"
   });
 }
 
@@ -94,6 +94,6 @@ function _clearCookie(res, cookieName){
     httpOnly: true,
     maxAge: 0,
     secure: true,
-    domain:"growthspringers.com"
+    domain:".growthspringers.com"
   });
 }
