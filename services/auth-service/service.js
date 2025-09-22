@@ -42,7 +42,7 @@ export async function signInWithGoogle(googleToken){
     Please sign in with a registered email.`
   )
 
-  return _createJWT(user._id, user.fullName, user.isAdmin)
+  return createJWT(user._id, user.fullName, user.isAdmin)
 
   async function _getUserEmailFromGoogleToken(token) {
     const client = new OAuth2Client();
@@ -108,6 +108,7 @@ export function verifyJWT(jwt){
     return JWT.verify(jwt, JWT_SECRET)
   }
   catch(err){
+    console.log(err)
     throw new Errors.BadRequestError({message: "Failed to verify provided JWT", cause: err})
   }
 }
