@@ -10,7 +10,7 @@ export function registerBeforeAllMiddleware(app) {
   app.use(
     cors({
       // Make sure this matches your actual frontend port(s)
-      origin: ["http://localhost:3000", "http://localhost:4000"],
+      origin: ["http://localhost:3000", "http://localhost:4000", "https://dash.growthspringers.com"],
       credentials: true,
     })
   );
