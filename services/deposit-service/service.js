@@ -71,7 +71,7 @@ export async function recordDeposit(deposit){
     
   })
 
-  sendDepositRecordedEmail(deposit, user)
+  await sendDepositRecordedEmail(deposit, user)
 }
 
 export async function updateDeposit(depositId, update){
@@ -173,11 +173,8 @@ async function sendDepositRecordedEmail(deposit, user){
     date: DateUtil.formatDateShortUS(deposit.date),
   }
 
-  user = {
-    ...user.toObject(),
-    newWorth: deposit.amount + (deposit.type == "Permanent"? user.permanentInvestment.amount  : user.temporaryInvestment.amount),
-    newPoints: deposit.pointsAwarded + user.points
-  }
+  user.newWorth = deposit.amount + (deposit.type == "Permanent"? user.permanentInvestment.amount  : user.temporaryInvestment.amount),
+  user.newPoints = deposit.pointsAwarded + user.points
 
   let emailTemplate = path.join(moduleDirectory, "email-templates/deposit-received.ejs")
 

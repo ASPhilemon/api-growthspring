@@ -44,7 +44,7 @@ export async function getUserById(userId){
 
 export async function getUserByEmail(email){
   Validator.schema(Schemas.getUserByEmail, email)
-  const user = DB.query(await User.findOne({email}))
+  const user = await DB.query(User.findOne({email}))
   if (!user) throw new Errors.NotFoundError("Failed to find user")
   return user
 }
