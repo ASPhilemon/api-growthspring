@@ -71,7 +71,7 @@ export async function recordDeposit(deposit){
     
   })
 
-  sendDepositRecordedEmail(deposit, user)
+  await sendDepositRecordedEmail(deposit, user)
 }
 
 export async function updateDeposit(depositId, update){
@@ -167,11 +167,18 @@ export async function deleteDeposit(depositId, cashLocationToDeductId) {
 }
 
 async function sendDepositRecordedEmail(deposit, user){
-  deposit.pointsAwarded = deposit.type == "Permanent"? _calculatePoints(deposit.amount) : 0
+  deposit = {
+    ...deposit,
+    pointsAwarded: deposit.type == "Permanent"? _calculatePoints(deposit.amount) : 0,
+    date: DateUtil.formatDateShortUS(deposit.date),
+  }
+
+  user.newWorth = deposit.amount + (deposit.type == "Permanent"? user.permanentInvestment.amount  : user.temporaryInvestment.amount),
+  user.newPoints = deposit.pointsAwarded + user.points
 
   let emailTemplate = path.join(moduleDirectory, "email-templates/deposit-received.ejs")
 
-  let message = await EJSUtil.renderTemplate(emailTemplate, deposit)
+  let message = await EJSUtil.renderTemplate(emailTemplate, {deposit, user})
 
   EmailServiceManager.sendEmail(
     "growthspring",

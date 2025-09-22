@@ -315,7 +315,7 @@ function _generatePassword(){
 
 function validatePasswordStrength(password){
   const result = zxcvbn(password)
-  if (result.score < 3){
+  if (result.score < 1){
     throw new Errors.BadRequestError("The password is too weak")
   }
 }

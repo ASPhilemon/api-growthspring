@@ -40,10 +40,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  phoneContact: {
-    type: String,
-    required: true
-  },
+  phoneContact: String,
   membershipDate: {
     type: Date,
     required: true
