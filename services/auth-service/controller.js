@@ -4,7 +4,7 @@ import * as Response from "../../utils/http-response-util.js"
 export async function signInWithPassword(req, res){
   const {email, password, cfTurnstileResponse} = req.body
   const jwt = await ServiceManager.signInWithPassword(email, password, cfTurnstileResponse)
-    const cookieDuration = 60*60*24*40 // 40 days
+    const cookieDuration = 60*60*24*40*1000 // 40 days
   _setCookie(res, {name: "jwt", value: jwt, duration:cookieDuration})
   Response.sendSuccess(jwt, {req, res})
 }
