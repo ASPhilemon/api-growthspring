@@ -81,12 +81,12 @@ export async function signOut(req, res){
 }
 
 function _setCookie(res, {name, value, duration }){
+  console.log(res, name, value, duration)
   res.cookie(name, value, {
     httpOnly: true,
     maxAge:duration,
     secure: true,
-    domain:"growthspringers.com",
-    sameSite: "none"
+    domain:"growthspringers.com"
   });
 }
 
