@@ -34,6 +34,7 @@ export function getUser(req, res, next) {
   try {
     // 1) Try cookie first
     let jwt = req.cookies?.jwt;
+    console.log("jwt ===== ", jwt)
 
     // 2) Fallback to Authorization header (Bearer <token>)
     if (!jwt) {
