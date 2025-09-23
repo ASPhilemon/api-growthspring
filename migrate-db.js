@@ -48,7 +48,7 @@ async function migrateDatabase(){
     migrateLoans(oldLoans, oldUsers, newDB),
     migratePointTransactions(oldPointTransactions, oldUsers, newDB),
     migrateEarnings(oldEarnings, oldUsers, newDB),
-    //migrateUnits(oldUnits, oldUsers, newDB)
+    migrateUnits(oldUnits, oldUsers, newDB)
   ])
 
   console.log("\nDATABASE MIGRARTION  SUCCEEDED ✔ ")
