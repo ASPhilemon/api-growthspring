@@ -81,7 +81,7 @@ export async function signOut(req, res){
 }
 
 function _setCookie(res, {name, value, duration }){
-  console.log(res, name, value, duration)
+  console.log("cookie name = ", name, value, duration)
   res.cookie(name, value, {
     httpOnly: true,
     maxAge:duration,
