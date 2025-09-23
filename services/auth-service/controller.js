@@ -10,7 +10,8 @@ export async function signInWithPassword(req, res){
 }
 
 export async function signInWithGoogle(req, res){
-  const jwt = await ServiceManager.signInWithGoogle()
+  const {credential} = req.body
+  const jwt = await ServiceManager.signInWithGoogle(credential)
     const cookieDuration = 60*60*24*40 // 40 days
   _setCookie(res, {name: "jwt", value: jwt, duration:cookieDuration})
   Response.sendSuccess(jwt, {req, res})
@@ -84,7 +85,8 @@ function _setCookie(res, {name, value, duration }){
     httpOnly: true,
     maxAge:duration,
     secure: true,
-    domain:".growthspringers.com"
+    domain:".growthspringers.com",
+    sameSite: "none"
   });
 }
 
