@@ -9,7 +9,7 @@ import cookieParser from "cookie-parser";
 export function registerBeforeAllMiddleware(app) {
   app.use(
     cors({
-      origin: ["http://localhost:3000", "http://localhost:4000", "https://dash.growthspringers.com", "https://auth.growthspringers.com"],
+      origin: ["https://dash.growthspringers.com", "https://auth.growthspringers.com", "https://growthspringers.com", "http://localhost:3000", "http://localhost:4000", ],
       credentials: true,
     })
   );
