@@ -7,7 +7,7 @@ export async function signInWithPassword(req, res){
     const cookieDuration = 60*60*24*40*1000 // 40 days
   _setCookie(res, {name: "jwt", value: jwt, duration:cookieDuration})
   Response.sendSuccess(jwt, {req, res})
-}_setC
+}
 
 export async function signInWithGoogle(req, res){
   const jwt = await ServiceManager.signInWithGoogle()
