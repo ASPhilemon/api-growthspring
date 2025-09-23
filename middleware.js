@@ -7,12 +7,7 @@ import { verifyJWT } from "./services/auth-service/service.js";
 import cookieParser from "cookie-parser";
 
 export function registerBeforeAllMiddleware(app) {
-  app.use(
-    cors({
-      origin: ["https://dash.growthspringers.com", "https://auth.growthspringers.com", "https://growthspringers.com", "http://localhost:3000", "http://localhost:4000", ],
-      credentials: true,
-    })
-  );
+  app.use(cors({origin: true, credentials: true}));
   app.use(express.static("public"));
   app.use(cookieParser());
   app.use(express.json());
