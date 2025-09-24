@@ -8,7 +8,7 @@ if (NODE_ENV === "debug-mongoose") {
 }
 mongoose.set('transactionAsyncLocalStorage', true);
 
-export async function connectDB(MONGODB_URI) {
+export default async function connectDB(MONGODB_URI) {
   if (!MONGODB_URI) throw new Error('MongoDB URI is required');
   
   // already connected to mongodb

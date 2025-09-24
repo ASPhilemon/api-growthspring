@@ -2,7 +2,8 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import dotenv from 'dotenv';
-import {connectDB, disconnectDB} from "./db.js"
+import {disconnectDB} from "./db.js"
+import connectDB from "./db.js"
 import app from "./app.js"
 import { AppError } from './utils/error-util.js';
 import { sendEmail } from './services/email-service/service.js';
