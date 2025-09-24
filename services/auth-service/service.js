@@ -110,7 +110,6 @@ export function verifyJWT(jwt){
     return JWT.verify(jwt, JWT_SECRET)
   }
   catch(err){
-    console.log(err)
     throw new Errors.BadRequestError({message: "Failed to verify provided JWT", cause: err})
   }
 }
