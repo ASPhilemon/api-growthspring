@@ -8,7 +8,7 @@ if (NODE_ENV === "debug-mongoose") {
 }
 mongoose.set('transactionAsyncLocalStorage', true);
 
-async function connectDB(MONGODB_URI) {
+export default async function connectDB(MONGODB_URI) {
   if (!MONGODB_URI) throw new Error('MongoDB URI is required');
   
   // already connected to mongodb
@@ -18,4 +18,8 @@ async function connectDB(MONGODB_URI) {
   DEBUG && console.log("connected to mongodb")
 }
 
-export default connectDB;
+export async function disconnectDB() {
+  if (mongoose.connection.readyState === 0) return;
+  await mongoose.disconnect();
+  DEBUG && console.log("disconnected from mongodb")
+}
