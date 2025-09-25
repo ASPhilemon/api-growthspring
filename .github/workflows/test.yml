@@ -35,7 +35,7 @@ jobs:
   deploy:
     name: Deploy to Production
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'  # deploy only on push to main
+    if: github.event_name == 'push'   # safe, because trigger already scoped to main
 
     steps:
       - name: Deploy via SSH
