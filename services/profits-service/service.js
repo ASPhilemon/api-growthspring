@@ -14,6 +14,7 @@ import * as UserServiceManager from "../user-service/service.js";
 import * as DepositServiceManager from "../deposit-service/service.js";
 import * as LoanServiceManager from "../loan-service/service.js";
 import * as EmailServiceManager from "../email-service/service.js";
+import * as DateUtil from "../../utils/date-util.js";
 
 const LOAN_TEMPLATES_PATH = "./email-templates.js"; 
 
@@ -350,7 +351,7 @@ export async function distributeAnnualProfits(
           balanceBefore: m.investmentAmount,
           cashLocation: { _id: reinvestCashLocationId, name: 'Profit Re-Investment' }, 
           source: "Profits",
-          date: new Date(),
+          date: DateUtil.getToday(),
           recordedBy: { _id: currentUser._id, fullName: currentUser.fullName }
         });
         earningsDestination = "Re-Invested";
@@ -365,7 +366,7 @@ export async function distributeAnnualProfits(
       await DB.query(Earnings.create({
         fullName: memberDetails.fullName,
         _id: memberDetails._id, 
-        date: new Date(),
+        date: DateUtil.getToday(),
         amount: roundedProfitDue,
         destination: earningsDestination,
         source: "Profits",
@@ -405,7 +406,7 @@ export async function distributeAnnualProfits(
     // Record Fund Earnings entry
     await DB.query(FundTransactions.create({
     name: "Tax",
-    date: new Date(),
+    date: DateUtil.getToday(),
     amount: clubTax,
     transaction_type: "Income",
     reason: "Profits",

@@ -64,7 +64,7 @@ export async function changeUserDashboardAppearance(userId, layOut, color) {
 
 
 export async function getUserDashboard(userId){
-  const currentYear = new Date().getFullYear();
+  const currentYear = DateUtil.getToday().getFullYear();
   const year = currentYear;
   const status = "Ongoing"
   const pagination = { page: 1, perPage: 100000 }; 
@@ -142,8 +142,8 @@ async function fetchAllDeposits(filter = {}, sort = { field: "date", order: -1 }
     return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
   }
 
-  const monthsPassedThisYear = (new Date().getMonth() + 1); // 1..12
-  const monthsForSaving = member.membershipDate < new Date(new Date().getFullYear(), 0, 1) ? monthsPassedThisYear : getDaysDifference(member.membershipDate, new Date()) / 30;
+  const monthsPassedThisYear = (DateUtil.getToday().getMonth() + 1); // 1..12
+  const monthsForSaving = member.membershipDate < new Date(DateUtil.getToday().getFullYear(), 0, 1) ? monthsPassedThisYear : getDaysDifference(member.membershipDate, DateUtil.getToday()) / 30;
   const formatCurrency = (amount) => {
     const safe = Number(amount || 0);
     return 'UGX ' + Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(safe);
@@ -176,7 +176,7 @@ async function fetchAllDeposits(filter = {}, sort = { field: "date", order: -1 }
 
   for (const member of allMembers) {
       memberNames.push(member.fullName);
-      const investmentDays = getDaysDifference(member.permanentInvestment.unitsDate, new Date());
+      const investmentDays = getDaysDifference(member.permanentInvestment.unitsDate, DateUtil.getToday());
       let totalUnits = investmentDays * member.permanentInvestment.amount + member.permanentInvestment.units;
       
       allCurrentUnits += totalUnits;
@@ -184,10 +184,10 @@ async function fetchAllDeposits(filter = {}, sort = { field: "date", order: -1 }
   }
 
   const currentMemberInfo = people.find(item => item.name === member.fullName);
-  const now = new Date();
+  const now = DateUtil.getToday();
   const startOfYear = new Date(now.getFullYear(), 0, 1);
-  const currentInvestmentAmount = currentMemberInfo.units / (getDaysDifference(startOfYear, new Date()));
-  const currentClubInvestmentAmount = allCurrentUnits / (getDaysDifference(startOfYear, new Date()));
+  const currentInvestmentAmount = currentMemberInfo.units / (getDaysDifference(startOfYear, DateUtil.getToday()));
+  const currentClubInvestmentAmount = allCurrentUnits / (getDaysDifference(startOfYear, DateUtil.getToday()));
   const ownershipPercentage = currentMemberInfo.units/allCurrentUnits;
 
   // points & credits
@@ -208,17 +208,17 @@ async function fetchAllDeposits(filter = {}, sort = { field: "date", order: -1 }
   
   // member debt totals & loans
   const totalStandardLoanDebt = ongoingMemberLoans.filter(t => t.type === "Standard").reduce((t, l) => {
-    const interestDue = LoansServiceManager.calculateCashInterestDueAmount(l, new Date(), member.points)?.totalInterestDue || 0;
+    const interestDue = LoansServiceManager.calculateCashInterestDueAmount(l, DateUtil.getToday(), member.points)?.totalInterestDue || 0;
     return t + (Number(l.principalLeft || 0) + Number(interestDue));
   }, 0);
   const totalFreeLoanDebt = ongoingMemberLoans.filter(t => t.type === "Permanent").reduce((t, l) => {
-    const interestDue = LoansServiceManager.calculateCashInterestDueAmount(l, new Date(), member.points)?.totalInterestDue || 0;
+    const interestDue = LoansServiceManager.calculateCashInterestDueAmount(l, DateUtil.getToday(), member.points)?.totalInterestDue || 0;
     return t + (Number(l.principalLeft || 0) + Number(interestDue));
   }, 0);
   const thisYearMemberStandardLoansSum = thisYearMemberLoans.filter(t => t.type === "Standard").reduce((t, l) => t + (l.amount || 0), 0);
   const thisYearMemberFreeLoansSum = thisYearMemberLoans.filter(t => t.type === "Interest-Free").reduce((t, l) => t + (l.amount || 0), 0);
-  const totalStandardLoansInterestDue = ongoingMemberLoans.filter(t => t.type === "Standard").reduce((t, l) => t + (LoansServiceManager.calculateCashInterestDueAmount(l, new Date(), member.points).totalInterestDue || 0), 0);
-  const totalFreeLoansInterestDue = 0; //ongoingMemberLoans.filter(t => t.type === "Interest-Free").reduce((t, l) => t + (LoansServiceManager.calculateCashInterestDueAmount(l, new Date(), member.points)?.totalInterestDue || 0), 0);
+  const totalStandardLoansInterestDue = ongoingMemberLoans.filter(t => t.type === "Standard").reduce((t, l) => t + (LoansServiceManager.calculateCashInterestDueAmount(l, DateUtil.getToday(), member.points).totalInterestDue || 0), 0);
+  const totalFreeLoansInterestDue = 0; //ongoingMemberLoans.filter(t => t.type === "Interest-Free").reduce((t, l) => t + (LoansServiceManager.calculateCashInterestDueAmount(l, DateUtil.getToday(), member.points)?.totalInterestDue || 0), 0);
   const totalStandardLoansEver = memberLoans.filter(t => t.type === "Standard").reduce((t, l) => t + (l.amount || 0), 0);
   const totalFreeLoansEver = memberLoans.filter(t => t.type === "Interest-Free").reduce((t, l) => t + (l.amount || 0), 0);
 
@@ -293,7 +293,7 @@ function formatRecordsForYears(processedObj, dateFormatter) {
   return entries.map(([year, sum]) => {
     const records = processedObj.recordsByYear?.[year] || [];
     const values = records.map(r => [dateFormatter(r.date), Math.round(r.amount || r.points || 0), r.source || r.reason || '']);
-    const avg = year != new Date().getFullYear() ? Math.round(sum.amount / 12) : Math.round(sum.amount / (new Date().getMonth() + 1));
+    const avg = year != DateUtil.getToday().getFullYear() ? Math.round(sum.amount / 12) : Math.round(sum.amount / (DateUtil.getToday().getMonth() + 1));
     return { year, total: Math.round(sum.amount || sum.points || 0), avgMonthyDeposit: avg, values };
   });
 }
@@ -314,9 +314,9 @@ function formatClubDeposits(clubDepositsArray) {
         return [month, amount, savers];
       });
 
-      const avg = year != new Date().getFullYear()
+      const avg = year != DateUtil.getToday().getFullYear()
         ? Math.round((sum.amount ?? sum.deposit_amount ?? 0) / 12)
-        : Math.round((sum.amount ?? sum.deposit_amount ?? 0) / (new Date().getMonth() + 1));
+        : Math.round((sum.amount ?? sum.deposit_amount ?? 0) / (DateUtil.getToday().getMonth() + 1));
 
       return { year, total: Math.round(sum.amount ?? sum.deposit_amount ?? 0), avgMonthyDeposit: avg, values: monthly };
     });
@@ -344,9 +344,9 @@ function formatClubEarnings(clubEarningsArray, clubUnits) {
       );
 
       // optional: average monthly earnings (handles partial current year like deposits)
-      const monthsSoFar = (Number(year) !== new Date().getFullYear())
+      const monthsSoFar = (Number(year) !== DateUtil.getToday().getFullYear())
         ? 12
-        : (new Date().getMonth() + 1);
+        : (DateUtil.getToday().getMonth() + 1);
       const avgMonthlyEarnings = monthsSoFar > 0 ? Math.round(totalEarn / monthsSoFar) : 0;
 
       return {
@@ -534,7 +534,7 @@ async function buildMemberLoanRecords(memberLoans, ctx, dateFormatter) {
     const interestDue =
       LoansServiceManager.calculateCashInterestDueAmount(
         record,
-        new Date(),
+        DateUtil.getToday(),
         points
       )?.totalInterestDue ?? 0;
 
