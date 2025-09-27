@@ -29,12 +29,10 @@ export function getUser(req, res, next) {
   try {
     // 1) Try cookie first
     let jwt = req.cookies?.jwt;
-    console.log("jwt before ===== ", jwt)
 
     // 2) Fallback to Authorization header (Bearer <token>)
     if (!jwt) {
       const auth = req.get("authorization") || req.get("Authorization");
-      console.log("authorization == ", auth)
       if (auth && auth.startsWith("Bearer ")) {
         jwt = auth.slice(7).trim();
       }
@@ -44,8 +42,6 @@ export function getUser(req, res, next) {
     if (!jwt && req.query?.token) {
       jwt = req.query.token;
     }
-
-    console.log("jwt after ===== ", jwt)
 
     if (jwt) {
       user = verifyJWT(jwt); // throws if invalid
@@ -76,7 +72,6 @@ export function errorHandler(err, req, res, next) {
   const statusCode = isAppError ? err.statusCode : 500;
   const errMessage = isAppError ? err.message : "Sorry, an unknown error occured";
   Response.sendError(errMessage, statusCode, { req, res });
-  console.log(err)
   const NODE_ENV = process.env.NODE_ENV;
   if (["debug", "debug-mongoose"].includes(NODE_ENV)) {
     console.error(err);
