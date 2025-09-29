@@ -72,6 +72,6 @@ async function sendErrorAlert(message) {
       )
     );
   } catch (err) {
-    console.error("Error sending error alert email:", err);
+    console.error("Error sending error alert emails: ", err);
   }
 }
