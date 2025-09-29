@@ -3,17 +3,16 @@ name: CI/CD Pipeline
 on:
   pull_request:
     branches:
-      - v2
       - main
   push:
     branches:
-      - main   # only deploy after merge to main
+      - main
 
 jobs:
   tests:
     name: Jest Tests
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'   # run tests only on PR
+    if: github.event_name == 'pull_request'
 
     env:
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
@@ -26,6 +25,12 @@ jobs:
         with:
           node-version: '20.12.2'
 
+      - name: Cache MongoDB binaries
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-${{ runner.os }}-8.0.0
+
       - name: Install dependencies
         run: npm install
 
@@ -35,7 +40,7 @@ jobs:
   deploy:
     name: Deploy to Production
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'   # safe, because trigger already scoped to main
+    if: github.event_name == 'push'
 
     steps:
       - name: Deploy via SSH
