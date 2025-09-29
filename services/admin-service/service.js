@@ -14,7 +14,7 @@ import * as UserServiceManager from "../user-service/service.js";
 import * as EmailServiceManager from "../email-service/service.js";
 import * as CashLocationServiceManager from "../cash-location-service/service.js";
 import * as DepositServiceManager from "../deposit-service/service.js";
-
+import DateUtil from "../../utils/date-util.js";
 
 /**
  * Transforms raw loan and payment data into a standardized financial record format.
@@ -126,7 +126,7 @@ function transformLoansToFinancialRecords(loans) {
       loansSummary.principalLeft += loan.principalLeft;
   
       if (loan.status === "Ongoing") {
-        loansSummary.expectedInterest += calculateTotalInterestDueAmount(loan, new Date());
+        loansSummary.expectedInterest += calculateTotalInterestDueAmount(loan, DateUtil.getToday());
       } else {
         loansSummary.interestPaid += loan.interestAmount; 
       }

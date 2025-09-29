@@ -7,6 +7,8 @@
 //PROCESS_STD_LOAN_PYMT
 //TEMPORARY_LOANS
 
+import * as DateUtil from "../../utils/date-util.js";
+
 
 
 // model
@@ -293,7 +295,7 @@ function calculatePointMonthsAccrued(loanStartDate, calculationEndDate) {
  * @returns {Promise<object>} A promise that resolves to the created loan document.
  */
 export async function createAndPersistLoan(params) {
-  const today = new Date();
+  const today = DateUtil.getToday();
 
   const newLoan = {
     duration: params.duration,
@@ -394,7 +396,7 @@ export async function calculateStandardLoanLimit(borrowerId) {
       type: "Standard"
   }));
 
-  const today = new Date();
+  const today = DateUtil.getToday();
   const dateAYearAgo = new Date(today.getTime() - (365 * 24 * 60 * 60 * 1000));
   const userId = borrowerId;
   const periodEnd = today;
@@ -677,9 +679,9 @@ await Promise.all(ops);
   const updatedLoanResult = await Loan.updateOne({ _id: loan._id }, {
       status: "Ongoing",
       approvedBy: { id: approvedBy.id, name: approvedBy.fullName },
-      date: new Date(),
+      date: DateUtil.getToday(),
       sources: sources,
-      lastPaymentDate: new Date(),
+      lastPaymentDate: DateUtil.getToday(),
   });
 
   await EmailServiceManager.sendEmailWithTemplate({
@@ -834,7 +836,7 @@ function calculateTotalInterestDueAmount(payments, amount, lastPaymentDate, loan
  * @param {number} availablePoints - The borrower's current available points.
  * @returns {number} The interest amount that must be paid with cash.
  */
-function calculateCashInterestDueAmount(loan, dueDate = new Date(), availablePoints) {
+function calculateCashInterestDueAmount(loan, dueDate = DateUtil.getToday(), availablePoints) {
   let totalInterestDue = calculateTotalInterestDueAmount(loan.payments.length, loan.principalLeft, loan.lastPaymentDate, loan.date, dueDate);
   const pointsInterestDue = calculatePointsInterestDueAmount(loan, availablePoints, dueDate); 
   totalInterestDue = Math.max(0, totalInterestDue - pointsInterestDue);
@@ -1036,7 +1038,7 @@ export function calculateFreeLoanEligibility(user, requestedAmount, requestedPer
   Validator.assert(user.temporaryInvestment?.amount !== undefined && user.temporaryInvestment?.units !== undefined,
     "User temporary savings data is incomplete.", Errors.InternalServerError );
 
-  const totalDaysSinceDeposit = getDaysDifference(user.temporaryInvestment.unitsDate, new Date());
+  const totalDaysSinceDeposit = getDaysDifference(user.temporaryInvestment.unitsDate, DateUtil.getToday());
 
   const loanPeriodLimit = requestedAmount > 0
     ? Math.round((user.temporaryInvestment?.amount * totalDaysSinceDeposit + user.temporaryInvestment?.units) / requestedAmount)
@@ -1068,10 +1070,10 @@ async function approveFreeLoanRequest(loan, approvedBy, sources, borrowerUser) {
   const updatedLoanResult = await Loan.updateOne({ _id: loan._id }, {
       status: "Ongoing",
       approvedBy: { id: approvedBy.id, name: approvedBy.fullName },
-      date: new Date(),
+      date: DateUtil.getToday(),
       units: 0,
       sources: sources,
-      lastPaymentDate: new Date(),
+      lastPaymentDate: DateUtil.getToday(),
   });
   
   await EmailServiceManager.sendEmailWithTemplate({

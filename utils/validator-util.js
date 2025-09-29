@@ -6,7 +6,7 @@ export function schema(schema, input){
 }
 
 export function assert(expr, errMessage, errType) {
-  let ErrorConstructor = errType?.errType || errType || Errors.BadRequestError;
+  let ErrorConstructor = errType || Errors.BadRequestError;
   if (!expr) {
     // Pass an object with message and statusCode to ensure compatibility with AppError
     throw new ErrorConstructor({ message: errMessage });
