@@ -16,7 +16,7 @@ export function registerBeforeAllMiddleware(app) {
     next();
   });
 
-  app.use(getUser); // attaches req.user if a valid JWT is present
+  app.use(getUser);
 }
 
 export function registerAfterAllMiddleware(app) {
@@ -25,29 +25,13 @@ export function registerAfterAllMiddleware(app) {
 
 export function getUser(req, res, next) {
   let user = null;
-
+      
+  let jwt = req.cookies?.jwt;
   try {
-    // 1) Try cookie first
-    let jwt = req.cookies?.jwt;
-
-    // 2) Fallback to Authorization header (Bearer <token>)
-    if (!jwt) {
-      const auth = req.get("authorization") || req.get("Authorization");
-      if (auth && auth.startsWith("Bearer ")) {
-        jwt = auth.slice(7).trim();
-      }
-    }
-
-    // 3) (Optional) Fallback to query param for debugging: ?token=...
-    if (!jwt && req.query?.token) {
-      jwt = req.query.token;
-    }
-
-    if (jwt) {
-      user = verifyJWT(jwt); // throws if invalid
-    }
-  } catch (err) {
-    user = null; // invalid token => unauthenticated
+    if (jwt) user = verifyJWT(jwt);
+  }
+  catch (err) {
+    user = null;
   }
 
   req.user = user;
