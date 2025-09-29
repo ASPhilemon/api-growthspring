@@ -42,7 +42,9 @@ export async function signInWithGoogle(googleToken){
     Please sign in with a registered email.`
   )
 
-  return _createJWT(user._id, user.fullName, user.isAdmin)
+  const user = await UserServiceManager.getUserByEmail(userEmail)
+
+  return createJWT(user._id, user.fullName, user.isAdmin)
 
   async function _getUserEmailFromGoogleToken(token) {
     const client = new OAuth2Client();

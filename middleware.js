@@ -7,13 +7,7 @@ import { verifyJWT } from "./services/auth-service/service.js";
 import cookieParser from "cookie-parser";
 
 export function registerBeforeAllMiddleware(app) {
-  app.use(
-    cors({
-      // Make sure this matches your actual frontend port(s)
-      origin: ["http://localhost:3000", "http://localhost:4000"],
-      credentials: true,
-    })
-  );
+  app.use(cors({origin: true, credentials: true}));
   app.use(express.static("public"));
   app.use(cookieParser());
   app.use(express.json());
@@ -78,7 +72,6 @@ export function errorHandler(err, req, res, next) {
   const statusCode = isAppError ? err.statusCode : 500;
   const errMessage = isAppError ? err.message : "Sorry, an unknown error occured";
   Response.sendError(errMessage, statusCode, { req, res });
-
   const NODE_ENV = process.env.NODE_ENV;
   if (["debug", "debug-mongoose"].includes(NODE_ENV)) {
     console.error(err);

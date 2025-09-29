@@ -665,11 +665,14 @@ export function calculateLoanPointsNeeded(loanAmount, loanDuration, borrowerPoin
  * @throws {ErrorUtil.AppError} If loan not found, not pending, or disbursement fails.
  */
 async function approveStandardLoanRequest(loan, approvedBy, sources, borrowerUser) {
-  await Promise.all(
-      sources.map(source =>
-          CashLocationServiceManager.addToCashLocation(source.id, -source.amount)
-      )
-  );
+
+const ops = sources.map(src =>
+{  const amount = src.amount == 0 ? 0 : -src.amount;
+  CashLocationServiceManager.addToCashLocation(src.id, amount)}
+);
+
+await Promise.all(ops);
+
   // Use Loan.updateOne directly
   const updatedLoanResult = await Loan.updateOne({ _id: loan._id }, {
       status: "Ongoing",
@@ -756,7 +759,8 @@ async function processStandardLoanPayment(loan, borrowerUser, paymentAmount, cas
   }
 
   // Persist the updated loan document
-  const updatedLoanRecordResult = await DB.query(loan.save());
+  const updatedLoanRecordResult = await DB.query(loan.save({ validateBeforeSave: false }));
+
 
   // Send notification
   let template = pendingDebt > 0 ? "loan-payment-confirmation.ejs" : "loan-cleared.ejs"; 
