@@ -33,7 +33,14 @@ import * as DepositServiceManager from "../deposit-service/service.js";
 import * as PointsServiceManager from "../point-service/service.js";
 import * as CashLocationServiceManager from '../cash-location-service/service.js';
 
-const LOAN_TEMPLATES_PATH = "./email-templates.js"; 
+
+import path from "path";
+import { fileURLToPath } from "url";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const LOAN_TEMPLATES_PATH = path.resolve(__dirname, "./email-templates");
+ 
 
 
 //....................................GENERAL_REQUESTS.....................................
@@ -773,6 +780,7 @@ async function processStandardLoanPayment(loan, borrowerUser, paymentAmount, cas
     subject: "Your Loan Payment Was Successful!",
     templateName: template,
     templateData: {
+      user_first_name: borrowerUser.displayName || borrowerUser.fullName, 
       amount_paid: paymentAmount,
       date: formattedDate,
       outstanding_debt: pendingDebt
@@ -1160,6 +1168,7 @@ async function processFreeLoanPayment(
     subject: "Your Loan Payment Was Successful!",
     templateName: template,
     templateData: {
+      user_first_name: borrowerUser.displayName || borrowerUser.fullName, 
       amount_paid: paymentAmount,
       date: formattedDate,
       outstanding_debt: loan.principalLeft
