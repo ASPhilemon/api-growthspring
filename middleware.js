@@ -57,7 +57,7 @@ export function errorHandler(err, req, res, next) {
   const errMessage = isAppError ? err.message : "Sorry, an unknown error occured";
   Response.sendError(errMessage, statusCode, { req, res });
   const NODE_ENV = process.env.NODE_ENV;
-  if (["debug", "debug-mongoose"].includes(NODE_ENV)) {
+  if (["debug", "debug-mongoose", "production"].includes(NODE_ENV)) {
     console.error(err);
   }
 }
