@@ -15,11 +15,11 @@ export default async function connectDB(MONGODB_URI) {
   if (mongoose.connection.readyState === 1) return;
   
   await mongoose.connect(MONGODB_URI);
-  DEBUG && console.log("connected to mongodb")
+  DEBUG && console.log("=== connected to mongodb")
 }
 
 export async function disconnectDB() {
   if (mongoose.connection.readyState === 0) return;
   await mongoose.disconnect();
-  DEBUG && console.log("disconnected from mongodb")
+  DEBUG && console.log("=== disconnected from mongodb")
 }

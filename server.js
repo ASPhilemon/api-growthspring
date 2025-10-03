@@ -29,19 +29,19 @@ await connectDB(MONGODB_URI)
 //start server
 const PORT = process.env.PORT
 app.listen(PORT, ()=> {
-  console.log(`Listening for requests on port ${PORT}`)
+  console.log(`=== Listening for requests on port ${PORT}`)
 })
 
 
 //handle server errors
 process.on("uncaughtException", async (err) => {
-  console.error("Uncaught Exception", err)
+  console.error("=== Uncaught Exception", err)
   //await sendErrorAlert(err.stack || err.message);
   if (!(err instanceof AppError)) await gracefulShutdown();
 });
 
 process.on("unhandledRejection", async (reason) => {
-  console.error("Uncaught Rejection", reason)
+  console.error("=== Uncaught Rejection", reason)
   //await sendErrorAlert("Unhandled promise rejection occured")
   if (!(reason instanceof AppError)) await gracefulShutdown()
 });
@@ -49,9 +49,9 @@ process.on("unhandledRejection", async (reason) => {
 async function gracefulShutdown() {
   try {
     await disconnectDB()
-    console.log("Cleanup complete. Exiting...");
+    console.log("=== Cleanup complete. Exiting...");
   } catch (cleanupErr) {
-    console.error("Error during cleanup:", cleanupErr);
+    console.error("=== Error during cleanup:", cleanupErr);
   } finally {
     process.exit(1)
   }
@@ -72,6 +72,6 @@ async function sendErrorAlert(message) {
       )
     );
   } catch (err) {
-    console.error("Error sending error alert email: ", err);
+    console.error("=== Error sending error alert email: ", err);
   }
 }

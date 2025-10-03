@@ -58,6 +58,6 @@ export function errorHandler(err, req, res, next) {
   Response.sendError(errMessage, statusCode, { req, res });
   const NODE_ENV = process.env.NODE_ENV;
   if (["debug", "debug-mongoose", "production"].includes(NODE_ENV)) {
-    console.error(err);
+    console.error("=== ", err);
   }
 }
