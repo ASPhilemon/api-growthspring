@@ -21,5 +21,5 @@ export default async function connectDB(MONGODB_URI) {
 export async function disconnectDB() {
   if (mongoose.connection.readyState === 0) return;
   await mongoose.disconnect();
-  DEBUG && console.log("=== disconnected from mongodb")
+  DEBUG && console.log("=== disconnected from mongodb.")
 }
