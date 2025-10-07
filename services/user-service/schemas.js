@@ -59,7 +59,7 @@ export const updateUser = Joi.object({
     permanentInvestment: investment,
     temporaryInvestment: investment,
     dob: birthday,
-    points: Joi.number().integer().min(0),
+    points: Joi.number().min(0),
     isActive: Joi.boolean(),
     isAdmin: Joi.boolean(),
     displayName: Joi.string()
@@ -84,13 +84,13 @@ export const deleteUserPhoto = userId
 
 export const addPoints = Joi.object({
   userId,
-  points: Joi.number().integer()
+  points: Joi.number()
 }).unknown(false)
 
 export const transferPoints = Joi.object({
   senderId: userId,
   recipientId: userId,
-  points: Joi.number().integer().min(1).required(),
+  points: Joi.number().min(1).required(),
   reason: Joi.string().required()
 }).unknown(false)
 

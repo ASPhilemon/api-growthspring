@@ -16,7 +16,7 @@ let uuidv4Pattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9
 
 const uuid = Joi.string().pattern(uuidv4Pattern)
 
-const points = Joi.number().integer().greater(0)
+const points = Joi.number().greater(0)
 
 
 //exported schemas
