@@ -142,6 +142,7 @@ export async function initiateLoan(
   Validator.assert(borrowerUser, "Borrower not found.", Errors.AppError);
 
   // Dispatch based on loanType
+  await DB.transaction(async ()=> {  
   switch (loanType) {
     case "Standard":
       return await initiateStandardLoanRequest(
@@ -154,6 +155,7 @@ export async function initiateLoan(
     default:
       Validator.assert(false, `Unsupported loan type for initiation: ${loanType}`, Errors.AppError );
   }
+  })
 }
 
 /**
@@ -177,6 +179,7 @@ export async function approveLoan(loanId, approvedBy, sources) {
   );
 
   // Dispatch based on loan type
+  await DB.transaction(async ()=> {  
   if (loan.type === "Standard") {
     return await approveStandardLoanRequest(loan, approvedBy, sources, borrowerUser);
   } else if (loan.type === "Interest-Free") {
@@ -184,6 +187,7 @@ export async function approveLoan(loanId, approvedBy, sources) {
   } else {
     Validator.assert(false, `Unsupported loan type for approval: ${loan.type}`, Errors.AppError );
   }
+   })
 }
 
 /**
@@ -224,6 +228,7 @@ export async function processLoanPayment(loanId, paymentAmount, cashLocationId, 
     Errors.AppError 
   );
 
+  await DB.transaction(async ()=> {
   switch (loan.type) {
     case "Standard":
       await processStandardLoanPayment(
@@ -238,6 +243,7 @@ export async function processLoanPayment(loanId, paymentAmount, cashLocationId, 
     default:
       Validator.assert(false, `Unsupported loan type for payment processing: ${loan.type}`, Errors.AppError );
   }
+   })
   return ''; 
 }
 
@@ -319,7 +325,7 @@ export async function createAndPersistLoan(params) {
     approvedBy: {},
     worthAtLoan: params.borrowerUser.permanentInvestment.amount,
     amount: params.amount,
-    date: today,
+    date: params.date,
     borrower: { id: params.borrowerUser._id, name: params.borrowerUser.fullName },
     pointsSpent: params.pointsSpent,
     discount: 0,
@@ -370,6 +376,7 @@ async function initiateStandardLoanRequest(
   const createdLoan = await createAndPersistLoan({
     amount,
     duration,
+    date: date,
     earliestDate: date,
     latestDate: date,
     borrowerUser,
@@ -734,18 +741,19 @@ async function processStandardLoanPayment(loan, borrowerUser, paymentAmount, cas
 
   // Distribute payment to principal and interest
   const paymentDistribution = calculateStandardLoanPrincipalPaid(paymentAmount, totalInterestDue, loan.principalLeft);
-
+  let recordedPayment = paymentAmount;
   if (paymentDistribution.excessAmount > 0) {
     Validator.assert(paymentDistribution.excessAmount >= 0, "Excess amount cannot be negative.", Errors.InternalServerError); // Defensive
     await handleExcessPayment(paymentDistribution.excessAmount, borrowerUser, cashLocationId, currentUser, paymentDate);
+    recordedPayment = paymentAmount - paymentDistribution.excessAmount;
   }
 
   // Record points consumption and update user balance
   const pointsConsumed = calculatePointsConsumed(pointsInterestDue);
-
+  const loanId = loan._id.toString();
   if (pointsConsumed > 0) { 
     Validator.assert(pointsConsumed > 0, "Points consumed must be positive to redeem.", Errors.InternalServerError); // Defensive
-    await PointsServiceManager.redeemPoints(borrowerUser._id, pointsConsumed, 'Loan Interest', '');
+    await PointsServiceManager.redeemPoints(borrowerUser._id, pointsConsumed, 'Loan Interest', loanId);
     await updateUserPointsBalance(borrowerUser._id, -pointsConsumed);
   }
 
@@ -754,7 +762,7 @@ async function processStandardLoanPayment(loan, borrowerUser, paymentAmount, cas
 
   // Add the current payment to the loan's payments array
   loan.payments.push({
-    amount: paymentAmount,
+    amount: recordedPayment,
     date: paymentDate,
     location: cashLocationId,
     updatedBy: { id: currentUser._id, name: currentUser.fullName }
@@ -909,7 +917,7 @@ async function updateUserPointsBalance(userId, pointsChange) {
   Validator.required({ userId, pointsChange });
 
   if (pointsChange !== 0) {
-    await UserServiceManager.updateUser(userId, { $inc: { "points": pointsChange } });
+    await UserServiceManager.addPoints(userId, pointsChange );
   }
 }
 
@@ -1016,6 +1024,7 @@ async function initiateFreeLoanRequest(
   const createdLoan = await createAndPersistLoan({
     amount,
     duration,
+    date: date,
     earliestDate : date,
     latestDate: date,
     borrowerUser,

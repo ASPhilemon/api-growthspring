@@ -890,6 +890,7 @@ async function fetchAllDeposits(filter = {}, sort = { field: "date", order: -1 }
 
   // loans and payments
   for (const loan of (allLoans || [])) {
+    if (loan.status != "Pending Approval" ){ 
     const loanDateISO = toISODate(loan.date);
     const loanAmountNum = safeNumber(loan.amount);
 
@@ -935,6 +936,7 @@ async function fetchAllDeposits(filter = {}, sort = { field: "date", order: -1 }
         isOutflow: false,
       });
     }
+   }
   }
 
   // ---------- Sort using internal ISO date (descending) ----------
