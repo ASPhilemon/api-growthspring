@@ -6,6 +6,7 @@ import pointRouter from "./services/point-service/routes.js"
 import userRouter from "./services/user-service/routes.js"
 import withdrawRouter from "./services/withdraw-service/routes.js"
 import authRouter from "./services/auth-service/routes.js"
+import clubFundTxRouter from "./services/admin-service/routes.js"
 
 //middleware imports
 import { registerBeforeAllMiddleware, registerAfterAllMiddleware } from "./middleware.js"
@@ -21,6 +22,7 @@ export function registerRoutes(app){
   app.use("/loans", loanRouter)
   app.use("/point-transactions", pointRouter)
   app.use("/withdraws", withdrawRouter)
+  app.use("/fund-transactions", clubFundTxRouter)
 
   //register afterAll middleware
   registerAfterAllMiddleware(app)

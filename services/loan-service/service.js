@@ -458,7 +458,6 @@ export function _calculateLimit(user, ongoingDebts, interestPaidInLastYear) {
 export async function getAggregatedLoanInterestByPeriod({ userId, periodStart, periodEnd }) {
   Validator.required({ userId, periodStart, periodEnd });
 
-  // Normalize to local day bounds (keep as-is if you prefer UTC)
   function toStartOfDay(d) {
     const x = d instanceof Date ? d : new Date(d);
     return new Date(x.getFullYear(), x.getMonth(), x.getDate(), 0, 0, 0, 0);
@@ -469,27 +468,26 @@ export async function getAggregatedLoanInterestByPeriod({ userId, periodStart, p
   }
 
   const A = toStartOfDay(periodStart);
+
+  // You said B is always current date; keep using normalized "today end"
   const B = toEndOfDay(periodEnd);
 
-  // Safe number
   const n = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
-  // Note: if you also want Interest-Free, call again with type: "Interest-Free" and add.
   const type = "Standard";
   const sort = { field: "date", order: -1 };
   const pagination = { page: 1, perPage: 2000 };
 
-  // Fetch
-  const ongoingLoansAll = (await getLoans({ userId, status: "Ongoing", sort, pagination, type })) || [];
-  const endedLoansMaybe = (await getLoans({ userId, status: "Ended", sort, pagination, type })) || [];
+  const ongoingLoansAll =
+    (await getLoans({ userId, status: "Ongoing", sort, pagination, type })) || [];
+  const endedLoansMaybe =
+    (await getLoans({ userId, status: "Ended", sort, pagination, type })) || [];
 
-  // Only consider loans that started on/before periodEnd
   const ongoingLoans = ongoingLoansAll.filter((l) => {
     const start = new Date(l.date);
     return !Number.isNaN(start) && start.getTime() <= B.getTime();
   });
 
-  // Ended loans that started by periodEnd and have a payment after periodStart
   const endedLoans = endedLoansMaybe.filter((l) => {
     const start = new Date(l.date);
     const lp = l.lastPaymentDate ? new Date(l.lastPaymentDate) : null;
@@ -502,7 +500,9 @@ export async function getAggregatedLoanInterestByPeriod({ userId, periodStart, p
     );
   });
 
-  // Helpers
+  // ---------------------------
+  // Snapshot helpers still needed (for principalLeftAt(A) + units)
+  // ---------------------------
   function paymentsUpTo(lo, cutoff) {
     const list = Array.isArray(lo.payments) ? lo.payments : [];
     const c = cutoff instanceof Date ? cutoff : new Date(cutoff);
@@ -513,90 +513,131 @@ export async function getAggregatedLoanInterestByPeriod({ userId, periodStart, p
     });
   }
 
-  function lastPaymentDateUpTo(lo, cutoff) {
-    const start = new Date(lo.date);
-    const pts = paymentsUpTo(lo, cutoff);
-    if (!pts.length) return start; // when no payments, lastPaid = loan start
-    let latest = start;
-    for (const p of pts) {
-      const d = new Date(p.date);
-      if (!Number.isNaN(d) && d > latest) latest = d;
-    }
-    return latest;
-  }
-
-  // If you truly need principal reconstruction at a snapshot:
-  // (This is a placeholder; ensure it matches your business math exactly.)
   function principalLeftAt(lo, cutoff) {
-    // If your system persists principalLeft “now” only, the reconstruction below is an estimate.
-    // Prefer a server util if you have one.
     const base = n(lo.amount);
-    const totalMonthsDue = calculateTotalMonthsDue(lo.date, cutoff); // ← your existing util
+    const totalMonthsDue = calculateTotalMonthsDue(lo.date, cutoff);
     const grown = base * Math.pow(1 + CONSTANTS.MONTHLY_LENDING_RATE, totalMonthsDue);
     const paidUpTo = paymentsUpTo(lo, cutoff).reduce((s, p) => s + n(p.amount), 0);
     const left = grown - paidUpTo;
     return left > 0 ? left : 0;
   }
 
-  // Keep snapshot between loan start and B
-  const clampSnapshot = (lo, snapshot) => {
-    const start = new Date(lo.date);
-    const s = snapshot < start ? start : snapshot;
-    return s > B ? B : s;
-  };
-
-  function interestAt(lo, snapshotRaw) {
-    const snapshot = clampSnapshot(lo, snapshotRaw instanceof Date ? snapshotRaw : new Date(snapshotRaw));
-    const pLen = paymentsUpTo(lo, snapshot).length;
-    const pLeft = principalLeftAt(lo, snapshot);
-    const lastPaid = lastPaymentDateUpTo(lo, snapshot);
-    const loanStart = new Date(lo.date);
-
-    return n(
-      calculateTotalInterestDueAmount(
-        pLen,
-        pLeft,
-        lastPaid,
-        loanStart,
-        snapshot
-      )
-    );
-  }
-
-  function interestNow(lo) {
+  // ---------------------------
+  // Interest due "now" (no snapshots)
+  // ---------------------------
+  function interestDueNow(lo) {
     const pLen = Array.isArray(lo.payments) ? lo.payments.length : 0;
     const pLeft = n(lo.principalLeft); // current server value
     const lastPaid = lo.lastPaymentDate ? new Date(lo.lastPaymentDate) : new Date(lo.date);
     const loanStart = new Date(lo.date);
+
     return n(
       calculateTotalInterestDueAmount(
         pLen,
         pLeft,
         lastPaid,
         loanStart,
-        B
+        B // "now" as-of point
       )
     );
   }
 
-  // Totals
-  const ongoingLoansInterest = ongoingLoans.reduce((total, lo) => {
-    const now = interestNow(lo);
-    const atStart = interestAt(lo, A);
-    const delta = Math.max(0, now - atStart);
-    return total + delta;
+  function accruedInterestAtB(lo, isEnded) {
+    const paidToDate = n(lo.interestAmount);
+    const dueAtB = isEnded ? 0 : interestDueNow(lo);
+    return paidToDate + dueAtB;
+  }
+
+  // ---------------------------
+  // Loan units (principal × time)
+  // ---------------------------
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+  function loanUnitsBetween({ lo, start, end, principalAtStart }) {
+    const s = start instanceof Date ? start : new Date(start);
+    const e = end instanceof Date ? end : new Date(end);
+    if (!s || !e || Number.isNaN(s) || Number.isNaN(e) || e <= s) return 0;
+
+    const payments = Array.isArray(lo.payments) ? lo.payments : [];
+    const pts = payments
+      .map((p) => ({ ...p, _d: new Date(p?.date) }))
+      .filter((p) => p._d && !Number.isNaN(p._d) && p._d > s && p._d <= e)
+      .sort((a, b) => a._d - b._d);
+
+    let principal = Math.max(0, n(principalAtStart));
+    let prev = s;
+    let units = 0;
+
+    for (const p of pts) {
+      const dtDays = Math.max(0, (p._d.getTime() - prev.getTime()) / MS_PER_DAY);
+      units += principal * dtDays;
+
+      principal = Math.max(0, principal - n(p.amount));
+      prev = p._d;
+    }
+
+    const tailDays = Math.max(0, (e.getTime() - prev.getTime()) / MS_PER_DAY);
+    units += principal * tailDays;
+
+    return units;
+  }
+
+  function loanUnitsTotalToB(lo) {
+    const loanStart = new Date(lo.date);
+    if (Number.isNaN(loanStart) || B <= loanStart) return 0;
+
+    return loanUnitsBetween({
+      lo,
+      start: loanStart,
+      end: B,
+      principalAtStart: n(lo.amount),
+    });
+  }
+
+  function loanUnitsInPeriod(lo) {
+    const loanStart = new Date(lo.date);
+    if (Number.isNaN(loanStart) || B <= loanStart) return 0;
+
+    const periodStart = A > loanStart ? A : loanStart;
+    if (B <= periodStart) return 0;
+
+    const principalAtStart = loanStart < A ? principalLeftAt(lo, A) : n(lo.amount);
+
+    return loanUnitsBetween({
+      lo,
+      start: periodStart,
+      end: B,
+      principalAtStart,
+    });
+  }
+
+  function allocatedInterestAccruedInPeriod(lo, isEnded) {
+    const unitsTotal = loanUnitsTotalToB(lo);
+    if (unitsTotal <= 0) return 0;
+
+    const unitsPeriod = loanUnitsInPeriod(lo);
+    if (unitsPeriod <= 0) return 0;
+
+    const totalAccruedAtB = accruedInterestAtB(lo, isEnded);
+    const ratio = unitsPeriod / unitsTotal;
+    const safeRatio = ratio < 0 ? 0 : ratio > 1 ? 1 : ratio;
+
+    return totalAccruedAtB * safeRatio;
+  }
+  
+  const ongoingLoansInterest = ongoingLoans.reduce((sum, lo) => {
+    //console.log(lo.amount, allocatedInterestAccruedInPeriod(lo, false));
+    return sum + allocatedInterestAccruedInPeriod(lo, false);
   }, 0);
 
-  const endedLoansInterest = endedLoans.reduce((total, lo) => {
-    const totalInterest = n(lo.interestAmount);
-    const atStart = interestAt(lo, A);
-    const delta = Math.max(0, totalInterest - atStart);
-    return total + delta;
-  }, 0);
+  const endedLoansInterest = endedLoans.reduce(
+    (sum, lo) => sum + allocatedInterestAccruedInPeriod(lo, true),
+    0
+  );
 
-  const totalInterestSinceStart = ongoingLoansInterest + endedLoansInterest;
-  return totalInterestSinceStart;
+  return ongoingLoansInterest + endedLoansInterest;
 }
+
 
 
 //...................................FUNCTIONS_TO_DETERMINE_INTEREST_CHARGED_IN_A_SPECIFIC_PERIOD..........
