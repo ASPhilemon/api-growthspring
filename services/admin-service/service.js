@@ -1,268 +1,125 @@
-// model
-import { Loan, PointsSale } from "./models.js";
-import mongoose from "mongoose"; 
+import { ClubFundAnnualTransaction } from "./models.js";
 
 // util
+import * as Errors from "../../utils/error-util.js";
 import * as DB from "../../utils/db-util.js";
-import * as ErrorUtil from "../../utils/error-util.js";
-import { getDaysDifference } from "../../utils/date-util.js";
-import { ACCOUNT_BALANCE_RANGES, categorizeAmounts } from "../../utils/financial-analytics-util.js"; 
-import CONSTANTS from "../../src/config/constants.js";
+import * as Validator from "../../utils/validator-util.js";
 
-// collaborator services
-import * as UserServiceManager from "../user-service/service.js";
-import * as EmailServiceManager from "../email-service/service.js";
-import * as CashLocationServiceManager from "../cash-location-service/service.js";
-import * as DepositServiceManager from "../deposit-service/service.js";
-import DateUtil from "../../utils/date-util.js";
+//import * as Schemas from "./schemas.js";
+
+// cash location service (used to resolve account name during transformation)
+import * as CashLocationService from "../cash-location-service/service.js";
 
 /**
- * Transforms raw loan and payment data into a standardized financial record format.
- * @param {Array<object>} loans - An array of loan documents.
- * @returns {Array<object>} An array of standardized financial records.
+ * Create a new club fund transaction record.
+ * New records should include `account` (cash-location ObjectId).
  */
-function transformLoansToFinancialRecords(loans) {
-    const financialRecords = [];
-  
-    loans.forEach(loan => {
-      financialRecords.push({
-        type: 'Loan',
-        amount: loan.amount,
-        date: loan.date,
-        name: loan.borrower.name,
-        source: loan.sources && loan.sources.length > 0 ? loan.sources.map(s => s.name).join(', ') : 'Not Available',
-        isOutflow: true,
-      });
-  
-      if (loan.payments && loan.payments.length > 0) {
-        loan.payments.forEach(payment => {
-          financialRecords.push({
-            type: 'Loan Payment',
-            amount: payment.amount,
-            date: payment.date,
-            name: loan.borrower.name,
-            destination: payment.location,
-            isOutflow: false, 
-          });
-        });
-      }
-    });
-    return financialRecords;
+export async function addClubFundAnnualTransaction(tx) {
+  // expected tx fields:
+  // { transaction_type, name, amount, reason, date, account? }
+  //Validator.schema(Schemas.addClubFundAnnualTransaction, tx);
+
+  // basic safety (optional—validation should already cover most)
+  if (!tx?.transaction_type) throw new Errors.BadRequestError("transaction_type is required");
+  if (!tx?.name) throw new Errors.BadRequestError("name is required");
+  if (!Number.isFinite(Number(tx?.amount)) || Number(tx.amount) < 0) {
+    throw new Errors.BadRequestError("amount must be a non-negative number");
   }
-  
-  /**
-   * Groups financial records by month and calculates inflow/outflow summaries.
-   * @param {Array<object>} records - An array of financial records.
-   * @returns {object} Monthly grouped financial summaries.
-   */
-  export function groupFinancialRecordsByMonth(records) {
-    return records.reduce((acc, record) => {
-      const month = new Date(record.date).toLocaleString('default', { month: 'long', year: 'numeric' });
-      if (!acc[month]) {
-        acc[month] = { records: [], totalInflow: 0, totalOutflow: 0, totalDeposits: 0, totalLoans: 0, totalLoanPayments: 0 };
-      }
-      acc[month].records.push(record);
-  
-      if (record.type === 'Loan') { 
-        acc[month].totalOutflow += record.amount;
-        acc[month].totalLoans += record.amount;
-      } else if (record.type === 'Loan Payment') { 
-        acc[month].totalInflow += record.amount;
-        acc[month].totalLoanPayments += record.amount;
-      } else if (record.type === 'Deposit') { 
-        acc[month].totalInflow += record.amount;
-        acc[month].totalDeposits += record.amount;
-      }
-  
-      return acc;
-    }, {});
+  if (!tx?.reason) throw new Errors.BadRequestError("reason is required");
+  if (!tx?.date) throw new Errors.BadRequestError("date is required");
+
+  // if account provided, ensure it exists (so FE can resolve it)
+  if (tx.account) {
+    // relies on cash-location service throwing NotFoundError if not found
+    await CashLocationService.getCashLocationById(tx.account);
   }
-  
-  /**
-   * Fetches all loan-related financial records (loan disbursements and payments).
-   * @returns {Promise<Array<object>>} An array of loan and loan payment records.
-   */
-  export async function getLoanFinancialRecords() {
-    const loans = await getLoans(); // Fetch all loans
-    return transformLoansToFinancialRecords(loans);
-  }
-  
-  /**
-   * Fetches and groups all loan-related financial records by month.
-   * @returns {Promise<object>} Monthly grouped financial summaries.
-   */
-  export async function getMonthlyLoanFinancialRecords() {
-    const loanRecords = await getLoanFinancialRecords();
-    loanRecords.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    return groupFinancialRecordsByMonth(loanRecords);
-  }
-  
-  
-  /**
-   * Summarizes an array of loan documents, calculating various statistics.
-   * @param {Array<object>} loans - An array of loan documents.
-   * @returns {object} An object containing summarized loan statistics.
-   */
-  export function summarizeLoans(loans) {
-    const loansSummary = {
-      ongoingLoansCount: 0,
-      endedLoansCount: 0,
-      totalPrincipal: 0,
-      principalLeft: 0,
-      interestPaid: 0,
-      expectedInterest: 0,
-      recievedInterest: 0,
-      members: new Set(),
-      membersEndedLoans: new Set(),
-      membersOngoingLoans: new Set(),
-    };
-  
-    loans.forEach(loan => {
-      loan.status === "Ongoing"
-        ? (loansSummary.ongoingLoansCount += 1)
-        : (loansSummary.endedLoansCount += 1);
-  
-      loansSummary.totalPrincipal += loan.amount;
-      loansSummary.principalLeft += loan.principalLeft;
-  
-      if (loan.status === "Ongoing") {
-        loansSummary.expectedInterest += calculateTotalInterestDueAmount(loan, DateUtil.getToday());
-      } else {
-        loansSummary.interestPaid += loan.interestAmount; 
-      }
-  
-      loansSummary.recievedInterest += loan.interestAmount; 
-  
-      if (loan.borrower && loan.borrower.name) {
-        loansSummary.members.add(loan.borrower.name);
-        if (loan.status === "Ongoing") {
-          loansSummary.membersOngoingLoans.add(loan.borrower.name);
-        } else {
-          loansSummary.membersEndedLoans.add(loan.borrower.name);
-        }
-      }
-    });
-  
-    return loansSummary;
-  }
-  
 
-  
-/**
- * Aggregates total loan amounts and collects member information from loan records.
- * @param {Array<object>} loanRecords - An array of loan documents.
- * @returns {object} An object containing:
- * - memberLoanTotalsById: { memberId: totalAmount }
- * - memberInfoMap: { memberId: memberName }
- * - memberMonthlyActivity: Map<memberId, Set<YYYY-MM>>
- * - allUniqueMonths: Set<YYYY-MM>
- */
-function aggregateLoanRecordData(loanRecords) {
-  const memberLoanTotalsById = {};
-  const memberInfoMap = {};
-  const memberMonthlyActivity = new Map();
-  const allUniqueMonths = new new Set();
-
-  loanRecords.forEach(record => {
-    const memberId = record.borrower.id.toString();
-    const memberName = record.borrower.name;
-    const recordDate = new Date(record.date);
-    const monthYear = `${recordDate.getFullYear()}-${(recordDate.getMonth() + 1).toString().padStart(2, '0')}`;
-
-    if (!memberLoanTotalsById[memberId]) {
-      memberLoanTotalsById[memberId] = 0;
-      memberInfoMap[memberId] = memberName;
-    }
-    memberLoanTotalsById[memberId] += record.amount;
-
-    if (!memberMonthlyActivity.has(memberId)) {
-      memberMonthlyActivity.set(memberId, new Set());
-    }
-    memberMonthlyActivity.get(memberId).add(monthYear);
-
-    allUniqueMonths.add(monthYear);
-  });
-
-  return { memberLoanTotalsById, memberInfoMap, memberMonthlyActivity, allUniqueMonths };
-}
-
-/**
- * Transforms aggregated member loan totals into an array with member names.
- * @param {object} memberLoanTotalsById - { memberId: totalAmount }
- * @param {object} memberInfoMap - { memberId: memberName }
- * @returns {Array<object>} An array of objects { id: string, name: string, total: number }.
- */
-function formatMemberLoanTotals(memberLoanTotalsById, memberInfoMap) {
-  return Object.keys(memberLoanTotalsById).map(memberId => ({
-    id: memberId,
-    name: memberInfoMap[memberId],
-    total: memberLoanTotalsById[memberId]
+  const created = await DB.query(ClubFundAnnualTransaction.create({
+    transaction_type: tx.transaction_type,
+    name: tx.name,
+    amount: Number(tx.amount),
+    reason: tx.reason,
+    date: tx.date,
+    account: tx.account || undefined,
   }));
+
+  return created;
 }
 
 /**
- * Calculates the monthly activity frequency categories for members.
- * @param {Map<string, Set<string>>} memberMonthlyActivity - Map of memberId to a Set of 'YYYY-MM' strings.
- * @param {Set<string>} allUniqueMonths - Set of all unique 'YYYY-MM' strings covered by records.
- * @param {object} memberLoanTotalsById - Used to iterate through all members who borrowed.
- * @returns {object} An object containing totalMonthsCovered, uniqueMonths, and categories.
+ * Fetch all club fund transactions (raw list).
  */
-function calculateActivityFrequency(memberMonthlyActivity, allUniqueMonths, memberLoanTotalsById) {
-  const totalMonthsCovered = allUniqueMonths.size;
-  const activityCountsByMembers = {};
+export async function getClubFundAnnualTransactions() {
+  return await DB.query(ClubFundAnnualTransaction.find().sort({ date: 1 }));
+}
 
-  for (let i = 0; i <= totalMonthsCovered; i++) {
-    activityCountsByMembers[i] = 0;
+export async function toAnnualSummariesForFrontend(transactions = null) {
+  const items = Array.isArray(transactions) ? transactions : await getClubFundAnnualTransactions();
+
+  const accountIds = Array.from(
+    new Set(
+      items
+        .map((t) => t?.account)
+        .filter(Boolean)
+        .map((id) => String(id))
+    )
+  );
+
+  const accountNameById = {};
+  if (accountIds.length) {
+    const resolved = await Promise.all(
+      accountIds.map(async (id) => {
+        try {
+          const cashLoc = await CashLocationService.getCashLocationById(id);
+          return [id, cashLoc?.name || "Unavailable"];
+        } catch {
+          return [id, "Unavailable"];
+        }
+      })
+    );
+    resolved.forEach(([id, name]) => {
+      accountNameById[id] = name;
+    });
   }
 
-  for (const memberId of Object.keys(memberLoanTotalsById)) {
-    const activeMonthsForMember = memberMonthlyActivity.get(memberId)?.size || 0;
-    activityCountsByMembers[activeMonthsForMember]++;
+  const out = {};
+  for (const t of items) {
+    const d = new Date(t?.date);
+    const year = !Number.isNaN(d.getTime()) ? String(d.getFullYear()) : "Unknown";
+
+    if (!out[year]) out[year] = { records: [] };
+
+    const accountName = t?.account ? (accountNameById[String(t.account)] || "Unavailable") : "Unavailable";
+    const isExpense = String(t?.transaction_type || "").toLowerCase() === "expense";
+
+    out[year].records.push({
+      date: t?.date,
+      name: String(t?.name || ""),
+      reason: String(t?.reason || ""),
+      amount: Number(t?.amount || 0),
+      account: accountName,
+      isOutflow: isExpense,
+    });
   }
 
-  const activityFrequencyCategories = [];
-  Object.keys(activityCountsByMembers).sort((a, b) => b - a).forEach(count => {
-    const numMonths = parseInt(count);
-    if (activityCountsByMembers[numMonths] > 0) {
-      activityFrequencyCategories.push({
-        activity: `${numMonths} out of ${totalMonthsCovered} months`,
-        count: activityCountsByMembers[numMonths]
-      });
-    }
+  const yearsSorted = Object.keys(out)
+    .filter((y) => /^\d{4}$/.test(y))
+    .sort((a, b) => Number(a) - Number(b));
+
+  const nonNumericYears = Object.keys(out).filter((y) => !/^\d{4}$/.test(y)).sort();
+  const ordered = {};
+
+  [...yearsSorted, ...nonNumericYears].forEach((y) => {
+    ordered[y] = out[y];
+    ordered[y].records.sort((a, b) => {
+      const da = new Date(a.date).getTime();
+      const db = new Date(b.date).getTime();
+      if (Number.isNaN(da) && Number.isNaN(db)) return 0;
+      if (Number.isNaN(da)) return 1;
+      if (Number.isNaN(db)) return -1;
+      return da - db;
+    });
   });
-
-  return {
-    totalMonthsCovered: totalMonthsCovered,
-    uniqueMonths: Array.from(allUniqueMonths).sort(),
-    categories: activityFrequencyCategories
-  };
+  return ordered;
 }
 
-/**
- * Fetches and processes loan records to categorize members based on their total loan amounts,
- * returns each member's total loans with names, and categorizes members by their monthly activity frequency.
- *
- * @param {Array<object>} loanRecords - An array of loan documents.
- * Expected structure: { borrower: { id: '...', name: '...' }, amount: number, date: Date, ... }
- * @returns {Promise<object>} An object containing:
- * - standings: Array of loan account standings by range.
- * - memberTotals: Array of objects where each object is { id: string, name: string, total: number }.
- * - activityFrequency: Object detailing monthly activity.
- */
-export async function generateLoanAccountStandings(loanRecords) {
-  const { memberLoanTotalsById, memberInfoMap, memberMonthlyActivity, allUniqueMonths } =
-    aggregateLoanRecordData(loanRecords);
-
-  const memberTotals = formatMemberLoanTotals(memberLoanTotalsById, memberInfoMap);
-  const loanStandings = categorizeAmounts(memberLoanTotalsById, ACCOUNT_BALANCE_RANGES);
-  const activityFrequency = calculateActivityFrequency(memberMonthlyActivity, allUniqueMonths, memberLoanTotalsById);
-
-  return {
-    standings: loanStandings,
-    memberTotals: memberTotals,
-    activityFrequency: activityFrequency
-  };
-}
-
-
-//for free loans eligibility for dashboard, use amounts as fraction of current deposit, or period as one year

@@ -27,6 +27,7 @@ import * as EmailServiceManager from "../email-service/service.js"
 import * as CashLocationServiceManager from '../cash-location-service/service.js';
 import * as LoansServiceManager from '../loan-service/service.js';
 import * as EarningsServiceManager from '../profits-service/service.js';
+import * as AdminServiceManager from "../admin-service/service.js";
 
 import * as Schemas from "./schemas.js"
 
@@ -1055,7 +1056,8 @@ const adminLoans = await buildMemberLoanRecords(allLoans, { usersById }, formatD
     allDeposits: processArray(allDeposits, (arr) => getTotalSumsAndSort(arr, "date", "amount")),
     allUsers: allMembers.map(m => ({name: m.fullName, id: m._id })),
     allLoans: adminLoans,
-    cashLocations: cashLocations
+    cashLocations: cashLocations,
+    clubFundAnnualSummaries: await AdminServiceManager.toAnnualSummariesForFrontend()
   };
 
   return response;
