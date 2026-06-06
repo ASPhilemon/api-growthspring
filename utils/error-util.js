@@ -10,13 +10,13 @@ export class AppError extends Error {
   static buildArgs(arg1, defaultMessage, statusCode, arg2 = null) {
     if (typeof arg1 === "string") {
       return { message: arg1, statusCode, cause: arg2 };
-    } else {
+    } 
       return {
         message: arg1?.message || defaultMessage,
         statusCode,
         cause: arg1?.cause || null,
       };
-    }
+    
   }
 }
 

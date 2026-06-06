@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
-//schemas
-const investmentSubSchema = new mongoose.Schema({
+//Schemas
+const investmentSchema = new mongoose.Schema({
   amount: {
     type: Number,
     required: true,
@@ -16,7 +16,7 @@ const investmentSubSchema = new mongoose.Schema({
   }
 }, {_id: false})
 
-const birthdaySubSchema = new mongoose.Schema({
+const birthdaySchema = new mongoose.Schema({
   month: {
     type: Number,
     required: true,
@@ -30,6 +30,21 @@ const birthdaySubSchema = new mongoose.Schema({
     max: 31
   }
 })
+
+const uiThemeSchema = new mongoose.Schema({
+  layout: {
+    type: String,
+    required: true,
+    enum: ["Layout 1", "Layout 2"],
+    default: "Layout 1"
+  },
+  color: {
+    type: String,
+    required: true,
+    enum: ["blue", "gold"],
+    default: "gold"
+  },
+});
 
 const userSchema = new mongoose.Schema({
   email: {
@@ -46,11 +61,11 @@ const userSchema = new mongoose.Schema({
     required: true
   },
   permanentInvestment: {
-    type: investmentSubSchema,
+    type: investmentSchema,
     required: true
   },
   temporaryInvestment: {
-    type: investmentSubSchema,
+    type: investmentSchema,
     required: true
   },
   points: {
@@ -61,43 +76,17 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     required: true,
   },
-  dob: birthdaySubSchema,
+  uiTheme: uiThemeSchema,
+  dob: birthdaySchema,
   isAdmin: Boolean,
   displayName: String,
   photoURL: String,
 })
 
-// --- Schema for Dashboard Appearance ---
-
-const appearanceSchema = new mongoose.Schema({
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User', 
-    required: true
-  },
-  layout: {
-    type: String,
-    required: true,
-    enum: ["Layout 1", "Layout 2"],
-    default: "Layout 1"
-  },
-  color: {
-    type: String,
-    required: true,
-    enum: ["blue", "gold"],
-    default: "gold"
-  },
-}, { timestamps: true });
-
-//models
+//Models
 const User  = mongoose.model(
   'user',
   userSchema
 );
 
-const Appearance  = mongoose.model(
-  'appearance',
-  appearanceSchema
-);
-
-export { User, Appearance }
+export { User }

@@ -76,15 +76,15 @@ export function generateDBLoan(options = {}) {
 
 export function generateDBLoans(options = {}) {
   const { numberOfLoans = 10, borrowers } = options;
-  let loanBorrowers = borrowers || UserMocks.generateDBUsers({ numberOfUsers: 5 });
+  const loanBorrowers = borrowers || UserMocks.generateDBUsers({ numberOfUsers: 5 });
 
   const dbLoans = [];
-  let recordedLoanDates = new Set();
+  const recordedLoanDates = new Set();
 
   for (let i = 0; i < numberOfLoans; ) {
-    let borrower = faker.helpers.arrayElement(loanBorrowers);
-    let dbLoan = generateDBLoan({ borrower });
-    let dateIso = dbLoan.date.toISOString();
+    const borrower = faker.helpers.arrayElement(loanBorrowers);
+    const dbLoan = generateDBLoan({ borrower });
+    const dateIso = dbLoan.date.toISOString();
     if (!recordedLoanDates.has(dateIso)) {
       dbLoans.push(dbLoan);
       recordedLoanDates.add(dateIso);
@@ -94,4 +94,4 @@ export function generateDBLoans(options = {}) {
 
   return dbLoans;
 }
-//npm test -- services/loan-service/tests/service.test.js
+//Npm test -- services/loan-service/tests/service.test.js

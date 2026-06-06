@@ -10,9 +10,9 @@ const MIN_DATE = "2023-01-01"
 const MAX_DATE = "2024-12-31"
 
 export function generateDBAwardTransaction(recipient, points, refId){
-  if (!recipient) recipient = UserMocks.generateDBUser();
-  if (!points) points = faker.number.int({min: 1, max: 10_000});
-  if (!refId) refId = new ObjectId().toHexString()
+  if (!recipient) {recipient = UserMocks.generateDBUser();}
+  if (!points) {points = faker.number.int({min: 1, max: 10_000});}
+  if (!refId) {refId = new ObjectId().toHexString()}
 
   const {_id, fullName} = recipient
 
@@ -31,9 +31,9 @@ export function generateDBAwardTransaction(recipient, points, refId){
 }
 
 export function generateDBRedeemTransaction(redeemedBy, points, refId){
-  if (!redeemedBy) redeemedBy = UserMocks.generateDBUser();
-  if (!points) points = faker.number.int({min: 1, max: 10_000});
-  if (!refId) refId = new ObjectId().toHexString()
+  if (!redeemedBy) {redeemedBy = UserMocks.generateDBUser();}
+  if (!points) {points = faker.number.int({min: 1, max: 10_000});}
+  if (!refId) {refId = new ObjectId().toHexString()}
 
   const {_id, fullName} = redeemedBy
 
@@ -52,9 +52,9 @@ export function generateDBRedeemTransaction(redeemedBy, points, refId){
 }
 
 export function generateDBTransferTransaction(recipient, sender, points){
-  if (!recipient) recipient = UserMocks.generateDBUser();
-  if (!sender) sender = UserMocks.generateDBUser();
-  if (!points) points = faker.number.int({min: 1, max: 10_000});
+  if (!recipient) {recipient = UserMocks.generateDBUser();}
+  if (!sender) {sender = UserMocks.generateDBUser();}
+  if (!points) {points = faker.number.int({min: 1, max: 10_000});}
 
   return {
     _id: new ObjectId().toHexString(),
@@ -74,9 +74,9 @@ export function generateDBTransferTransaction(recipient, sender, points){
 }
 
 export function generateInputAwardTransaction(recipient, points, refId){
-  if (!recipient) recipient = UserMocks.generateDBUser();
-  if (!points) points = faker.number.int({min: 1, max: 10_000});
-  if (!refId) refId = new ObjectId().toHexString()
+  if (!recipient) {recipient = UserMocks.generateDBUser();}
+  if (!points) {points = faker.number.int({min: 1, max: 10_000});}
+  if (!refId) {refId = new ObjectId().toHexString()}
 
   return {
     recipientId: recipient._id,
@@ -88,9 +88,9 @@ export function generateInputAwardTransaction(recipient, points, refId){
 }
 
 export function generateInputRedeemTransaction(redeemedBy, points, refId){
-  if (!redeemedBy) redeemedBy = UserMocks.generateDBUser();
-  if (!points) points = faker.number.int({min: 1, max: 10_000});
-  if (!refId) refId = new ObjectId().toHexString()
+  if (!redeemedBy) {redeemedBy = UserMocks.generateDBUser();}
+  if (!points) {points = faker.number.int({min: 1, max: 10_000});}
+  if (!refId) {refId = new ObjectId().toHexString()}
 
   return {
     redeemedById: redeemedBy._id,
@@ -102,9 +102,9 @@ export function generateInputRedeemTransaction(redeemedBy, points, refId){
 }
 
 export function generateInputTransferTransaction(recipient, sender, points){
-  if (!recipient) recipient = UserMocks.generateDBUser();
-  if (!sender) sender = UserMocks.generateDBUser();
-  if (!points) points = faker.number.int({min: 1, max: 10_000});
+  if (!recipient) {recipient = UserMocks.generateDBUser();}
+  if (!sender) {sender = UserMocks.generateDBUser();}
+  if (!points) {points = faker.number.int({min: 1, max: 10_000});}
 
   return {
     recipientId: recipient._id,
@@ -116,18 +116,18 @@ export function generateInputTransferTransaction(recipient, sender, points){
 }
 
 export function generateDBTransactions(numberOfTransactions, {users}= {}){
-  if (!users) users = UserMocks.generateDBUsers({numberOfUsers: 2});
+  if (!users) {users = UserMocks.generateDBUsers({numberOfUsers: 2});}
 
   const perCategory = Math.floor(numberOfTransactions / 3)
 
   const transactions = []
-  //ensure transaction dates and points and unique for deterministic sorting
-  let pointsSet = new Set()
-  let datesSet = new Set()
+  //Ensure transaction dates and points and unique for deterministic sorting
+  const pointsSet = new Set()
+  const datesSet = new Set()
 
   for (let i = 0; i < perCategory;){
-    let user = faker.helpers.arrayElement(users)
-    let sender, recipient
+    const user = faker.helpers.arrayElement(users)
+    let recipient, sender
 
     if (users[0] == user){
       sender = users[0]
@@ -140,20 +140,20 @@ export function generateDBTransactions(numberOfTransactions, {users}= {}){
     const redeemTransaction = generateDBRedeemTransaction(user)
     const transferTransaction = generateDBTransferTransaction(recipient, sender)
 
-    //unique dates
-    if (datesSet.has(awardTransaction.date)) continue;
+    //Unique dates
+    if (datesSet.has(awardTransaction.date)) {continue;}
     datesSet.add(awardTransaction.date)
-    if (datesSet.has(redeemTransaction.date)) continue;
+    if (datesSet.has(redeemTransaction.date)) {continue;}
     datesSet.add(redeemTransaction.date)
-    if (datesSet.has(transferTransaction.date)) continue;
+    if (datesSet.has(transferTransaction.date)) {continue;}
     datesSet.add(transferTransaction.date)
 
-    //unique point quantities
-    if (pointsSet.has(awardTransaction.points)) continue;
+    //Unique point quantities
+    if (pointsSet.has(awardTransaction.points)) {continue;}
     pointsSet.add(awardTransaction.points)
-    if (pointsSet.has(redeemTransaction.points)) continue;
+    if (pointsSet.has(redeemTransaction.points)) {continue;}
     pointsSet.add(redeemTransaction.points)
-    if (pointsSet.has(transferTransaction.points)) continue;
+    if (pointsSet.has(transferTransaction.points)) {continue;}
     pointsSet.add(transferTransaction.points)
 
     transactions.push(awardTransaction, redeemTransaction, transferTransaction)

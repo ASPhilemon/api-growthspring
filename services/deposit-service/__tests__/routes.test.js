@@ -5,26 +5,24 @@ import dotenv from "dotenv"
 import * as Mocks from "./mocks.js"
 import * as UserMocks from "../../user-service/__tests__/mocks.js"
 
-//load environment variables
+//Load environment variables
 dotenv.config()
 
-// mock dependencies
-jest.unstable_mockModule('../service.js', () => {
-  return {
+// Mock dependencies
+jest.unstable_mockModule('../service.js', () => ({
     getDeposits: jest.fn(),
     getDepositById: jest.fn(),
     getYearlyDeposits: jest.fn(),
     recordDeposit: jest.fn(),
     updateDeposit: jest.fn(),
     deleteDeposit: jest.fn(),
-  }
-})
+  }))
 
-//import test app
+//Import test app
 const app = (await import("../../../app.js")).default;
 
-// import dependencies
-const ServiceManager = await import("../service.js");
+// Import dependencies
+const Service = await import("../service.js");
 
 import { createJWT } from '../../auth-service/service.js';
 
@@ -52,7 +50,7 @@ const routes = [
     path: "/", method: "get",
     query: depositsQuery,
     allowed: ["admin",],
-    serviceHandler: ServiceManager.getDeposits,
+    serviceHandler: Service.getDeposits,
     serviceHandlerArgs: [
       { userId, year, month},
       {field: sortBy, order: sortOrder}, 
@@ -62,40 +60,40 @@ const routes = [
   {
     path: "/deposit-123", method: "get", 
     allowed : ["admin"],
-    serviceHandler: ServiceManager.getDepositById,
+    serviceHandler: Service.getDepositById,
     serviceHandlerArgs: ["deposit-123"],
   },
   {
     path: "/yearly-deposits", method: "get", 
     allowed : ["admin"],
-    serviceHandler: ServiceManager.getYearlyDeposits,
+    serviceHandler: Service.getYearlyDeposits,
     serviceHandlerArgs: [],
   },
   {
     path: "/", method: "post",
     body:deposit,
     allowed : ["admin"],
-    serviceHandler: ServiceManager.recordDeposit,
+    serviceHandler: Service.recordDeposit,
     serviceHandlerArgs: [{...deposit, recordedBy: {_id: adminUser._id, fullName: adminUser.fullName}}]
   },
   {
     path: "/deposit-123", method: "put", 
     body: depositUpdate,
     allowed : ["admin"],
-    serviceHandler: ServiceManager.updateDeposit,
+    serviceHandler: Service.updateDeposit,
     serviceHandlerArgs: ["deposit-123", {...depositUpdate, updatedById: adminUser._id}]
   },
   {
     path: "/deposit-123", method: "delete", 
     body: {cashLocationToDeductId: "cash-location-123"},
     allowed : ["admin"],
-    serviceHandler: ServiceManager.deleteDeposit,
+    serviceHandler: Service.deleteDeposit,
     serviceHandlerArgs: ["deposit-123", "cash-location-123"]
   }
 ]
 
 describe("Access Control", ()=>{
-  for (let route of routes){
+  for (const route of routes){
     const endpoint = BASE_PATH + route.path
     test("anonymous user", async () => {
       const anonymousUserAllowed = route.allowed.includes("anonymous")
@@ -136,12 +134,12 @@ describe("Access Control", ()=>{
 })
 
 describe("Service Handlers Are Called With Correct Args", ()=>{
-  for (let route of routes){
+  for (const route of routes){
 
     const queryString = new URLSearchParams(route.query).toString();
     const endpoint = BASE_PATH + route.path + (queryString ? `?${queryString}` : "");
 
-    test(`${route.method + " " + route.path} service handler is called with correct args`, async () => {
+    test(`${`${route.method  } ${  route.path}`} service handler is called with correct args`, async () => {
       const {_id, fullName, isAdmin} = adminUser
       const jwt = createJWT(_id, fullName, isAdmin)
       await request(app)[route.method](endpoint)

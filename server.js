@@ -2,13 +2,15 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import dotenv from 'dotenv';
-import {disconnectDB} from "./db.js"
-import connectDB from "./db.js"
+import {disconnectDB, connectDB} from "./db.js"
 import app from "./app.js"
 import { AppError } from './utils/error-util.js';
 import { sendEmail } from './services/email-service/service.js';
 
-//load environemnt variables 
+//Cron jobs
+import "./cron.js"
+
+//Load environemnt variables 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ENV_FILE = process.env.NODE_ENV === "production"?
@@ -21,29 +23,29 @@ if (!fs.existsSync(ENV_FILE_PATH)) {
 dotenv.config({ path: ENV_FILE_PATH, override: true})
 
 
-//connect to database
-const MONGODB_URI = process.env.MONGODB_URI
+//Connect to database
+const {MONGODB_URI} = process.env
 await connectDB(MONGODB_URI)
 
 
-//start server
-const PORT = process.env.PORT
+//Start server
+const {PORT} = process.env
 app.listen(PORT, ()=> {
   console.log(`=== Listening for requests on port ${PORT}`)
 })
 
 
-//handle server errors
+//Handle server errors
 process.on("uncaughtException", async (err) => {
   console.error("=== Uncaught Exception", err)
-  //await sendErrorAlert(err.stack || err.message);
-  if (!(err instanceof AppError)) await gracefulShutdown();
+  //Await sendErrorAlert(err.stack || err.message);
+  if (!(err instanceof AppError)) {await gracefulShutdown();}
 });
 
 process.on("unhandledRejection", async (reason) => {
   console.error("=== Uncaught Rejection", reason)
-  //await sendErrorAlert("Unhandled promise rejection occured")
-  if (!(reason instanceof AppError)) await gracefulShutdown()
+  //Await sendErrorAlert("Unhandled promise rejection occured")
+  if (!(reason instanceof AppError)) {await gracefulShutdown()}
 });
 
 async function gracefulShutdown() {

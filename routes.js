@@ -1,4 +1,4 @@
-//router imports
+//Router imports
 import cashLocationRouter from "./services/cash-location-service/routes.js"
 import depositRouter from "./services/deposit-service/routes.js"
 import loanRouter from "./services/loan-service/routes.js"
@@ -8,11 +8,11 @@ import withdrawRouter from "./services/withdraw-service/routes.js"
 import authRouter from "./services/auth-service/routes.js"
 import clubFundTxRouter from "./services/admin-service/routes.js"
 
-//middleware imports
-import { registerBeforeAllMiddleware, registerAfterAllMiddleware } from "./middleware.js"
+//Middleware imports
+import { registerAfterAllMiddleware, registerBeforeAllMiddleware } from "./middleware.js"
 
 export function registerRoutes(app){
-  //register beforeAll middleware
+  //Register beforeAll middleware
   registerBeforeAllMiddleware(app)
 
   app.use("/auth", authRouter)
@@ -24,7 +24,7 @@ export function registerRoutes(app){
   app.use("/withdraws", withdrawRouter)
   app.use("/fund-transactions", clubFundTxRouter)
 
-  //register afterAll middleware
+  //Register afterAll middleware
   registerAfterAllMiddleware(app)
 }
 

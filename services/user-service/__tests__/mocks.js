@@ -7,11 +7,11 @@ const MIN_DATE = "2022-01-01"
 const MAX_DATE = "2025-01-01"
 
 export function generateDBUser({userType = "regular"} = {}){
-  let firstName = faker.person.firstName()
-  let lastName = faker.person.lastName()
-  let dbUser = {
+  const firstName = faker.person.firstName()
+  const lastName = faker.person.lastName()
+  const dbUser = {
     _id: new ObjectId().toHexString(),
-    fullName: firstName + " " + lastName,
+    fullName: `${firstName  } ${  lastName}`,
     membershipDate: faker.date.between({from: MIN_DATE, to: MAX_DATE}),
     points: faker.number.int({min: 20_000, max: 30_000}),
     temporaryInvestment: {
@@ -26,7 +26,7 @@ export function generateDBUser({userType = "regular"} = {}){
     },
     email: faker.internet.email({firstName, lastName}),
     phoneContact: faker.phone.number({style: "international"}),
-    isAdmin: userType == "admin"? true: false,
+    isAdmin: userType == "admin",
     isActive: true,
   }
   return dbUser

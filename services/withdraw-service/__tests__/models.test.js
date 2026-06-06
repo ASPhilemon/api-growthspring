@@ -38,7 +38,7 @@ describe("Withdraw Model:Write Operations", ()=>{
 
   test("Withdraw.updateOne should update existing withdraw", async ()=>{
     await Withdraw.updateOne({_id: withdraw._id}, {$set: {amount: 1_000}})
-    let updatedWithdraw = await Withdraw.findById(withdraw._id)
+    const updatedWithdraw = await Withdraw.findById(withdraw._id)
     expect(updatedWithdraw.amount).toEqual(1_000)
   })
 
@@ -51,44 +51,44 @@ describe("Withdraw Model:Write Operations", ()=>{
 
 //Withdraw Model Read Operations
 describe("Withdraw Model: Withdraw.getWithdraws", ()=>{
-  let numberOfWithdrawers = 2
-  let numberOfWithdraws = 500
-  let withdrawers = UserMocks.generateDBUsers({numberOfUsers: numberOfWithdrawers})
-  let withdraws = Mocks.generateDBWithdraws({numberOfWithdraws, withdrawers})
+  const numberOfWithdrawers = 2
+  const numberOfWithdraws = 500
+  const withdrawers = UserMocks.generateDBUsers({numberOfUsers: numberOfWithdrawers})
+  const withdraws = Mocks.generateDBWithdraws({numberOfWithdraws, withdrawers})
 
   beforeAll(async()=>{
-    //delete any existing withdraws and withdrawnBys
+    //Delete any existing withdraws and withdrawnBys
     await mongoose.connection.dropDatabase()
     await User.insertMany(withdrawers)
     await Withdraw.insertMany(withdraws)
   }, 20_000)
 
   test("no args - should sort and return the first 20 withdraws sorted by date in descending order", async ()=>{
-    //expected withdraws ids 
-    let defaultPerPage = 20
-    let expectedWithdrawsIds = [...withdraws]
+    //Expected withdraws ids 
+    const defaultPerPage = 20
+    const expectedWithdrawsIds = [...withdraws]
     .sort((a, b)=>b.date - a.date)
     .slice(0, defaultPerPage)
     .map((withdraw)=> withdraw._id)
 
-    //actual withdraw ids
-    let actualWithdrawsIds = (await Withdraw.getWithdraws())
+    //Actual withdraw ids
+    const actualWithdrawsIds = (await Withdraw.getWithdraws())
     .map((withdraw)=>withdraw._id)
 
     expect(actualWithdrawsIds).toEqual(expectedWithdrawsIds)
   })
 
   test("all args passed - should return the withdraws based on the filter, sort, and pagination", async ()=>{
-    let filter = {
+    const filter = {
       userId: withdrawers[0]._id, 
       year: 2024, 
       month: 5
     }
-    let sort = {field: "amount", order: 1}
-    let pagination = {page: 2, perPage: 5}
+    const sort = {field: "amount", order: 1}
+    const pagination = {page: 2, perPage: 5}
 
-    //expected withdraws ids 
-    let expectedWithdrawsIds = [...withdraws]
+    //Expected withdraws ids 
+    const expectedWithdrawsIds = [...withdraws]
     .filter((withdraw)=>{
       const withdrawYear = new Date(withdraw.date).getUTCFullYear()
       const withdrawMonth = new Date(withdraw.date).getUTCMonth() + 1 //1-based index to match mongodb $month operator
@@ -100,8 +100,8 @@ describe("Withdraw Model: Withdraw.getWithdraws", ()=>{
     .slice((pagination.page - 1) * pagination.perPage,  pagination.page * pagination.perPage)
     .map((withdraw)=>withdraw._id)
 
-    //actual withdraw ids
-    let actualWithdrawsIds = (await Withdraw.getWithdraws(filter, sort, pagination))
+    //Actual withdraw ids
+    const actualWithdrawsIds = (await Withdraw.getWithdraws(filter, sort, pagination))
     .map((withdraw)=>withdraw._id)
 
     expect(actualWithdrawsIds).toEqual(expectedWithdrawsIds)

@@ -2,15 +2,7 @@ import * as Errors from "./error-util.js"
 
 export function schema(schema, input){
   const { error } =  schema.validate(input)
-  if(error) throw new Errors.BadRequestError({message: "Failed to validate input", cause: error})
-}
-
-export function assert(expr, errMessage, errType) {
-  let ErrorConstructor = errType || Errors.BadRequestError;
-  if (!expr) {
-    // Pass an object with message and statusCode to ensure compatibility with AppError
-    throw new ErrorConstructor({ message: errMessage });
-  }
+  if(error) {throw new Errors.BadRequestError({message: "Failed to validate input", cause: error})}
 }
 
 export function required(input) {

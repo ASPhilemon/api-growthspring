@@ -9,7 +9,7 @@ import { requireAdmin } from "../../middleware.js"
 
 router.use(requireAdmin)
 
-// cash location transfers routes
+// Cash location transfers routes
 cashLocationTransferRouter.get(
   "/",
   RouteController.getTransfers
@@ -31,11 +31,11 @@ cashLocationTransferRouter.delete(
   RouteController.deleteTransfer
 )
 
-//register cash location transfers routes
+//Register cash location transfers routes
 router.use("/transfers", cashLocationTransferRouter)
 
 
-//cash location routes
+//Cash location routes
 router.get(
   "/",
   RouteController.getCashLocations

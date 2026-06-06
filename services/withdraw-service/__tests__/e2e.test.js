@@ -11,32 +11,28 @@ import { CashLocation } from '../../cash-location-service/models.js';
 import { User } from '../../user-service/models.js';
 import connectDB from "../../../db.js"
 
-//load environment variables
+//Load environment variables
 dotenv.config()
 
-// mock email service
+// Mock email service
 let EmailServiceManager = await import('../../email-service/service.js')
-jest.unstable_mockModule('../../email-service/service.js', () => {
-  return {
+jest.unstable_mockModule('../../email-service/service.js', () => ({
     ...EmailServiceManager,
     sendEmail: jest.fn(),
-  }
-})
+  }))
 EmailServiceManager = await import('../../email-service/service.js')
 
-//mock DateUtil
+//Mock DateUtil
 let DateUtil = await import('../../../utils/date-util.js')
-jest.unstable_mockModule('../../../utils/date-util.js', async () => {
-  return {
+jest.unstable_mockModule('../../../utils/date-util.js', async () => ({
     ...DateUtil,
     getToday: jest.fn(()=>new Date("2025-06-01"))
-  }
-})
+  }))
 DateUtil = await import('../../../utils/date-util.js')
 
 const { createJWT } = await import('../../auth-service/service.js')
 
-//import test app
+//Import test app
 const app = (await import("../../../app.js")).default;
 
 beforeAll(async()=>{
@@ -55,15 +51,15 @@ beforeEach(() => {
 const BASE_PATH = "/withdraws"
 
 describe("GET /withdraws", ()=>{
-  let withdrawers, numberOfWithdrawers
-  let withdraws, numberOfWithdraws
+  let numberOfWithdrawers, withdrawers
+  let numberOfWithdraws, withdraws
   let adminUser, jwt
 
   beforeAll(async()=>{
-    //remove any existing withdrawers and withdraws
+    //Remove any existing withdrawers and withdraws
     await mongoose.connection.db.dropDatabase()
 
-    //insert withdrawers and withdraws into database
+    //Insert withdrawers and withdraws into database
     numberOfWithdrawers = 2
     numberOfWithdraws = 500
     withdrawers = UserMocks.generateDBUsers({numberOfWithdrawers})
@@ -71,36 +67,36 @@ describe("GET /withdraws", ()=>{
     await User.insertMany(withdrawers)
     await Withdraw.insertMany(withdraws)
 
-    //set jwt
+    //Set jwt
     adminUser = UserMocks.generateDBUser({userType: "admin"})
-    let {_id: userId, fullName, isAdmin} = adminUser
+    const {_id: userId, fullName, isAdmin} = adminUser
     jwt = createJWT(userId, fullName, isAdmin)
 
   }, 20_000)
 
   test("no query params - should return the first 20 sorted withdraws, sorted by date in descending order", async ()=>{
-    //send api request
-    let endpoint = BASE_PATH
-    let response = await request(app).get(endpoint)
+    //Send api request
+    const endpoint = BASE_PATH
+    const response = await request(app).get(endpoint)
     .set("Cookie", cookie.serialize("jwt", jwt))
 
-    //expected withdraws ids 
-    let defaultPerPage = 20
-    let expectedWithdrawsIds = [...withdraws]
+    //Expected withdraws ids 
+    const defaultPerPage = 20
+    const expectedWithdrawsIds = [...withdraws]
     .sort((a, b)=>b.date - a.date)
     .slice(0, defaultPerPage)
     .map((withdraw)=>withdraw._id)
 
-    //actual withdraw ids
-    let actualWithdrawsIds = response.body.data
+    //Actual withdraw ids
+    const actualWithdrawsIds = response.body.data
     .map((withdraw)=>withdraw._id)
 
     expect(actualWithdrawsIds).toEqual(expectedWithdrawsIds)
   })
 
   test("all query params passed - should return the withdraws based on the passed params", async ()=>{
-    //query params
-    let query = {
+    //Query params
+    const query = {
       userId: withdrawers[0]._id,
       year: 2024,
       month: 1,
@@ -110,15 +106,15 @@ describe("GET /withdraws", ()=>{
       perPage: 5,
     }
 
-    let queryString = new URLSearchParams(query).toString();
+    const queryString = new URLSearchParams(query).toString();
 
-    //send api request
-    const endpoint = BASE_PATH + "?" + queryString
-    let response = await request(app).get(endpoint)
+    //Send api request
+    const endpoint = `${BASE_PATH  }?${  queryString}`
+    const response = await request(app).get(endpoint)
     .set("Cookie", cookie.serialize("jwt", jwt))
 
-    //expected withdraws ids 
-    let expectedWithdrawsIds = [...withdraws]
+    //Expected withdraws ids 
+    const expectedWithdrawsIds = [...withdraws]
     .filter((withdraw)=>{
       const withdrawYear = new Date(withdraw.date).getUTCFullYear()
       const withdrawMonth = new Date(withdraw.date).getUTCMonth() + 1 //1-based index to match mongodb $month operator
@@ -130,8 +126,8 @@ describe("GET /withdraws", ()=>{
     .slice((query.page - 1) * query.perPage,  query.page * query.perPage)
     .map((withdraw)=>withdraw._id)
 
-    //actual withdraw ids
-    let actualWithdrawsIds = response.body.data
+    //Actual withdraw ids
+    const actualWithdrawsIds = response.body.data
     .map((withdraw)=>withdraw._id)
 
     expect(actualWithdrawsIds).toEqual(expectedWithdrawsIds)
@@ -140,34 +136,34 @@ describe("GET /withdraws", ()=>{
 })
 
 describe("POST /withdraws", ()=>{
-  let currentWithdrawer, adminUser
-  let mobileMoneyCashLocation, standardCharteredCashLocation, currentWithdrawCashLocation
+  let adminUser, currentWithdrawer
+  let currentWithdrawCashLocation, mobileMoneyCashLocation, standardCharteredCashLocation
   let withdraw
-  let jwt, endpoint, response
+  let endpoint, jwt, response
   
   beforeAll(async()=>{
-    //remove any existing records in database
+    //Remove any existing records in database
     await mongoose.connection.db.dropDatabase()
 
     currentWithdrawer = UserMocks.generateDBUser()
     mobileMoneyCashLocation = CashLocationMocks.generateDBCashLocation()
     standardCharteredCashLocation = CashLocationMocks.generateDBCashLocation()
 
-    //use mobile money cash location for the withdraw
+    //Use mobile money cash location for the withdraw
     currentWithdrawCashLocation = mobileMoneyCashLocation
     withdraw = Mocks.generateInputWithdraw({
       withdrawnBy: currentWithdrawer,
       cashLocation: currentWithdrawCashLocation
     })
 
-    //insert cash locations and withdrawor into database
+    //Insert cash locations and withdrawor into database
     await User.create(currentWithdrawer)
     await CashLocation.insertMany([
       mobileMoneyCashLocation,
       standardCharteredCashLocation,
     ])
 
-    //send api request
+    //Send api request
     endpoint = BASE_PATH
     adminUser = UserMocks.generateDBUser({userType: "admin"})
     const {_id: userId, fullName, isAdmin} = adminUser
@@ -213,15 +209,15 @@ describe("POST /withdraws", ()=>{
 })
 
 describe("PUT /withdraw/:id", ()=>{
-  let currentWithdrawer, recordedBy, adminUser
+  let adminUser, currentWithdrawer, recordedBy
   let mobileMoneyCashLocation, standardCharteredCashLocation
-  let currentWithdrawCashLocation, cashLocationToAdd, cashLocationToDeduct
+  let cashLocationToAdd, cashLocationToDeduct, currentWithdrawCashLocation
   let currentWithdraw, withdrawUpdate
   let currentPointTransaction
-  let jwt, endpoint, response
+  let endpoint, jwt, response
   
   beforeAll(async()=>{
-    //remove any existing records in database
+    //Remove any existing records in database
     await mongoose.connection.db.dropDatabase()
 
     currentWithdrawer = UserMocks.generateDBUser()
@@ -235,7 +231,7 @@ describe("PUT /withdraw/:id", ()=>{
     })
     adminUser = UserMocks.generateDBUser({userType: "admin"})
 
-    //use mobile money cash location for the current withdraw
+    //Use mobile money cash location for the current withdraw
     currentWithdrawCashLocation = mobileMoneyCashLocation
     recordedBy = adminUser
     currentWithdraw = Mocks.generateDBWithdraw({
@@ -244,13 +240,13 @@ describe("PUT /withdraw/:id", ()=>{
       cashLocation: currentWithdrawCashLocation
     })
 
-    //use mobile money cash location for cashLocationToDeduct
-    //use standard chartered cash location for cashLocationToAdd
+    //Use mobile money cash location for cashLocationToDeduct
+    //Use standard chartered cash location for cashLocationToAdd
     cashLocationToAdd = mobileMoneyCashLocation
     cashLocationToDeduct = standardCharteredCashLocation
     withdrawUpdate = Mocks.generateWithdrawUpdate({cashLocationToAdd, cashLocationToDeduct})
 
-    //insert withdrawer, current withdraw, and cashlocations into database
+    //Insert withdrawer, current withdraw, and cashlocations into database
     await User.create(currentWithdrawer)
     await Withdraw.create(currentWithdraw)
     await CashLocation.insertMany([
@@ -258,8 +254,8 @@ describe("PUT /withdraw/:id", ()=>{
       standardCharteredCashLocation,
     ])
 
-    //send api request
-    endpoint = BASE_PATH + "/" + currentWithdraw._id
+    //Send api request
+    endpoint = `${BASE_PATH  }/${  currentWithdraw._id}`
     const {_id: userId, fullName, isAdmin} = adminUser
     jwt = createJWT(userId, fullName, isAdmin)
     response = await request(app).put(endpoint)
@@ -319,14 +315,14 @@ describe("PUT /withdraw/:id", ()=>{
 })
 
 describe("DELETE /withdraw/:id", ()=>{
-  let currentWithdrawer, adminUser
+  let adminUser, currentWithdrawer
   let mobileMoneyCashLocation, standardCharteredCashLocation
   let cashLocationToAdd
   let withdraw
-  let jwt, endpoint, response
+  let endpoint, jwt, response
   
   beforeAll(async()=>{
-    //remove any existing records in database
+    //Remove any existing records in database
     await mongoose.connection.db.dropDatabase()
 
     currentWithdrawer = UserMocks.generateDBUser()
@@ -344,10 +340,10 @@ describe("DELETE /withdraw/:id", ()=>{
       withdrawnBy: currentWithdrawer,
     })
 
-    //use mobile money cash location for cashLocationToAdd
+    //Use mobile money cash location for cashLocationToAdd
     cashLocationToAdd = mobileMoneyCashLocation
 
-    //insert withdrawer, withdraw and cashlocations into database
+    //Insert withdrawer, withdraw and cashlocations into database
     await User.create(currentWithdrawer)
     await Withdraw.create(withdraw)
     await CashLocation.insertMany([
@@ -357,8 +353,8 @@ describe("DELETE /withdraw/:id", ()=>{
 
     const {_id: cashLocationToAddId} = cashLocationToAdd
 
-    //send api request
-    endpoint = BASE_PATH + "/" + withdraw._id
+    //Send api request
+    endpoint = `${BASE_PATH  }/${  withdraw._id}`
     const {_id: userId, fullName, isAdmin} = adminUser
     jwt = createJWT(userId, fullName, isAdmin)
     response = await request(app).delete(endpoint)

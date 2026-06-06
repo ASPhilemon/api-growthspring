@@ -1,7 +1,7 @@
 import { MongoClient } from "mongodb";
 import dotenv from "dotenv";
 
-//load environemnt variables
+//Load environemnt variables
 dotenv.config()
 
 const OLD_DB_URI = process.env.MONGODB_URI_OLD
@@ -60,30 +60,26 @@ async function migrateDatabase(){
 async function migrateUsers(oldUsers, newDB){
 
   const newUsers = oldUsers.map((user)=> transformUser(user))
-  const userOps = newUsers.map((newUser)=>{
-    return {
+  const userOps = newUsers.map((newUser)=>({
       updateOne: {
       filter: { "_id": newUser._id },
       update: { $setOnInsert: newUser },
       upsert: true
     }
-  }})
+  }))
 
-  const passwords = oldUsers.map((user)=>{
-    return {
+  const passwords = oldUsers.map((user)=>({
       hash: user.password,
       user: {_id: user._id,fullName: user.fullName, email: user.email}
-    }
-  })
+    }))
 
-  const passwordOps = passwords.map((password)=>{
-    return {
+  const passwordOps = passwords.map((password)=>({
       updateOne: {
       filter: { "user._id": password.user._id },
       update: { $setOnInsert: password },
       upsert: true
     }
-  }})
+  }))
 
   const [userResult, passwordResult] = await Promise.all([
     newDB.collection("users").bulkWrite(userOps),
@@ -95,25 +91,22 @@ async function migrateUsers(oldUsers, newDB){
 
 async function migrateDeposits(oldUsers, oldDeposits, newDB){
   const newDeposits = oldDeposits.map((deposit)=>transformDeposit(deposit, oldUsers))
-  const depositOps = newDeposits.map((newDeposit)=>{
-    return {
+  const depositOps = newDeposits.map((newDeposit)=>({
       updateOne: {
       filter: { _id: newDeposit._id },
       update: { $setOnInsert: newDeposit },
       upsert: true
     }
-  }})
+  }))
 
   const yearlyDeposits = calculateYearlyDeposits(oldDeposits)
-  const yearlyDepositOps = yearlyDeposits.map((yearlyDeposit)=>{
-    return {
+  const yearlyDepositOps = yearlyDeposits.map((yearlyDeposit)=>({
       updateOne: {
         filter: {year: yearlyDeposit.year},
         update: {$setOnInsert: yearlyDeposit},
         upsert: true
       }
-    }
-  })
+    }))
 
   const [depositResult, yearlyDepositResult] = await Promise.all([
     newDB.collection("deposits").bulkWrite(depositOps),
@@ -125,14 +118,13 @@ async function migrateDeposits(oldUsers, oldDeposits, newDB){
 
 async function migrateLoans(oldLoans, oldUsers, newDB){
   const newLoans = oldLoans.map((oldLoan)=>transformLoan(oldLoan, oldUsers))
-  const loanOps = newLoans.map((newLoan)=>{
-    return {
+  const loanOps = newLoans.map((newLoan)=>({
       updateOne: {
       filter: { _id: newLoan._id },
       update: { $setOnInsert: newLoan },
       upsert: true
     }
-  }})
+  }))
 
   const result = await newDB.collection("loans").bulkWrite(loanOps)
   migrationResults.push(`${result.upsertedCount} loans migrated`)
@@ -143,20 +135,19 @@ async function migratePointTransactions(oldTransactions, oldUsers, newDB){
   .map((transaction)=>transformPointTransaction(transaction, oldUsers))
   .filter((transaction)=>transaction.points > 0)
 
-  const transactionOps = newTransactions.map((newTransaction)=>{
-    return {
+  const transactionOps = newTransactions.map((newTransaction)=>({
       updateOne: {
       filter: { _id: newTransaction._id },
       update: { $setOnInsert: newTransaction },
       upsert: true
     }
-  }})
+  }))
 
   const result = await newDB.collection("point-transactions").bulkWrite(transactionOps)
   migrationResults.push(`${result.upsertedCount} point transactions migrated`)
 }
 
-//helper functions
+//Helper functions
 function transformUser(user){
   return {
     _id: user._id,
@@ -213,17 +204,17 @@ function calculateYearlyDeposits(deposits) {
 
 function safeDaysBetween(start, end) {
   // Returns whole days from start -> end (0 if end <= start or either invalid)
-  if (!start || !end) return 0;
+  if (!start || !end) {return 0;}
   const d1 = new Date(start);
   const d2 = new Date(end);
-  if (isNaN(d1) || isNaN(d2)) return 0;
+  if (isNaN(d1) || isNaN(d2)) {return 0;}
   // Strip to UTC midnight to avoid TZ drift
   const utc1 = Date.UTC(d1.getFullYear(), d1.getMonth(), d1.getDate());
   const utc2 = Date.UTC(d2.getFullYear(), d2.getMonth(), d2.getDate());
   const diff = utc2 - utc1;
-  if (diff <= 0) return 0;
+  if (diff <= 0) {return 0;}
   const oneDay = 1000 * 60 * 60 * 24;
-  return Math.floor(diff / oneDay); // exact integer once times are zeroed
+  return Math.floor(diff / oneDay); // Exact integer once times are zeroed
 }
 
 function transformLoan(loan, users){
@@ -290,7 +281,7 @@ function transformLoan(loan, users){
     installmentAmount: loan.installment_amount,
     sources: [],
     payments: loan.payments.map((payment)=>{
-      let updatedBy = users.find((user)=>user.fullName == payment.updated_by) || adminBlaise
+      const updatedBy = users.find((user)=>user.fullName == payment.updated_by) || adminBlaise
       return {
         date: payment.payment_date,
         amount: payment.payment_amount,
@@ -349,8 +340,8 @@ async function ensureUnitsIndexes(newDB) {
       console.log("Dropped legacy index beneficiary._id_1_year_1");
     }
   } catch (e) {
-    // ignore if index didn't exist
-    if (e?.codeName !== "IndexNotFound") throw e;
+    // Ignore if index didn't exist
+    if (e?.codeName !== "IndexNotFound") {throw e;}
   }
 
   // Ensure the correct unique index for the new schema
@@ -360,10 +351,10 @@ async function ensureUnitsIndexes(newDB) {
 
 
 function transformUnit(legacy) {
-  // legacy: { _id, name, year: "2023", units: Long|Number|{$numberLong:"..."} }
+  // Legacy: { _id, name, year: "2023", units: Long|Number|{$numberLong:"..."} }
   const fullName = legacy?.name ?? "";
   const year = Number(legacy?.year);
-  // when read via the driver, this is usually a Number; fall back to Number(...)
+  // When read via the driver, this is usually a Number; fall back to Number(...)
   const rawUnits = legacy?.units;
   const units =
     typeof rawUnits === "number"
@@ -376,8 +367,8 @@ function transformUnit(legacy) {
     fullName,
     year,
     units: Math.max(0, Number.isFinite(units) ? units : 0),
-    // timestamps are added by Mongoose on insert in your app;
-    // leave them out in the migration document
+    // Timestamps are added by Mongoose on insert in your app;
+    // Leave them out in the migration document
   };
 }
 
@@ -386,7 +377,7 @@ async function migrateUnits(oldUnits, _oldUsers, newDB) {
   // Transform
   const newUnits = oldUnits
     .map(transformUnit)
-    // keep only valid rows for the target schema
+    // Keep only valid rows for the target schema
     .filter(u => u.fullName && Number.isInteger(u.year) && u.year >= 1900 && u.year <= 3000 && u.units >= 0);
 
   // Upsert keyed by (fullName, year)
@@ -415,24 +406,24 @@ const EARNING_DEST = new Set(["Re-Invested", "Withdrawn"]);
 const EARNING_SRC = new Set(["Permanent Savings", "Temporary Savings"]);
 const EARNING_STATUS = new Set(["Sent", "Pending", "Failed"]);
 
-// map legacy -> new enum
+// Map legacy -> new enum
 function normalizeEarningSource(src) {
-  if (src === "Distribution") return "Permanent Savings";
+  if (src === "Distribution") {return "Permanent Savings";}
   return src;
 }
 
 function transformEarning(legacy) {
-  // legacy:
+  // Legacy:
   // {
   //   _id:ObjectId, beneficiary_name, date_of_earning:Date,
-  //   earnings_amount:Number, destination, source, status
+  //   Earnings_amount:Number, destination, source, status
   // }
   const fullName = (legacy?.beneficiary_name ?? "").trim();
-  const _id = legacy?._id; // keep original _id
+  const _id = legacy?._id; // Keep original _id
   const date = legacy?.date_of_earning instanceof Date ? legacy.date_of_earning : new Date(legacy?.date_of_earning);
   const amount = Number(legacy?.earnings_amount ?? 0);
 
-  // enums
+  // Enums
   const destination = EARNING_DEST.has(legacy?.destination) ? legacy.destination : "Re-Invested";
   const mappedSrc = normalizeEarningSource(legacy?.source);
   const source = EARNING_SRC.has(mappedSrc) ? mappedSrc : "Permanent Savings";
@@ -457,7 +448,7 @@ async function migrateEarnings(oldEarnings, _oldUsers, newDB) {
 
   const ops = newEarnings.map(e => ({
     updateOne: {
-      filter: { _id: e._id }, // preserve original _id
+      filter: { _id: e._id }, // Preserve original _id
       update: { $setOnInsert: e },
       upsert: true,
     },
@@ -473,5 +464,5 @@ async function migrateEarnings(oldEarnings, _oldUsers, newDB) {
 }
 
 
-//perform migration
+//Perform migration
 await migrateDatabase()

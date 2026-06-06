@@ -5,9 +5,9 @@ import { v4 as uuid } from "uuid";
 const { ObjectId } = mongoose.Types
 
 export function generateDBCashLocation({_id, name, amount} = {}){
-  if(!_id) _id = new ObjectId().toString();
-  if (!name) name = faker.helpers.arrayElement(["Mobile Money", "Standard Chartered"]);
-  if(!amount) amount = faker.number.int({min: 10_000_000, max: 20_000_000})
+  if(!_id) {_id = new ObjectId().toString();}
+  if (!name) {name = faker.helpers.arrayElement(["Mobile Money", "Standard Chartered"]);}
+  if(!amount) {amount = faker.number.int({min: 10_000_000, max: 20_000_000})}
 
   const cashLocation = {
     _id,
@@ -41,8 +41,8 @@ export function generateCashLocationUpdate(){
 }
 
 export function generateTransfer(source, dest){
- if (!source) source =  generateInputCashLocation();
- if (!dest) dest =  generateInputCashLocation();
+ if (!source) {source =  generateInputCashLocation();}
+ if (!dest) {dest =  generateInputCashLocation();}
 
 
   return {
@@ -54,7 +54,7 @@ export function generateTransfer(source, dest){
 }
 
 export function generateTransferUpdate(transfer){
-  if(!transfer) transfer = generateTransfer()
+  if(!transfer) {transfer = generateTransfer()}
   return {
     amount: faker.number.int({min: 1, max: 20_000})
   }

@@ -3,18 +3,18 @@ import * as Response from "../../utils/http-response-util.js"
 import * as DateUtil from "../../utils/date-util.js"
 
 export async function getTransactions(req, res){
-  let {userId, type, year, month, sortBy, sortOrder, page, perPage} = req.query
-  let filter = {
+  const {userId, type, year, month, sortBy, sortOrder, page, perPage} = req.query
+  const filter = {
     userId,
     type,
     year: Number(year) || undefined,
     month: Number(month) || undefined
   }
-  let sort = {
+  const sort = {
     field: sortBy,
     order: Number(sortOrder) || undefined
   }
-  let pagination = {
+  const pagination = {
     page: Number(page) || undefined,
     perPage: Number(perPage) || undefined
   }

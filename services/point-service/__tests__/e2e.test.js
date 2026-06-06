@@ -9,32 +9,28 @@ import { PointTransaction } from '../models.js';
 import { User } from '../../user-service/models.js';
 import connectDB from "../../../db.js"
 
-//load environment variables
+//Load environment variables
 dotenv.config()
 
-// mock email service
+// Mock email service
 let EmailServiceManager = await import('../../email-service/service.js')
-jest.unstable_mockModule('../../email-service/service.js', () => {
-  return {
+jest.unstable_mockModule('../../email-service/service.js', () => ({
     ...EmailServiceManager,
     sendEmail: jest.fn(),
-  }
-})
+  }))
 EmailServiceManager = await import('../../email-service/service.js')
 
-//mock DateUtil
+//Mock DateUtil
 let DateUtil = await import('../../../utils/date-util.js')
-jest.unstable_mockModule('../../../utils/date-util.js', async () => {
-  return {
+jest.unstable_mockModule('../../../utils/date-util.js', async () => ({
     ...DateUtil,
     getToday: jest.fn(()=>new Date("2025-06-01"))
-  }
-})
+  }))
 DateUtil = await import('../../../utils/date-util.js')
 
 const { createJWT } = await import('../../auth-service/service.js')
 
-//import test app
+//Import test app
 const app = (await import("../../../app.js")).default;
 
 beforeAll(async()=>{
@@ -53,15 +49,15 @@ beforeEach(() => {
 const BASE_PATH = "/point-transactions"
 
 describe("GET /point-transactions", ()=>{
-  let users, numberOfUsers
-  let transactions, numberOfTransactions
+  let numberOfUsers, users
+  let numberOfTransactions, transactions
   let adminUser, jwt
 
   beforeAll(async()=>{
-    //remove any existing records
+    //Remove any existing records
     await mongoose.connection.db.dropDatabase()
 
-    //insert users and transactions into database
+    //Insert users and transactions into database
     numberOfUsers = 2
     numberOfTransactions = 500
     users = UserMocks.generateDBUsers({numberOfUsers})
@@ -69,45 +65,45 @@ describe("GET /point-transactions", ()=>{
     await User.insertMany(users)
     await PointTransaction.insertMany(transactions)
 
-    //set jwt
+    //Set jwt
     adminUser = UserMocks.generateDBUser({userType: "admin"})
-    let {_id: userId, fullName, isAdmin} = adminUser
+    const {_id: userId, fullName, isAdmin} = adminUser
     jwt = createJWT(userId, fullName, isAdmin)
 
   }, 20_000)
 
   test("no query params - should return the first 20 sorted transactions, sorted by date in descending order", async ()=>{
-    //send api request
-    let endpoint = BASE_PATH
-    let response = await request(app).get(endpoint)
+    //Send api request
+    const endpoint = BASE_PATH
+    const response = await request(app).get(endpoint)
     .set("Cookie", cookie.serialize("jwt", jwt))
 
-    //expected transactions ids 
-    let defaultPerPage = 20
-    let expectedTransactionsIds = [...transactions]
+    //Expected transactions ids 
+    const defaultPerPage = 20
+    const expectedTransactionsIds = [...transactions]
     .sort((a, b)=>b.date - a.date)
     .slice(0, defaultPerPage)
     .map((transaction)=>transaction._id)
 
-    //actual transaction ids
-    let actualTransactionsIds = response.body.data
+    //Actual transaction ids
+    const actualTransactionsIds = response.body.data
     .map((transaction)=>transaction._id)
 
     expect(actualTransactionsIds).toEqual(expectedTransactionsIds)
   })
 
   test("all query params passed - should return the transactions based on the passed params", async ()=>{
-    //query params
-    let filter = {
+    //Query params
+    const filter = {
       userId: users[0]._id,
       type: "award",
       year: 2024, 
       month: 1
     }
-    let sort = {field: "date", order: 1}
-    let pagination = {page: 1, perPage: 5}
-    //expected transactions ids 
-    let expectedTransactionsIds = [...transactions]
+    const sort = {field: "date", order: 1}
+    const pagination = {page: 1, perPage: 5}
+    //Expected transactions ids 
+    const expectedTransactionsIds = [...transactions]
     .filter((transaction)=>{
       const transactionYear = new Date(transaction.date).getUTCFullYear()
       const transactionMonth = new Date(transaction.date).getUTCMonth() + 1 //1-based index to match mongodb $month operator
@@ -124,8 +120,8 @@ describe("GET /point-transactions", ()=>{
     .slice((pagination.page - 1) * pagination.perPage,  pagination.page * pagination.perPage)
     .map((transaction)=>transaction._id)
 
-    //actual transaction ids
-    let actualTransactionsIds = (await PointTransaction.getTransactions(filter, sort, pagination))
+    //Actual transaction ids
+    const actualTransactionsIds = (await PointTransaction.getTransactions(filter, sort, pagination))
     .map((transaction)=>transaction._id.toString())
     expect(actualTransactionsIds).toEqual(expectedTransactionsIds)
   })
@@ -133,9 +129,9 @@ describe("GET /point-transactions", ()=>{
 })
 
 describe("POST /point-transactions", ()=>{
-  let currentRecipient, currentSender, currentRedeemedBy, adminUser
+  let adminUser, currentRecipient, currentRedeemedBy, currentSender
   let awardTransaction, redeemTransaction, transferTransaction
-  let jwt, endpoint, response
+  let endpoint, jwt, response
   
   beforeAll(async()=>{
     currentRecipient = UserMocks.generateDBUser()
@@ -149,12 +145,12 @@ describe("POST /point-transactions", ()=>{
 
   describe("Award Transaction", ()=>{
     beforeAll(async ()=>{
-      //remove any existing records in database
+      //Remove any existing records in database
       await mongoose.connection.db.dropDatabase()
 
       await User.create(currentRecipient)
 
-      //send api request
+      //Send api request
       endpoint = BASE_PATH
       adminUser = UserMocks.generateDBUser({userType: "admin"})
       const {_id: userId, fullName, isAdmin} = adminUser
@@ -183,12 +179,12 @@ describe("POST /point-transactions", ()=>{
 
   describe("Redeem Transaction", ()=>{
     beforeAll(async ()=>{
-      //remove any existing records in database
+      //Remove any existing records in database
       await mongoose.connection.db.dropDatabase()
 
       await User.create(currentRedeemedBy)
 
-      //send api request
+      //Send api request
       endpoint = BASE_PATH
       adminUser = UserMocks.generateDBUser({userType: "admin"})
       const {_id: userId, fullName, isAdmin} = adminUser
@@ -217,12 +213,12 @@ describe("POST /point-transactions", ()=>{
 
   describe("Transfer Transaction", ()=>{
     beforeAll(async ()=>{
-      //remove any existing records in database
+      //Remove any existing records in database
       await mongoose.connection.db.dropDatabase()
 
       await User.insertMany([currentRecipient, currentSender])
 
-      //send api request
+      //Send api request
       endpoint = BASE_PATH
       adminUser = UserMocks.generateDBUser({userType: "admin"})
       const {_id: userId, fullName, isAdmin} = adminUser
@@ -257,9 +253,9 @@ describe("POST /point-transactions", ()=>{
 })
 
 describe("PUT /point-transactions/:id", ()=>{
-  let currentRecipient, currentSender, currentRedeemedBy
-  let awardTransaction, redeemTransaction, transferTransaction, transactionUpdate
-  let adminUser, jwt, endpoint, response
+  let currentRecipient, currentRedeemedBy, currentSender
+  let awardTransaction, redeemTransaction, transactionUpdate, transferTransaction
+  let adminUser, endpoint, jwt, response
   
   beforeAll(async()=>{
     currentRecipient = UserMocks.generateDBUser()
@@ -278,14 +274,14 @@ describe("PUT /point-transactions/:id", ()=>{
 
   describe("Award Transaction", ()=>{
     beforeAll(async ()=>{
-      //remove any existing records in database
+      //Remove any existing records in database
       await mongoose.connection.db.dropDatabase()
 
       await User.create(currentRecipient)
       await PointTransaction.create(awardTransaction)
 
-      //send api request
-      endpoint = BASE_PATH + "/" + awardTransaction._id
+      //Send api request
+      endpoint = `${BASE_PATH  }/${  awardTransaction._id}`
       response = await request(app).put(endpoint)
       .set("Cookie", cookie.serialize("jwt", jwt))
       .send(transactionUpdate)
@@ -310,14 +306,14 @@ describe("PUT /point-transactions/:id", ()=>{
 
   describe("Redeem Transaction", ()=>{
     beforeAll(async ()=>{
-      //remove any existing records in database
+      //Remove any existing records in database
       await mongoose.connection.db.dropDatabase()
 
       await PointTransaction.create(redeemTransaction)
       await User.create(currentRedeemedBy)
 
-      //send api request
-      endpoint = BASE_PATH + "/" + redeemTransaction._id
+      //Send api request
+      endpoint = `${BASE_PATH  }/${  redeemTransaction._id}`
       response = await request(app).put(endpoint)
       .set("Cookie", cookie.serialize("jwt", jwt))
       .send(transactionUpdate)
@@ -342,14 +338,14 @@ describe("PUT /point-transactions/:id", ()=>{
 
   describe("Transfer Transaction", ()=>{
     beforeAll(async ()=>{
-      //remove any existing records in database
+      //Remove any existing records in database
       await mongoose.connection.db.dropDatabase()
 
       await User.insertMany([currentRecipient, currentSender])
       await PointTransaction.create(transferTransaction)
 
-      //send api request
-      endpoint = BASE_PATH + "/" + transferTransaction._id
+      //Send api request
+      endpoint = `${BASE_PATH  }/${  transferTransaction._id}`
       response = await request(app).put(endpoint)
       .set("Cookie", cookie.serialize("jwt", jwt))
       .send(transactionUpdate)
@@ -380,9 +376,9 @@ describe("PUT /point-transactions/:id", ()=>{
 })
 
 describe("DELETE /point-transactions/:id", ()=>{
-  let currentRecipient, currentSender, currentRedeemedBy
-  let awardTransaction, redeemTransaction, transferTransaction, transactionUpdate
-  let adminUser, jwt, endpoint, response
+  let currentRecipient, currentRedeemedBy, currentSender
+  let awardTransaction, redeemTransaction, transactionUpdate, transferTransaction
+  let adminUser, endpoint, jwt, response
   
   beforeAll(async()=>{
     currentRecipient = UserMocks.generateDBUser()
@@ -401,14 +397,14 @@ describe("DELETE /point-transactions/:id", ()=>{
 
   describe("Award Transaction", ()=>{
     beforeAll(async ()=>{
-      //remove any existing records in database
+      //Remove any existing records in database
       await mongoose.connection.db.dropDatabase()
 
       await User.create(currentRecipient)
       await PointTransaction.create(awardTransaction)
 
-      //send api request
-      endpoint = BASE_PATH + "/" + awardTransaction._id
+      //Send api request
+      endpoint = `${BASE_PATH  }/${  awardTransaction._id}`
       response = await request(app).delete(endpoint)
       .set("Cookie", cookie.serialize("jwt", jwt))
     })
@@ -432,14 +428,14 @@ describe("DELETE /point-transactions/:id", ()=>{
 
   describe("Redeem Transaction", ()=>{
     beforeAll(async ()=>{
-      //remove any existing records in database
+      //Remove any existing records in database
       await mongoose.connection.db.dropDatabase()
 
       await PointTransaction.create(redeemTransaction)
       await User.create(currentRedeemedBy)
 
-      //send api request
-      endpoint = BASE_PATH + "/" + redeemTransaction._id
+      //Send api request
+      endpoint = `${BASE_PATH  }/${  redeemTransaction._id}`
       response = await request(app).delete(endpoint)
       .set("Cookie", cookie.serialize("jwt", jwt))
     })
@@ -463,14 +459,14 @@ describe("DELETE /point-transactions/:id", ()=>{
 
   describe("Transfer Transaction", ()=>{
     beforeAll(async ()=>{
-      //remove any existing records in database
+      //Remove any existing records in database
       await mongoose.connection.db.dropDatabase()
 
       await User.insertMany([currentRecipient, currentSender])
       await PointTransaction.create(transferTransaction)
 
-      //send api request
-      endpoint = BASE_PATH + "/" + transferTransaction._id
+      //Send api request
+      endpoint = `${BASE_PATH  }/${  transferTransaction._id}`
       response = await request(app).delete(endpoint)
       .set("Cookie", cookie.serialize("jwt", jwt))
     })

@@ -22,7 +22,7 @@ beforeEach(() => {
 
 //Deposit Model
 describe("Deposit Model:Write Operations", ()=>{
-  let depositor, deposit
+  let deposit, depositor
 
   beforeAll(async()=>{
     await mongoose.connection.dropDatabase()
@@ -38,7 +38,7 @@ describe("Deposit Model:Write Operations", ()=>{
 
   test("Deposit.updateOne should update existing deposit", async ()=>{
     await Deposit.updateOne({_id: deposit._id}, {$set: {amount: 1_000}})
-    let updatedDeposit = await Deposit.findById(deposit._id)
+    const updatedDeposit = await Deposit.findById(deposit._id)
     expect(updatedDeposit.amount).toEqual(1_000)
   })
 
@@ -50,44 +50,44 @@ describe("Deposit Model:Write Operations", ()=>{
 })
 
 describe("Deposit Model: Deposit.getDeposits", ()=>{
-  let numberOfDepositors = 2
-  let numberOfDeposits = 500
-  let depositors = UserMocks.generateDBUsers({numberOfUsers: numberOfDepositors})
-  let deposits = Mocks.generateDBDeposits({numberOfDeposits, depositors})
+  const numberOfDepositors = 2
+  const numberOfDeposits = 500
+  const depositors = UserMocks.generateDBUsers({numberOfUsers: numberOfDepositors})
+  const deposits = Mocks.generateDBDeposits({numberOfDeposits, depositors})
 
   beforeAll(async()=>{
-    //delete any existing deposits and depositors
+    //Delete any existing deposits and depositors
     await mongoose.connection.dropDatabase()
     await User.insertMany(depositors)
     await Deposit.insertMany(deposits)
   }, 20_000)
 
   test("no args - should sort and return the first 20 deposits sorted by date in descending order", async ()=>{
-    //expected deposits ids 
-    let defaultPerPage = 20
-    let expectedDepositsIds = [...deposits]
+    //Expected deposits ids 
+    const defaultPerPage = 20
+    const expectedDepositsIds = [...deposits]
     .sort((a, b)=>b.date - a.date)
     .slice(0, defaultPerPage)
     .map((deposit)=> deposit._id)
 
-    //actual deposit ids
-    let actualDepositsIds = (await Deposit.getDeposits())
+    //Actual deposit ids
+    const actualDepositsIds = (await Deposit.getDeposits())
     .map((deposit)=>deposit._id)
 
     expect(actualDepositsIds).toEqual(expectedDepositsIds)
   })
 
   test("all args passed - should return the deposits based on the filter, sort, and pagination", async ()=>{
-    let filter = {
+    const filter = {
       userId: depositors[0]._id, 
       year: 2024, 
       month: 1
     }
-    let sort = {field: "date", order: 1}
-    let pagination = {page: 2, perPage: 5}
+    const sort = {field: "date", order: 1}
+    const pagination = {page: 2, perPage: 5}
 
-    //expected deposits ids 
-    let expectedDepositsIds = [...deposits]
+    //Expected deposits ids 
+    const expectedDepositsIds = [...deposits]
     .filter((deposit)=>{
       const depositYear = new Date(deposit.date).getUTCFullYear()
       const depositMonth = new Date(deposit.date).getUTCMonth() + 1 //1-based index to match mongodb $month operator
@@ -99,8 +99,8 @@ describe("Deposit Model: Deposit.getDeposits", ()=>{
     .slice((pagination.page - 1) * pagination.perPage,  pagination.page * pagination.perPage)
     .map((deposit)=>deposit._id)
 
-    //actual deposit ids
-    let actualDepositsIds = (await Deposit.getDeposits(filter, sort, pagination))
+    //Actual deposit ids
+    const actualDepositsIds = (await Deposit.getDeposits(filter, sort, pagination))
     .map((deposit)=>deposit._id)
 
     expect(actualDepositsIds).toEqual(expectedDepositsIds)

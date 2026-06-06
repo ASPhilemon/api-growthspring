@@ -7,11 +7,11 @@ const MIN_DATE = "2023-01-01"
 const MAX_DATE = "2024-12-31"
 
 export function generateInputDeposit({depositor, depositType, cashLocation} = {}){
-  if (!depositor) depositor = UserMocks.generateDBUser();
-  if(!depositType) depositType = "Permanent";
-  if (!cashLocation) cashLocation = CashLocationMocks.generateInputCashLocation();
+  if (!depositor) {depositor = UserMocks.generateDBUser();}
+  if(!depositType) {depositType = "Permanent";}
+  if (!cashLocation) {cashLocation = CashLocationMocks.generateInputCashLocation();}
 
-  let inputDeposit = {
+  const inputDeposit = {
     _id: uuid(),
     depositor: {_id: depositor._id, fullName: depositor.fullName},
     date: faker.date.between({from: MIN_DATE, to: MAX_DATE}).toISOString(),
@@ -25,12 +25,12 @@ export function generateInputDeposit({depositor, depositType, cashLocation} = {}
 }
 
 export function generateDBDeposit({depositor, depositType, recordedBy, cashLocation} = {}){
-  if (!depositor) depositor = UserMocks.generateDBUser();
-  if(!depositType) depositType = faker.helpers.arrayElement(["Permanent", "Temporary"]);
-  if(!recordedBy) recordedBy = UserMocks.generateDBUser("admin");
-  if(!cashLocation) cashLocation = CashLocationMocks.generateInputCashLocation();
+  if (!depositor) {depositor = UserMocks.generateDBUser();}
+  if(!depositType) {depositType = faker.helpers.arrayElement(["Permanent", "Temporary"]);}
+  if(!recordedBy) {recordedBy = UserMocks.generateDBUser("admin");}
+  if(!cashLocation) {cashLocation = CashLocationMocks.generateInputCashLocation();}
 
-  let dbDeposit = {
+  const dbDeposit = {
     _id: uuid(),
     depositor: {
       _id: depositor._id,
@@ -56,19 +56,19 @@ export function generateDBDeposit({depositor, depositType, recordedBy, cashLocat
 
 export function generateDBDeposits({numberOfDeposits, depositors} = {}){
   if(!depositors){
-    let numberOfDepositors = 5
+    const numberOfDepositors = 5
     depositors = UserMocks.generateDBUsers(numberOfDepositors)
   }
 
   const dbDeposits = []
-  //ensure dbDeposits have unique dates and amounts for deterministic sort by date and amount in mongodb
-  let recordedDepositDates = new Set()
-  let recordedDepositAmounts = new Set()
+  //Ensure dbDeposits have unique dates and amounts for deterministic sort by date and amount in mongodb
+  const recordedDepositDates = new Set()
+  const recordedDepositAmounts = new Set()
 
   for (let i = 0; i < numberOfDeposits;){
-    let depositor = faker.helpers.arrayElement(depositors);
-    let dbDeposit = generateDBDeposit({depositor})
-    let isUnique = !recordedDepositDates.has(dbDeposit.date.toISOString()) &&
+    const depositor = faker.helpers.arrayElement(depositors);
+    const dbDeposit = generateDBDeposit({depositor})
+    const isUnique = !recordedDepositDates.has(dbDeposit.date.toISOString()) &&
     !recordedDepositAmounts.has(dbDeposit.amount)
     if (isUnique){
       dbDeposits.push(dbDeposit)
@@ -82,10 +82,10 @@ export function generateDBDeposits({numberOfDeposits, depositors} = {}){
 }
 
 export function generateDepositUpdate({cashLocationToAdd, cashLocationToDeduct} = {}){
-  if (!cashLocationToAdd) cashLocationToAdd = CashLocationMocks.generateInputCashLocation();
-  if (!cashLocationToDeduct) cashLocationToDeduct = CashLocationMocks.generateInputCashLocation()
+  if (!cashLocationToAdd) {cashLocationToAdd = CashLocationMocks.generateInputCashLocation();}
+  if (!cashLocationToDeduct) {cashLocationToDeduct = CashLocationMocks.generateInputCashLocation()}
 
-  let depositUpdate = {
+  const depositUpdate = {
     amount: faker.number.int({min: 1, max: 1_000_000}),
     date: faker.date.between({from: MIN_DATE, to: MAX_DATE}).toISOString(),
     cashLocationToAdd: {
@@ -102,7 +102,7 @@ export function generateDepositUpdate({cashLocationToAdd, cashLocationToDeduct} 
 }
 
 export function generateDBYearlyDeposit(){
-  let dbYearlyDeposit = {
+  const dbYearlyDeposit = {
     year: faker.number.int({min: 2020, max: 2025}),
     total: faker.number.int({min: 1, max: 10_000_000}),
     monthTotals: Array.from({ length: 12 }, () => faker.number.int({ min: 0, max: 1000 })),

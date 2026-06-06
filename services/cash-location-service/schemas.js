@@ -1,8 +1,8 @@
 import Joi from "joi";
 import mongoose from "mongoose";
 
-//reusable fields
-let uuidv4Pattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/
+//Reusable fields
+const uuidv4Pattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/
 const uuid = Joi.string().pattern(uuidv4Pattern)
 
 const objectId = Joi.custom((value, helpers) => {

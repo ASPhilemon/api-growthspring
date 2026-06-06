@@ -1,7 +1,7 @@
 import Joi from "joi";
 
-// reusable fields
-let objectIdPattern = /^[a-f0-9]{24}$/i
+// Reusable fields
+const objectIdPattern = /^[a-f0-9]{24}$/i
 
 const objectId = Joi.string().pattern(objectIdPattern)
 

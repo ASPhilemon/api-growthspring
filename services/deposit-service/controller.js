@@ -2,21 +2,21 @@ import * as ServiceManager from "./service.js"
 import * as Response from "../../utils/http-response-util.js"
 
 export async function getDeposits(req, res){
-  let {userId, year, month, sortBy, sortOrder, page, perPage} = req.query
-  let filter = {
+  const {userId, year, month, sortBy, sortOrder, page, perPage} = req.query
+  const filter = {
     userId,
-    year: Number(year) || undefined,
-    month: Number(month) || undefined
+    year: Number(year) || null,
+    month: Number(month) || null
   }
-  let sort = {
+  const sort = {
     field: sortBy,
-    order: Number(sortOrder) || undefined
+    order: Number(sortOrder) || null
   }
-  let pagination = {
-    page: Number(page) || undefined,
-    perPage: Number(perPage) || undefined
+  const pagination = {
+    page: Number(page) || null,
+    perPage: Number(perPage) || null
   }
-  let deposits = await ServiceManager.getDeposits(filter, sort, pagination)
+  const deposits = await ServiceManager.getDeposits(filter, sort, pagination)
   Response.sendSuccess(deposits, {req, res})
 }
 

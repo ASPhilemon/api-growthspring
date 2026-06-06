@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 const { ObjectId } = mongoose.Types
 
-//cash-location schema
+//Cash-location schema
 const cashLocationSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -15,7 +15,7 @@ const cashLocationSchema = new mongoose.Schema({
   },
 }, { timestamps:true });
 
-//cash-location sub document schema
+//Cash-location sub document schema
 const subCashLocationSchema = new mongoose.Schema({
   _id : {
     type: ObjectId,
@@ -28,7 +28,7 @@ const subCashLocationSchema = new mongoose.Schema({
   }
 });
 
-//cash-location-transfer schema
+//Cash-location-transfer schema
 const cashLocationTransferSchema = new mongoose.Schema({
   _id: String,
   source: {
@@ -45,10 +45,10 @@ const cashLocationTransferSchema = new mongoose.Schema({
   },
 }, { timestamps:true });
 
-//cash-location model
+//Cash-location model
 const CashLocation  = mongoose.model('cash-location', cashLocationSchema);
 
-//cash-location-transfer model
+//Cash-location-transfer model
 const CashLocationTransfer  = mongoose.model('cash-location-transfer', cashLocationTransferSchema);
 
 export {CashLocation, CashLocationTransfer}

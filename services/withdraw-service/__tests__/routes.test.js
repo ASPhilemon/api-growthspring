@@ -5,25 +5,23 @@ import dotenv from "dotenv"
 import * as Mocks from "./mocks.js"
 import * as UserMocks from "../../user-service/__tests__/mocks.js"
 
-//load environment variables
+//Load environment variables
 dotenv.config()
 
-// mock dependencies
-jest.unstable_mockModule('../service.js', () => {
-  return {
+// Mock dependencies
+jest.unstable_mockModule('../service.js', () => ({
     getWithdraws: jest.fn(),
     getWithdrawById: jest.fn(),
     getYearlyWithdraws: jest.fn(),
     recordWithdraw: jest.fn(),
     updateWithdraw: jest.fn(),
     deleteWithdraw: jest.fn(),
-  }
-})
+  }))
 
-//import test app
+//Import test app
 const app = (await import("../../../app.js")).default;
 
-// import dependencies
+// Import dependencies
 const ServiceManager = await import("../service.js");
 
 import { createJWT } from '../../auth-service/service.js';
@@ -89,12 +87,12 @@ const routes = [
 ]
 
 describe("Access Control", ()=>{
-  for (let route of routes){
+  for (const route of routes){
     const endpoint = BASE_PATH + route.path
     const anonymousUserAllowed = route.allowed.includes("anonymous")
     const regularUserAllowed = route.allowed.includes("regular-user")
 
-    test(`${route.method + " " + route.path}: anonymous user is ${anonymousUserAllowed? "allowed" : "denied"} access `, async () => {
+    test(`${`${route.method  } ${  route.path}`}: anonymous user is ${anonymousUserAllowed? "allowed" : "denied"} access `, async () => {
       const response = await request(app)[route.method](endpoint)
       if (anonymousUserAllowed){
         expect(route.serviceHandler).toHaveBeenCalled();
@@ -105,7 +103,7 @@ describe("Access Control", ()=>{
       }
     });
 
-    test(`${route.method + " " + route.path}: regular user is ${regularUserAllowed? "allowed" : "denied"} access  `, async () => {
+    test(`${`${route.method  } ${  route.path}`}: regular user is ${regularUserAllowed? "allowed" : "denied"} access  `, async () => {
       const {_id, fullName, isAdmin} = regularUser
       const jwt = createJWT(_id, fullName, isAdmin)
       const response = await request(app)[route.method](endpoint)
@@ -119,7 +117,7 @@ describe("Access Control", ()=>{
       }
     });
 
-    test(`${route.method + " " + route.path}: admin user is allowed access`, async () => {
+    test(`${`${route.method  } ${  route.path}`}: admin user is allowed access`, async () => {
       const {_id, fullName, isAdmin} = adminUser
       const jwt = createJWT(_id, fullName, isAdmin)
       await request(app)[route.method](endpoint)
@@ -131,12 +129,12 @@ describe("Access Control", ()=>{
 })
 
 describe("Service Handlers Are Called With Correct Args", ()=>{
-  for (let route of routes){
+  for (const route of routes){
 
     const queryString = new URLSearchParams(route.query).toString();
     const endpoint = BASE_PATH + route.path + (queryString ? `?${queryString}` : "");
 
-    test(`${route.method + " " + route.path} service handler is called with correct args`, async () => {
+    test(`${`${route.method  } ${  route.path}`} service handler is called with correct args`, async () => {
       const {_id, fullName, isAdmin} = adminUser
       const jwt = createJWT(_id, fullName, isAdmin)
       await request(app)[route.method](endpoint)

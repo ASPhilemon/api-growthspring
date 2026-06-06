@@ -1,6 +1,6 @@
 import { CashLocation, CashLocationTransfer } from "./models.js"
 
-//util
+//Util
 import * as Errors from "../../utils/error-util.js"
 import * as DB from "../../utils/db-util.js"
 import * as Validator from "../../utils/validator-util.js"
@@ -14,7 +14,7 @@ export async function getCashLocations(){
 export async function getCashLocationById(cashLocationId){
   Validator.schema(Schemas.getCashLocationById, cashLocationId)
   const cashLocation = await DB.query(CashLocation.findById(cashLocationId))
-  if (!cashLocation) throw new Errors.NotFoundError("Failed to find cash location");
+  if (!cashLocation) {throw new Errors.NotFoundError("Failed to find cash location");}
   return cashLocation
 }
 
@@ -39,7 +39,7 @@ export async function getTransfers(){
 export async function getTransferById(transferId){
   Validator.schema(Schemas.getTransferById, transferId)
   const transfer = await DB.query(CashLocationTransfer.findOne({_id : transferId}))
-  if(!transfer) throw new Errors.NotFoundError("Failed to find transfer");
+  if(!transfer) {throw new Errors.NotFoundError("Failed to find transfer");}
 
   return transfer
 }
@@ -94,7 +94,7 @@ export async function deleteTransfer(transferId){
   })
 }
 
-//helpers
+//Helpers
 function _addToCashLocation(cashLocation, amount){
   if (cashLocation.amount + amount < 0) {
     throw new Errors.BadRequestError(`Insufficient balance in ${cashLocation.name}`)

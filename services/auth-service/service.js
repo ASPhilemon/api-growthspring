@@ -7,16 +7,16 @@ import crypto from "crypto"
 
 import { OAuth2Client } from "google-auth-library"
 
-import { OTP, Password, Passkey, Challenge } from "./models.js"
+import { Challenge, OTP, Passkey, Password } from "./models.js"
 
-//utils
+//Utils
 import * as DB from "../../utils/db-util.js"
 import * as Errors from "../../utils/error-util.js"
 import * as Validator from "../../utils/validator-util.js"
 
-//collaborator services
-import * as EmailServiceManager from "../email-service/service.js"
-import * as UserServiceManager from "../user-service/service.js"
+//Collaborator services
+import * as EmailService from "../email-service/service.js"
+import * as UserService from "../user-service/service.js"
 
 export async function signInWithPassword(email, password, cfTurnstileResponse){
   await _verifyCfTurnstileResponse(cfTurnstileResponse)
@@ -26,7 +26,7 @@ export async function signInWithPassword(email, password, cfTurnstileResponse){
 
   await matchPasswordWithHash(password, hashedPassword)
 
-  const user = await UserServiceManager.getUserByEmail(email)
+  const user = await UserService.getUserByEmail(email)
   return createJWT(user._id, user.fullName, user.isAdmin)
 
 }
@@ -42,7 +42,7 @@ export async function signInWithGoogle(googleToken){
     Please sign in with a registered email.`
   )
 
-  const user = await UserServiceManager.getUserByEmail(userEmail)
+  const user = await UserService.getUserByEmail(userEmail)
 
   return createJWT(user._id, user.fullName, user.isAdmin)
 
@@ -63,26 +63,26 @@ export async function signInWithGoogle(googleToken){
 
 export async function getPasswordByUserId(userId){
   const password = await DB.query(Password.findOne({"user._id": userId}))
-  if (!password) throw new Errors.NotFoundError("Failed to find password");
+  if (!password) {throw new Errors.NotFoundError("Failed to find password");}
   return password
 }
 
 export async function getPasswordByUserEmail(userEmail){
   const password = await DB.query(Password.findOne({"user.email": userEmail}))
-  if (!password) throw new Errors.NotFoundError("Failed to find password");
+  if (!password) {throw new Errors.NotFoundError("Failed to find password");}
   return password
 }
 
 export async function createOTP(email, otpPurpose, cfTurnstileResponse){
   await _verifyCfTurnstileResponse(cfTurnstileResponse)
-  let otp = _buildOTP(email, otpPurpose)
+  const otp = _buildOTP(email, otpPurpose)
   try{
     await getPasswordByUserEmail(email)
     await DB.query(OTP.create(otp))
     sendOTPCreatedEmail(otp);
   }
   catch(err){
-    if(!(err instanceof Errors.NotFoundError)) throw err
+    if(!(err instanceof Errors.NotFoundError)) {throw err}
   }
 }
  
@@ -90,7 +90,7 @@ export async function resetPassword(otpCode, newPassword, cfTurnstileResponse){
   validatePasswordStrength(newPassword)
 
   const otp = await DB.query(OTP.findOne({code: otpCode, purpose: "reset-password"}))
-  if(!otp) throw new Errors.BadRequestError("The OTP is expired or incorrect");
+  if(!otp) {throw new Errors.BadRequestError("The OTP is expired or incorrect");}
 
   const hash = hashPassword(newPassword)
 
@@ -105,7 +105,7 @@ export async function resetPassword(otpCode, newPassword, cfTurnstileResponse){
 }
 
 export function verifyJWT(jwt){
-  const JWT_SECRET = process.env.JWT_SECRET
+  const {JWT_SECRET} = process.env
   try{
     return JWT.verify(jwt, JWT_SECRET)
   }
@@ -133,8 +133,8 @@ export async function createPassword(userId, fullName, email){
 }
 
 async function sendPasswordResetEmail(email){
-  const user = await UserServiceManager.getUserByEmail(email)
-  EmailServiceManager.sendEmail(
+  const user = await UserService.getUserByEmail(email)
+  EmailService.sendEmail(
     "growthspring",
     user.email,
     "Password Reset Successful",
@@ -143,7 +143,7 @@ async function sendPasswordResetEmail(email){
 }
 
 function sendOTPCreatedEmail(otp){
-  EmailServiceManager.sendEmail(
+  EmailService.sendEmail(
     "growthspring",
     otp.email,
     `One Time Password - ${otp.purpose} `,
@@ -156,7 +156,7 @@ export async function getRegistrationOptionsWebAuthn(otpCode){
   const otp = await DB.query(OTP.findOne({code: otpCode}))
   Validator.assert(otp, "OTP code is invalid or expired")
 
-  //get already registered passkeys for the user in otp
+  //Get already registered passkeys for the user in otp
   const userPasskeys = await DB.query(Passkey.find({"user.email": otp.email}))
 
   const registrationOptions = await _generateRestrationOptions(otp.email, userPasskeys)
@@ -254,7 +254,7 @@ export async function verifyAuthenticationWebAuthn(response, challengeId){
 
   const [updateResult, user] = await Promise.all([
     _updatePasskeyCounter(verification.authenticationInfo.newCounter, passkey),
-    UserServiceManager.getUserByEmail({email: passkey.email})
+    UserService.getUserByEmail({email: passkey.email})
   ])
 
   Validator.assert(updateResult.matchedCount, "Passkey not found")
@@ -263,7 +263,7 @@ export async function verifyAuthenticationWebAuthn(response, challengeId){
 
   return jwt
 
-  //helpers
+  //Helpers
   async function verifyResponse(response, passkey, challenge){
     const {rpId, origin} = _getWebAuthnConstants()
     let verification;
@@ -294,7 +294,7 @@ export async function verifyAuthenticationWebAuthn(response, challengeId){
   }
 }
 
-//helpers
+//Helpers
 function _buildOTP(email, otpPurpose){
   const minOTPCode = 1e5
   const maxOTPCode = 9e5
@@ -324,12 +324,12 @@ function validatePasswordStrength(password){
 
 async function matchPasswordWithHash(password, hash){
   const match = await bcrypt.compare(password, hash )
-  if (!match) throw new Errors.BadRequestError("Incorrect email or password")
+  if (!match) {throw new Errors.BadRequestError("Incorrect email or password")}
 }
 
 async function _verifyCfTurnstileResponse(cfTurnstileResponse){
   return
-  if (process.env.NODE_ENV != "production") return;
+  if (process.env.NODE_ENV != "production") {return;}
 
   const CLOUDFLARE_TURNSTILE_API = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
   const response = await fetch(CLOUDFLARE_TURNSTILE_API, {

@@ -1,13 +1,13 @@
 import { ClubFundAnnualTransaction } from "./models.js";
 
-// util
+// Util
 import * as Errors from "../../utils/error-util.js";
 import * as DB from "../../utils/db-util.js";
 import * as Validator from "../../utils/validator-util.js";
 
-//import * as Schemas from "./schemas.js";
+//Import * as Schemas from "./schemas.js";
 
-// cash location service (used to resolve account name during transformation)
+// Cash location service (used to resolve account name during transformation)
 import * as CashLocationService from "../cash-location-service/service.js";
 
 /**
@@ -15,22 +15,22 @@ import * as CashLocationService from "../cash-location-service/service.js";
  * New records should include `account` (cash-location ObjectId).
  */
 export async function addClubFundAnnualTransaction(tx) {
-  // expected tx fields:
+  // Expected tx fields:
   // { transaction_type, name, amount, reason, date, account? }
   //Validator.schema(Schemas.addClubFundAnnualTransaction, tx);
 
-  // basic safety (optional—validation should already cover most)
-  if (!tx?.transaction_type) throw new Errors.BadRequestError("transaction_type is required");
-  if (!tx?.name) throw new Errors.BadRequestError("name is required");
+  // Basic safety (optional—validation should already cover most)
+  if (!tx?.transaction_type) {throw new Errors.BadRequestError("transaction_type is required");}
+  if (!tx?.name) {throw new Errors.BadRequestError("name is required");}
   if (!Number.isFinite(Number(tx?.amount)) || Number(tx.amount) < 0) {
     throw new Errors.BadRequestError("amount must be a non-negative number");
   }
-  if (!tx?.reason) throw new Errors.BadRequestError("reason is required");
-  if (!tx?.date) throw new Errors.BadRequestError("date is required");
+  if (!tx?.reason) {throw new Errors.BadRequestError("reason is required");}
+  if (!tx?.date) {throw new Errors.BadRequestError("date is required");}
 
-  // if account provided, ensure it exists (so FE can resolve it)
+  // If account provided, ensure it exists (so FE can resolve it)
   if (tx.account) {
-    // relies on cash-location service throwing NotFoundError if not found
+    // Relies on cash-location service throwing NotFoundError if not found
     await CashLocationService.getCashLocationById(tx.account);
   }
 
@@ -87,7 +87,7 @@ export async function toAnnualSummariesForFrontend(transactions = null) {
     const d = new Date(t?.date);
     const year = !Number.isNaN(d.getTime()) ? String(d.getFullYear()) : "Unknown";
 
-    if (!out[year]) out[year] = { records: [] };
+    if (!out[year]) {out[year] = { records: [] };}
 
     const accountName = t?.account ? (accountNameById[String(t.account)] || "Unavailable") : "Unavailable";
     const isExpense = String(t?.transaction_type || "").toLowerCase() === "expense";
@@ -114,9 +114,9 @@ export async function toAnnualSummariesForFrontend(transactions = null) {
     ordered[y].records.sort((a, b) => {
       const da = new Date(a.date).getTime();
       const db = new Date(b.date).getTime();
-      if (Number.isNaN(da) && Number.isNaN(db)) return 0;
-      if (Number.isNaN(da)) return 1;
-      if (Number.isNaN(db)) return -1;
+      if (Number.isNaN(da) && Number.isNaN(db)) {return 0;}
+      if (Number.isNaN(da)) {return 1;}
+      if (Number.isNaN(db)) {return -1;}
       return da - db;
     });
   });

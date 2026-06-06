@@ -51,7 +51,7 @@ describe("PointTransaction Model:Write Operations", ()=>{
     const transaction = Mocks.generateDBAwardTransaction()
     await PointTransaction.create(transaction)
     await PointTransaction.updateOne({_id: transaction._id}, {$set: {points: 100}})
-    let updatedTransaction = await PointTransaction.findById(transaction._id)
+    const updatedTransaction = await PointTransaction.findById(transaction._id)
     expect(updatedTransaction.points).toEqual(100)
   })
 
@@ -65,43 +65,43 @@ describe("PointTransaction Model:Write Operations", ()=>{
 })
 
 describe("PointTransaction Model: PointTransaction.getTransactions", ()=>{
-  let numberOfUsers = 2
-  let numberOfTransactions = 1_000
-  let users = UserMocks.generateDBUsers({numberOfUsers})
-  let transactions = Mocks.generateDBTransactions(numberOfTransactions, {users})
+  const numberOfUsers = 2
+  const numberOfTransactions = 1_000
+  const users = UserMocks.generateDBUsers({numberOfUsers})
+  const transactions = Mocks.generateDBTransactions(numberOfTransactions, {users})
 
   beforeAll(async()=>{
-    //delete any existing records
+    //Delete any existing records
     await mongoose.connection.dropDatabase()
     await PointTransaction.insertMany(transactions)
   }, 20_000)
 
   test("no args - should sort and return the first 20 transactions sorted by date in descending order", async ()=>{
-    //expected transactions ids 
-    let defaultPerPage = 20
-    let expectedTransactionsIds = [...transactions]
+    //Expected transactions ids 
+    const defaultPerPage = 20
+    const expectedTransactionsIds = [...transactions]
     .sort((a, b)=>b.date - a.date)
     .slice(0, defaultPerPage)
     .map((transaction)=> transaction._id)
 
-    //actual transactions ids
-    let actualTransactionsIds = (await PointTransaction.getTransactions())
+    //Actual transactions ids
+    const actualTransactionsIds = (await PointTransaction.getTransactions())
     .map((transaction)=>transaction._id.toString())
 
     expect(actualTransactionsIds).toEqual(expectedTransactionsIds)
   })
 
   test("all args passed - should return the transactions based on the filter, sort, and pagination", async ()=>{
-    let filter = {
+    const filter = {
       userId: users[0]._id,
       type: "award",
       year: 2024, 
       month: 1
     }
-    let sort = {field: "date", order: 1}
-    let pagination = {page: 1, perPage: 5}
-    //expected transactions ids 
-    let expectedTransactionsIds = [...transactions]
+    const sort = {field: "date", order: 1}
+    const pagination = {page: 1, perPage: 5}
+    //Expected transactions ids 
+    const expectedTransactionsIds = [...transactions]
     .filter((transaction)=>{
       const transactionYear = new Date(transaction.date).getUTCFullYear()
       const transactionMonth = new Date(transaction.date).getUTCMonth() + 1 //1-based index to match mongodb $month operator
@@ -118,8 +118,8 @@ describe("PointTransaction Model: PointTransaction.getTransactions", ()=>{
     .slice((pagination.page - 1) * pagination.perPage,  pagination.page * pagination.perPage)
     .map((transaction)=>transaction._id)
 
-    //actual transaction ids
-    let actualTransactionsIds = (await PointTransaction.getTransactions(filter, sort, pagination))
+    //Actual transaction ids
+    const actualTransactionsIds = (await PointTransaction.getTransactions(filter, sort, pagination))
     .map((transaction)=>transaction._id.toString())
     expect(actualTransactionsIds).toEqual(expectedTransactionsIds)
   })

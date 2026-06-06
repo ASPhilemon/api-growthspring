@@ -9,32 +9,28 @@ import * as UserMocks from '../../user-service/__tests__/mocks.js';
 import { CashLocation, CashLocationTransfer } from '../models.js';
 import connectDB from "../../../db.js"
 
-//load environment variables
+//Load environment variables
 dotenv.config()
 
-// mock email service
-let EmailServiceManager = await import('../../email-service/service.js')
-jest.unstable_mockModule('../../email-service/service.js', () => {
-  return {
-    ...EmailServiceManager,
+// Mock email service
+let EmailService = await import('../../email-service/service.js')
+jest.unstable_mockModule('../../email-service/service.js', () => ({
+    ...EmailService,
     sendEmail: jest.fn(),
-  }
-})
-EmailServiceManager = await import('../../email-service/service.js')
+  }))
+EmailService = await import('../../email-service/service.js')
 
-//mock DateUtil
+//Mock DateUtil
 let DateUtil = await import('../../../utils/date-util.js')
-jest.unstable_mockModule('../../../utils/date-util.js', async () => {
-  return {
+jest.unstable_mockModule('../../../utils/date-util.js', async () => ({
     ...DateUtil,
     getToday: jest.fn(()=>new Date("2025-06-01"))
-  }
-})
+  }))
 DateUtil = await import('../../../utils/date-util.js')
 
 const { createJWT } = await import('../../auth-service/service.js')
 
-//import test app
+//Import test app
 const app = (await import("../../../app.js")).default;
 
 beforeAll(async()=>{
@@ -57,31 +53,31 @@ describe("GET /cash-locations", ()=>{
   let adminUser, jwt
 
   beforeAll(async()=>{
-    //remove any existing cashLocationers and cashLocations
+    //Remove any existing cashLocationers and cashLocations
     await mongoose.connection.db.dropDatabase()
 
     cashLocations = Mocks.generateDBCashLocations()
     await CashLocation.insertMany(cashLocations)
 
-    //set jwt
+    //Set jwt
     adminUser = UserMocks.generateDBUser({userType: "admin"})
-    let {_id: userId, fullName, isAdmin} = adminUser
+    const {_id: userId, fullName, isAdmin} = adminUser
     jwt = createJWT(userId, fullName, isAdmin)
 
   })
 
   test("should return all cash locations", async ()=>{
-    //send api request
-    let endpoint = BASE_PATH
-    let response = await request(app).get(endpoint)
+    //Send api request
+    const endpoint = BASE_PATH
+    const response = await request(app).get(endpoint)
     .set("Cookie", cookie.serialize("jwt", jwt))
 
-    //expected cashLocations ids 
-    let expectedCashLocationsIds = cashLocations
+    //Expected cashLocations ids 
+    const expectedCashLocationsIds = cashLocations
     .map((cashLocation)=>cashLocation._id)
 
-    //actual cashLocation ids
-    let actualCashLocationsIds = response.body.data
+    //Actual cashLocation ids
+    const actualCashLocationsIds = response.body.data
     .map((cashLocation)=>cashLocation._id)
 
     expect(actualCashLocationsIds).toEqual(expectedCashLocationsIds)
@@ -94,23 +90,23 @@ describe("GET /cash-location-123", ()=>{
   let adminUser, jwt
 
   beforeAll(async()=>{
-    //remove any existing cashLocationers and cashLocations
+    //Remove any existing cashLocationers and cashLocations
     await mongoose.connection.db.dropDatabase()
 
     cashLocation = Mocks.generateDBCashLocation()
     await CashLocation.create(cashLocation)
 
-    //set jwt
+    //Set jwt
     adminUser = UserMocks.generateDBUser({userType: "admin"})
-    let {_id: userId, fullName, isAdmin} = adminUser
+    const {_id: userId, fullName, isAdmin} = adminUser
     jwt = createJWT(userId, fullName, isAdmin)
 
   })
 
   test("should return inserted cash location", async ()=>{
-    //send api request
-    let endpoint = BASE_PATH + "/" + cashLocation._id
-    let response = await request(app).get(endpoint)
+    //Send api request
+    const endpoint = `${BASE_PATH  }/${  cashLocation._id}`
+    const response = await request(app).get(endpoint)
     .set("Cookie", cookie.serialize("jwt", jwt))
 
     const insertedCashLocationId = response.body.data._id
@@ -121,12 +117,12 @@ describe("GET /cash-location-123", ()=>{
 })
 
 describe("PUT /cash-locations/:id", ()=>{
-  let currentCashLocation, cashLocationUpdate
+  let cashLocationUpdate, currentCashLocation
   let adminUser, jwt
   let endpoint, response
   
   beforeAll(async()=>{
-    //remove any existing records in database
+    //Remove any existing records in database
     await mongoose.connection.db.dropDatabase()
 
     currentCashLocation = Mocks.generateDBCashLocation()
@@ -135,8 +131,8 @@ describe("PUT /cash-locations/:id", ()=>{
 
     adminUser = UserMocks.generateDBUser({userType: "admin"})
 
-    //send api request
-    endpoint = BASE_PATH + "/" + currentCashLocation._id
+    //Send api request
+    endpoint = `${BASE_PATH  }/${  currentCashLocation._id}`
     const {_id: userId, fullName, isAdmin} = adminUser
     jwt = createJWT(userId, fullName, isAdmin)
     response = await request(app).put(endpoint)
@@ -161,31 +157,31 @@ describe("GET /cash-locations/transfers", ()=>{
   let adminUser, jwt
 
   beforeAll(async()=>{
-    //remove any existing transferers and transfers
+    //Remove any existing transferers and transfers
     await mongoose.connection.db.dropDatabase()
 
     transfers = Mocks.generateTransfers()
     await CashLocationTransfer.insertMany(transfers)
 
-    //set jwt
+    //Set jwt
     adminUser = UserMocks.generateDBUser({userType: "admin"})
-    let {_id: userId, fullName, isAdmin} = adminUser
+    const {_id: userId, fullName, isAdmin} = adminUser
     jwt = createJWT(userId, fullName, isAdmin)
 
   })
 
   test("should return all transfers", async ()=>{
-    //send api request
-    let endpoint = BASE_PATH + '/transfers'
-    let response = await request(app).get(endpoint)
+    //Send api request
+    const endpoint = `${BASE_PATH  }/transfers`
+    const response = await request(app).get(endpoint)
     .set("Cookie", cookie.serialize("jwt", jwt))
 
-    //expected transfers ids 
-    let expectedTransfersIds = transfers
+    //Expected transfers ids 
+    const expectedTransfersIds = transfers
     .map((transfer)=>transfer._id)
 
-    //actual transfer ids
-    let actualTransfersIds = response.body.data
+    //Actual transfer ids
+    const actualTransfersIds = response.body.data
     .map((transfer)=>transfer._id)
 
     expect(actualTransfersIds).toEqual(expectedTransfersIds)
@@ -198,23 +194,23 @@ describe("GET /cash-locations/transfers/transfer-123", ()=>{
   let adminUser, jwt
 
   beforeAll(async()=>{
-    //remove any existing transferers and transfers
+    //Remove any existing transferers and transfers
     await mongoose.connection.db.dropDatabase()
 
     transfer = Mocks.generateTransfer()
     await CashLocationTransfer.create(transfer)
 
-    //set jwt
+    //Set jwt
     adminUser = UserMocks.generateDBUser({userType: "admin"})
-    let {_id: userId, fullName, isAdmin} = adminUser
+    const {_id: userId, fullName, isAdmin} = adminUser
     jwt = createJWT(userId, fullName, isAdmin)
 
   })
 
   test("should return inserted transfer", async ()=>{
-    //send api request
-    let endpoint = BASE_PATH  + '/transfers/' + transfer._id
-    let response = await request(app).get(endpoint)
+    //Send api request
+    const endpoint = `${BASE_PATH   }/transfers/${  transfer._id}`
+    const response = await request(app).get(endpoint)
     .set("Cookie", cookie.serialize("jwt", jwt))
 
     const insertedTransferId = response.body.data._id
@@ -226,12 +222,12 @@ describe("GET /cash-locations/transfers/transfer-123", ()=>{
 
 describe("POST /cash-locations/transfers", ()=>{
   let transfer
-  let adminUser, jwt, endpoint, response
+  let adminUser, endpoint, jwt, response
   let currentSourceCashLocation
   let currentDestCashLocation
 
   beforeAll(async()=>{
-    //remove any existing transferers and transfers
+    //Remove any existing transferers and transfers
     await mongoose.connection.db.dropDatabase()
 
     currentDestCashLocation = Mocks.generateDBCashLocation()
@@ -244,14 +240,14 @@ describe("POST /cash-locations/transfers", ()=>{
       currentDestCashLocation
     ])
 
-    //set jwt
+    //Set jwt
     adminUser = UserMocks.generateDBUser({userType: "admin"})
-    let {_id: userId, fullName, isAdmin} = adminUser
+    const {_id: userId, fullName, isAdmin} = adminUser
     jwt = createJWT(userId, fullName, isAdmin)
 
-    endpoint = BASE_PATH  + '/transfers'
+    endpoint = `${BASE_PATH   }/transfers`
 
-    //send api request
+    //Send api request
     response = await request(app).post(endpoint)
     .set("Cookie", cookie.serialize("jwt", jwt))
     .send(transfer)
@@ -277,13 +273,13 @@ describe("POST /cash-locations/transfers", ()=>{
 
 describe("PUT /cash-locations/transfers/transfer-123", ()=>{
   let currentTransfer
-  let adminUser, jwt, endpoint, response
+  let adminUser, endpoint, jwt, response
   let currentSourceCashLocation
   let currentDestCashLocation
   let transferUpdate
 
   beforeAll(async()=>{
-    //remove any existing transferers and transfers
+    //Remove any existing transferers and transfers
     await mongoose.connection.db.dropDatabase()
 
     currentDestCashLocation = Mocks.generateDBCashLocation()
@@ -299,14 +295,14 @@ describe("PUT /cash-locations/transfers/transfer-123", ()=>{
 
     transferUpdate = Mocks.generateTransferUpdate()
 
-    //set jwt
+    //Set jwt
     adminUser = UserMocks.generateDBUser({userType: "admin"})
-    let {_id: userId, fullName, isAdmin} = adminUser
+    const {_id: userId, fullName, isAdmin} = adminUser
     jwt = createJWT(userId, fullName, isAdmin)
 
-    endpoint = BASE_PATH  + '/transfers/' + currentTransfer._id
+    endpoint = `${BASE_PATH   }/transfers/${  currentTransfer._id}`
 
-    //send api request
+    //Send api request
     response = await request(app).put(endpoint)
     .set("Cookie", cookie.serialize("jwt", jwt))
     .send(transferUpdate)
@@ -332,12 +328,12 @@ describe("PUT /cash-locations/transfers/transfer-123", ()=>{
 
 describe("DELETE /cash-locations/transfers/transfer-123", ()=>{
   let transfer
-  let adminUser, jwt, endpoint, response
+  let adminUser, endpoint, jwt, response
   let currentSourceCashLocation
   let currentDestCashLocation
 
   beforeAll(async()=>{
-    //remove any existing transferers and transfers
+    //Remove any existing transferers and transfers
     await mongoose.connection.db.dropDatabase()
 
     currentDestCashLocation = Mocks.generateDBCashLocation()
@@ -351,14 +347,14 @@ describe("DELETE /cash-locations/transfers/transfer-123", ()=>{
       currentDestCashLocation
     ])
 
-    //set jwt
+    //Set jwt
     adminUser = UserMocks.generateDBUser({userType: "admin"})
-    let {_id: userId, fullName, isAdmin} = adminUser
+    const {_id: userId, fullName, isAdmin} = adminUser
     jwt = createJWT(userId, fullName, isAdmin)
 
-    endpoint = BASE_PATH  + '/transfers/' + transfer._id
+    endpoint = `${BASE_PATH   }/transfers/${  transfer._id}`
 
-    //send api request
+    //Send api request
     response = await request(app).delete(endpoint)
     .set("Cookie", cookie.serialize("jwt", jwt))
 

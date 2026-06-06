@@ -7,10 +7,10 @@ const MIN_DATE = "2023-01-01"
 const MAX_DATE = "2024-12-31"
 
 export function generateInputWithdraw({withdrawnBy, cashLocation} = {}){
-  if (!withdrawnBy) withdrawnBy = UserMocks.generateDBUser();
-  if (!cashLocation) cashLocation = CashLocationMocks.generateInputCashLocation();
+  if (!withdrawnBy) {withdrawnBy = UserMocks.generateDBUser();}
+  if (!cashLocation) {cashLocation = CashLocationMocks.generateInputCashLocation();}
 
-  let inputWithdraw = {
+  const inputWithdraw = {
     _id: uuid(),
     withdrawnBy: {_id: withdrawnBy._id, fullName: withdrawnBy.fullName},
     date: faker.date.between({from: MIN_DATE, to: MAX_DATE}).toISOString(),
@@ -22,11 +22,11 @@ export function generateInputWithdraw({withdrawnBy, cashLocation} = {}){
 }
 
 export function generateDBWithdraw({withdrawnBy, recordedBy, cashLocation} = {}){
-  if (!withdrawnBy) withdrawnBy = UserMocks.generateDBUser();
-  if(!recordedBy) recordedBy = UserMocks.generateDBUser("admin");
-  if(!cashLocation) cashLocation = CashLocationMocks.generateInputCashLocation();
+  if (!withdrawnBy) {withdrawnBy = UserMocks.generateDBUser();}
+  if(!recordedBy) {recordedBy = UserMocks.generateDBUser("admin");}
+  if(!cashLocation) {cashLocation = CashLocationMocks.generateInputCashLocation();}
 
-  let dbWithdraw = {
+  const dbWithdraw = {
     _id: uuid(),
     withdrawnBy: {
       _id: withdrawnBy._id,
@@ -48,19 +48,19 @@ export function generateDBWithdraw({withdrawnBy, recordedBy, cashLocation} = {})
 
 export function generateDBWithdraws({numberOfWithdraws, withdrawers} = {}){
   if(!withdrawers){
-    let numberOfWithdrawers = 5
+    const numberOfWithdrawers = 5
     withdrawers = UserMocks.generateDBUsers({numberOfWithdrawers})
   }
 
   const dbWithdraws = []
-  //ensure dbWithdraws have unique dates and amounts for deterministic sort by date and amount in mongodb
-  let recordedWithdrawDates = new Set()
-  let recordedWithdrawAmounts = new Set()
+  //Ensure dbWithdraws have unique dates and amounts for deterministic sort by date and amount in mongodb
+  const recordedWithdrawDates = new Set()
+  const recordedWithdrawAmounts = new Set()
 
   for (let i = 0; i < numberOfWithdraws;){
-    let withdrawnBy = faker.helpers.arrayElement(withdrawers);
-    let dbWithdraw = generateDBWithdraw({withdrawnBy})
-    let isUnique = !recordedWithdrawDates.has(dbWithdraw.date.toISOString()) &&
+    const withdrawnBy = faker.helpers.arrayElement(withdrawers);
+    const dbWithdraw = generateDBWithdraw({withdrawnBy})
+    const isUnique = !recordedWithdrawDates.has(dbWithdraw.date.toISOString()) &&
     !recordedWithdrawAmounts.has(dbWithdraw.amount)
     if (isUnique){
       dbWithdraws.push(dbWithdraw)
@@ -74,10 +74,10 @@ export function generateDBWithdraws({numberOfWithdraws, withdrawers} = {}){
 }
 
 export function generateWithdrawUpdate({cashLocationToAdd, cashLocationToDeduct} = {}){
-  if (!cashLocationToAdd) cashLocationToAdd = CashLocationMocks.generateInputCashLocation();
-  if (!cashLocationToDeduct) cashLocationToDeduct = CashLocationMocks.generateInputCashLocation()
+  if (!cashLocationToAdd) {cashLocationToAdd = CashLocationMocks.generateInputCashLocation();}
+  if (!cashLocationToDeduct) {cashLocationToDeduct = CashLocationMocks.generateInputCashLocation()}
 
-  let withdrawUpdate = {
+  const withdrawUpdate = {
     amount: faker.number.int({min: 1, max: 1_000_000}),
     date: faker.date.between({from: MIN_DATE, to: MAX_DATE}).toISOString(),
     cashLocationToAdd: {

@@ -66,19 +66,19 @@ loanSchema.statics.getFilteredLoans = async function({
   type,
   order = -1, 
   sortBy = "date", 
-  perPage = 2000, // keep your default
+  perPage = 2000, // Keep your default
 }) {
-  if (typeof year === "string") year = Number(year);
+  if (typeof year === "string") {year = Number(year);}
 
   const pipeline = [];
   const matchCriteria = [];
 
   // Basic matches
-  if (type) matchCriteria.push({ type });
+  if (type) {matchCriteria.push({ type });}
 
   if (status) {
     if (status === "Overdue") {
-      matchCriteria.push({ status: "Ongoing" }); // refine later if you support overdue
+      matchCriteria.push({ status: "Ongoing" }); // Refine later if you support overdue
     } else {
       matchCriteria.push({ status });
     }
@@ -94,7 +94,7 @@ loanSchema.statics.getFilteredLoans = async function({
     }
   }
 
-  if (matchCriteria.length) pipeline.push({ $match: { $and: matchCriteria } });
+  if (matchCriteria.length) {pipeline.push({ $match: { $and: matchCriteria } });}
 
   // Consistent date for filtering/sorting
   pipeline.push({
@@ -105,9 +105,9 @@ loanSchema.statics.getFilteredLoans = async function({
 
   // Year / month filters (if provided)
   const timeExprs = [];
-  if (year)  timeExprs.push({ $eq: [ { $year: "$_effectiveDate" }, year ] });
-  if (month) timeExprs.push({ $eq: [ { $month: "$_effectiveDate" }, month ] });
-  if (timeExprs.length) pipeline.push({ $match: { $expr: { $and: timeExprs } } });
+  if (year)  {timeExprs.push({ $eq: [ { $year: "$_effectiveDate" }, year ] });}
+  if (month) {timeExprs.push({ $eq: [ { $month: "$_effectiveDate" }, month ] });}
+  if (timeExprs.length) {pipeline.push({ $match: { $expr: { $and: timeExprs } } });}
 
   // Lookup borrower (keep behavior)
   pipeline.push({

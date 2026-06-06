@@ -14,32 +14,28 @@ import { CashLocation } from '../../cash-location-service/models.js';
 import { User } from '../../user-service/models.js';
 import connectDB from "../../../db.js"
 
-//load environment variables
+//Load environment variables
 dotenv.config()
 
-// mock email service
-let EmailServiceManager = await import('../../email-service/service.js')
-jest.unstable_mockModule('../../email-service/service.js', () => {
-  return {
-    ...EmailServiceManager,
+// Mock email service
+let EmailService = await import('../../email-service/service.js')
+jest.unstable_mockModule('../../email-service/service.js', () => ({
+    ...EmailService,
     sendEmail: jest.fn(),
-  }
-})
-EmailServiceManager = await import('../../email-service/service.js')
+  }))
+EmailService = await import('../../email-service/service.js')
 
-//mock DateUtil
+//Mock DateUtil
 let DateUtil = await import('../../../utils/date-util.js')
-jest.unstable_mockModule('../../../utils/date-util.js', async () => {
-  return {
+jest.unstable_mockModule('../../../utils/date-util.js', async () => ({
     ...DateUtil,
     getToday: jest.fn(()=>new Date("2025-06-01"))
-  }
-})
+  }))
 DateUtil = await import('../../../utils/date-util.js')
 
 const { createJWT } = await import('../../auth-service/service.js')
 
-//import test app
+//Import test app
 const app = (await import("../../../app.js")).default;
 
 beforeAll(async()=>{
@@ -63,10 +59,10 @@ describe("GET /deposits", ()=>{
   let adminUser, jwt
 
   beforeAll(async()=>{
-    //remove any existing depositors and deposits
+    //Remove any existing depositors and deposits
     await mongoose.connection.db.dropDatabase()
 
-    //insert depositors and deposits into database
+    //Insert depositors and deposits into database
     numberOfDepositors = 2
     numberOfDeposits = 500
     depositors = UserMocks.generateDBUsers({numberOfDepositors})
@@ -74,36 +70,36 @@ describe("GET /deposits", ()=>{
     await User.insertMany(depositors)
     await Deposit.insertMany(deposits)
 
-    //set jwt
+    //Set jwt
     adminUser = UserMocks.generateDBUser({userType: "admin"})
-    let {_id: userId, fullName, isAdmin} = adminUser
+    const {_id: userId, fullName, isAdmin} = adminUser
     jwt = createJWT(userId, fullName, isAdmin)
 
   }, 20_000)
 
   test("no query params - should return the first 20 sorted deposits, sorted by date in descending order", async ()=>{
-    //send api request
-    let endpoint = BASE_PATH
-    let response = await request(app).get(endpoint)
+    //Send api request
+    const endpoint = BASE_PATH
+    const response = await request(app).get(endpoint)
     .set("Cookie", cookie.serialize("jwt", jwt))
 
-    //expected deposits ids 
-    let defaultPerPage = 20
-    let expectedDepositsIds = [...deposits]
+    //Expected deposits ids 
+    const defaultPerPage = 20
+    const expectedDepositsIds = [...deposits]
     .sort((a, b)=>b.date - a.date)
     .slice(0, defaultPerPage)
     .map((deposit)=>deposit._id)
 
-    //actual deposit ids
-    let actualDepositsIds = response.body.data
+    //Actual deposit ids
+    const actualDepositsIds = response.body.data
     .map((deposit)=>deposit._id)
 
     expect(actualDepositsIds).toEqual(expectedDepositsIds)
   })
 
   test("all query params passed - should return the deposits based on the passed params", async ()=>{
-    //query params
-    let query = {
+    //Query params
+    const query = {
       userId: depositors[0]._id,
       year: 2024,
       month: 1,
@@ -113,15 +109,15 @@ describe("GET /deposits", ()=>{
       perPage: 5,
     }
 
-    let queryString = new URLSearchParams(query).toString();
+    const queryString = new URLSearchParams(query).toString();
 
-    //send api request
-    const endpoint = BASE_PATH + "?" + queryString
-    let response = await request(app).get(endpoint)
+    //Send api request
+    const endpoint = `${BASE_PATH  }?${  queryString}`
+    const response = await request(app).get(endpoint)
     .set("Cookie", cookie.serialize("jwt", jwt))
 
-    //expected deposits ids 
-    let expectedDepositsIds = [...deposits]
+    //Expected deposits ids 
+    const expectedDepositsIds = [...deposits]
     .filter((deposit)=>{
       const depositYear = new Date(deposit.date).getUTCFullYear()
       const depositMonth = new Date(deposit.date).getUTCMonth() + 1 //1-based index to match mongodb $month operator
@@ -133,8 +129,8 @@ describe("GET /deposits", ()=>{
     .slice((query.page - 1) * query.perPage,  query.page * query.perPage)
     .map((deposit)=>deposit._id)
 
-    //actual deposit ids
-    let actualDepositsIds = response.body.data
+    //Actual deposit ids
+    const actualDepositsIds = response.body.data
     .map((deposit)=>deposit._id)
 
     expect(actualDepositsIds).toEqual(expectedDepositsIds)
@@ -143,20 +139,20 @@ describe("GET /deposits", ()=>{
 })
 
 describe("POST /deposits: Permanent Deposit", ()=>{
-  let currentDepositor, adminUser
-  let mobileMoneyCashLocation, standardCharteredCashLocation, currentDepositCashLocation
+  let adminUser, currentDepositor
+  let currentDepositCashLocation, mobileMoneyCashLocation, standardCharteredCashLocation
   let deposit
-  let jwt, endpoint, response
+  let endpoint, jwt, response
   
   beforeAll(async()=>{
-    //remove any existing records in database
+    //Remove any existing records in database
     await mongoose.connection.db.dropDatabase()
 
     currentDepositor = UserMocks.generateDBUser()
     mobileMoneyCashLocation = CashLocationMocks.generateDBCashLocation()
     standardCharteredCashLocation = CashLocationMocks.generateDBCashLocation()
 
-    //use mobile money cash location for the deposit
+    //Use mobile money cash location for the deposit
     currentDepositCashLocation = mobileMoneyCashLocation
     deposit = Mocks.generateInputDeposit({
       depositor: currentDepositor,
@@ -164,14 +160,14 @@ describe("POST /deposits: Permanent Deposit", ()=>{
       cashLocation: currentDepositCashLocation
     })
 
-    //insert cash locations and depositor into database
+    //Insert cash locations and depositor into database
     await User.create(currentDepositor)
     await CashLocation.insertMany([
       mobileMoneyCashLocation,
       standardCharteredCashLocation,
     ])
 
-    //send api request
+    //Send api request
     endpoint = BASE_PATH
     adminUser = UserMocks.generateDBUser({userType: "admin"})
     const {_id: userId, fullName, isAdmin} = adminUser
@@ -246,20 +242,20 @@ describe("POST /deposits: Permanent Deposit", ()=>{
 })
 
 describe("POST /deposits: Temporary Deposit", ()=>{
-  let currentDepositor, adminUser
-  let mobileMoneyCashLocation, standardCharteredCashLocation, currentDepositCashLocation
+  let adminUser, currentDepositor
+  let currentDepositCashLocation, mobileMoneyCashLocation, standardCharteredCashLocation
   let deposit
-  let jwt, endpoint, response
+  let endpoint, jwt, response
   
   beforeAll(async()=>{
-    //remove any existing records in database
+    //Remove any existing records in database
     await mongoose.connection.db.dropDatabase()
 
     currentDepositor = UserMocks.generateDBUser()
     mobileMoneyCashLocation = CashLocationMocks.generateDBCashLocation()
     standardCharteredCashLocation = CashLocationMocks.generateDBCashLocation()
 
-    //use mobile money cash location for the deposit
+    //Use mobile money cash location for the deposit
     currentDepositCashLocation = mobileMoneyCashLocation
     deposit = Mocks.generateInputDeposit({
       depositor: currentDepositor,
@@ -267,14 +263,14 @@ describe("POST /deposits: Temporary Deposit", ()=>{
       cashLocation: currentDepositCashLocation
   })
 
-    //insert cash locations and depositor into database
+    //Insert cash locations and depositor into database
     await User.create(currentDepositor)
     await CashLocation.insertMany([
       mobileMoneyCashLocation,
       standardCharteredCashLocation,
     ])
 
-    //send api request
+    //Send api request
     endpoint = BASE_PATH
     adminUser = UserMocks.generateDBUser({userType: "admin"})
     const {_id: userId, fullName, isAdmin} = adminUser
@@ -329,15 +325,15 @@ describe("POST /deposits: Temporary Deposit", ()=>{
 })
 
 describe("PUT /deposit/:id: Permanent Deposit", ()=>{
-  let currentDepositor, recordedBy, adminUser
+  let adminUser, currentDepositor, recordedBy
   let mobileMoneyCashLocation, standardCharteredCashLocation
-  let currentDepositCashLocation, cashLocationToAdd, cashLocationToDeduct
+  let cashLocationToAdd, cashLocationToDeduct, currentDepositCashLocation
   let currentDeposit, depositUpdate
   let currentPointTransaction
-  let jwt, endpoint, response
+  let endpoint, jwt, response
   
   beforeAll(async()=>{
-    //remove any existing records in database
+    //Remove any existing records in database
     await mongoose.connection.db.dropDatabase()
 
     currentDepositor = UserMocks.generateDBUser()
@@ -351,7 +347,7 @@ describe("PUT /deposit/:id: Permanent Deposit", ()=>{
     })
     adminUser = UserMocks.generateDBUser({userType: "admin"})
 
-    //use mobile money cash location for the current deposit
+    //Use mobile money cash location for the current deposit
     currentDepositCashLocation = mobileMoneyCashLocation
     recordedBy = adminUser
     currentDeposit = Mocks.generateDBDeposit({
@@ -360,20 +356,20 @@ describe("PUT /deposit/:id: Permanent Deposit", ()=>{
       recordedBy,
       cashLocation: currentDepositCashLocation
     })
-    //current point transactio
+    //Current point transactio
     currentPointTransaction = PointTransactionMocks.generateDBAwardTransaction(
       currentDepositor,
       Math.floor((currentDeposit.amount / 10_000) * 3),
       currentDeposit._id,
     )
 
-    //use mobile money cash location for cashLocationToDeduct
-    //use standard chartered cash location for cashLocationToAdd
+    //Use mobile money cash location for cashLocationToDeduct
+    //Use standard chartered cash location for cashLocationToAdd
     cashLocationToAdd = mobileMoneyCashLocation
     cashLocationToDeduct = standardCharteredCashLocation
     depositUpdate = Mocks.generateDepositUpdate({cashLocationToAdd, cashLocationToDeduct})
 
-    //insert depositor, current deposit, current point transaction and cashlocations into database
+    //Insert depositor, current deposit, current point transaction and cashlocations into database
     await User.create(currentDepositor)
     await Deposit.create(currentDeposit)
     await PointTransaction.create(currentPointTransaction)
@@ -382,8 +378,8 @@ describe("PUT /deposit/:id: Permanent Deposit", ()=>{
       standardCharteredCashLocation,
     ])
 
-    //send api request
-    endpoint = BASE_PATH + "/" + currentDeposit._id
+    //Send api request
+    endpoint = `${BASE_PATH  }/${  currentDeposit._id}`
     const {_id: userId, fullName, isAdmin} = adminUser
     jwt = createJWT(userId, fullName, isAdmin)
     response = await request(app).put(endpoint)
@@ -454,14 +450,14 @@ describe("PUT /deposit/:id: Permanent Deposit", ()=>{
 })
 
 describe("PUT /deposit/:id: Temporary Deposit", ()=>{
-  let currentDepositor, recordedBy, adminUser
+  let adminUser, currentDepositor, recordedBy
   let mobileMoneyCashLocation, standardCharteredCashLocation
-  let currentDepositCashLocation, cashLocationToAdd, cashLocationToDeduct
+  let cashLocationToAdd, cashLocationToDeduct, currentDepositCashLocation
   let currentDeposit, depositUpdate
-  let jwt, endpoint, response
+  let endpoint, jwt, response
   
   beforeAll(async()=>{
-    //remove any existing records in database
+    //Remove any existing records in database
     await mongoose.connection.db.dropDatabase()
 
     currentDepositor = UserMocks.generateDBUser()
@@ -475,7 +471,7 @@ describe("PUT /deposit/:id: Temporary Deposit", ()=>{
     })
     adminUser = UserMocks.generateDBUser({userType: "admin"})
 
-    //use mobile money cash location for the current deposit
+    //Use mobile money cash location for the current deposit
     currentDepositCashLocation = mobileMoneyCashLocation
     recordedBy = adminUser
     currentDeposit = Mocks.generateDBDeposit({
@@ -485,13 +481,13 @@ describe("PUT /deposit/:id: Temporary Deposit", ()=>{
       cashLocation: currentDepositCashLocation
     })
 
-    //use mobile money cash location for cashLocationToDeduct
-    //use standard chartered cash location for cashLocationToAdd
+    //Use mobile money cash location for cashLocationToDeduct
+    //Use standard chartered cash location for cashLocationToAdd
     cashLocationToAdd = mobileMoneyCashLocation
     cashLocationToDeduct = standardCharteredCashLocation
     depositUpdate = Mocks.generateDepositUpdate({cashLocationToAdd, cashLocationToDeduct})
 
-    //insert depositor, current deposit, current point transaction and cashlocations into database
+    //Insert depositor, current deposit, current point transaction and cashlocations into database
     await User.create(currentDepositor)
     await Deposit.create(currentDeposit)
     await CashLocation.insertMany([
@@ -499,8 +495,8 @@ describe("PUT /deposit/:id: Temporary Deposit", ()=>{
       standardCharteredCashLocation,
     ])
 
-    //send api request
-    endpoint = BASE_PATH + "/" + currentDeposit._id
+    //Send api request
+    endpoint = `${BASE_PATH  }/${  currentDeposit._id}`
     const {_id: userId, fullName, isAdmin} = adminUser
     jwt = createJWT(userId, fullName, isAdmin)
     response = await request(app).put(endpoint)
@@ -565,15 +561,15 @@ describe("PUT /deposit/:id: Temporary Deposit", ()=>{
 })
 
 describe("DELETE /deposit/:id: Permanent Deposit", ()=>{
-  let currentDepositor, adminUser
+  let adminUser, currentDepositor
   let mobileMoneyCashLocation, standardCharteredCashLocation
   let cashLocationToDeduct
   let deposit
   let pointTransaction
-  let jwt, endpoint, response
+  let endpoint, jwt, response
   
   beforeAll(async()=>{
-    //remove any existing records in database
+    //Remove any existing records in database
     await mongoose.connection.db.dropDatabase()
 
     currentDepositor = UserMocks.generateDBUser()
@@ -591,17 +587,17 @@ describe("DELETE /deposit/:id: Permanent Deposit", ()=>{
       depositor: currentDepositor,
       depositType: "Permanent"
     })
-    //point transaction
+    //Point transaction
     pointTransaction = PointTransactionMocks.generateDBAwardTransaction(
       currentDepositor,
       Math.floor((deposit.amount / 10_000) * 3),
       deposit._id,
     )
 
-    //use mobile money cash location for cashLocationToDeduct
+    //Use mobile money cash location for cashLocationToDeduct
     cashLocationToDeduct = mobileMoneyCashLocation
 
-    //insert depositor, deposit, point transaction and cashlocations into database
+    //Insert depositor, deposit, point transaction and cashlocations into database
     await User.create(currentDepositor)
     await Deposit.create(deposit)
     await PointTransaction.create(pointTransaction)
@@ -612,8 +608,8 @@ describe("DELETE /deposit/:id: Permanent Deposit", ()=>{
 
     const {_id: cashLocationToDeductId} = cashLocationToDeduct
 
-    //send api request
-    endpoint = BASE_PATH + "/" + deposit._id
+    //Send api request
+    endpoint = `${BASE_PATH  }/${  deposit._id}`
     const {_id: userId, fullName, isAdmin} = adminUser
     jwt = createJWT(userId, fullName, isAdmin)
     response = await request(app).delete(endpoint)
@@ -663,14 +659,14 @@ describe("DELETE /deposit/:id: Permanent Deposit", ()=>{
 })
 
 describe("DELETE /deposit/:id: Temporary Deposit", ()=>{
-  let currentDepositor, adminUser
+  let adminUser, currentDepositor
   let mobileMoneyCashLocation, standardCharteredCashLocation
   let cashLocationToDeduct
   let deposit
-  let jwt, endpoint, response
+  let endpoint, jwt, response
   
   beforeAll(async()=>{
-    //remove any existing records in database
+    //Remove any existing records in database
     await mongoose.connection.db.dropDatabase()
 
     currentDepositor = UserMocks.generateDBUser()
@@ -689,10 +685,10 @@ describe("DELETE /deposit/:id: Temporary Deposit", ()=>{
       depositType: "Temporary",
     })
 
-    //use mobile money cash location for cashLocationToDeduct
+    //Use mobile money cash location for cashLocationToDeduct
     cashLocationToDeduct = mobileMoneyCashLocation
 
-    //insert depositor, deposit, point transaction and cashlocations into database
+    //Insert depositor, deposit, point transaction and cashlocations into database
     await User.create(currentDepositor)
     await Deposit.create(deposit)
     await CashLocation.insertMany([
@@ -702,8 +698,8 @@ describe("DELETE /deposit/:id: Temporary Deposit", ()=>{
 
     const {_id: cashLocationToDeductId} = cashLocationToDeduct
 
-    //send api request
-    endpoint = BASE_PATH + "/" + deposit._id
+    //Send api request
+    endpoint = `${BASE_PATH  }/${  deposit._id}`
     const {_id: userId, fullName, isAdmin} = adminUser
     jwt = createJWT(userId, fullName, isAdmin)
     response = await request(app).delete(endpoint)

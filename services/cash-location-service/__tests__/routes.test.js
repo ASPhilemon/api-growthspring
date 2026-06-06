@@ -5,26 +5,24 @@ import dotenv from "dotenv"
 import * as Mocks from "./mocks.js"
 import * as UserMocks from "../../user-service/__tests__/mocks.js"
 
-//load environment variables
+//Load environment variables
 dotenv.config()
 
-// mock dependencies
-jest.unstable_mockModule('../service.js', () => {
-  return {
+// Mock dependencies
+jest.unstable_mockModule('../service.js', () => ({
     getCashLocations: jest.fn(),
     getCashLocationById: jest.fn(),
     updateCashLocation: jest.fn(),
     recordTransfer: jest.fn(),
     updateTransfer: jest.fn(),
     deleteTransfer: jest.fn(),
-  }
-})
+  }))
 
-//import test app
+//Import test app
 const app = (await import("../../../app.js")).default;
 
-// import dependencies
-const ServiceManager = await import("../service.js");
+// Import dependencies
+const Service = await import("../service.js");
 
 import { createJWT } from '../../auth-service/service.js';
 
@@ -45,52 +43,52 @@ const routes = [
   {
     path: "/", method: "get",
     allowed: ["admin",],
-    serviceHandler: ServiceManager.getCashLocations,
+    serviceHandler: Service.getCashLocations,
     serviceHandlerArgs: []
   }, 
   {
     path: "/cash-location-123", method: "get", 
     allowed : ["admin"],
-    serviceHandler: ServiceManager.getCashLocationById,
+    serviceHandler: Service.getCashLocationById,
     serviceHandlerArgs: ["cash-location-123"],
   },
   {
     path: "/cash-location-123", method: "put", 
     body: cashLocationUpdate,
     allowed : ["admin"],
-    serviceHandler: ServiceManager.updateCashLocation,
+    serviceHandler: Service.updateCashLocation,
     serviceHandlerArgs: ["cash-location-123", cashLocationUpdate]
   },
   {
     path: "/transfers", method: "post",
     body: transfer,
     allowed : ["admin"],
-    serviceHandler: ServiceManager.recordTransfer,
+    serviceHandler: Service.recordTransfer,
     serviceHandlerArgs: [transfer]
   },
   {
     path: "/transfers/transfer-123", method: "put", 
     body: transferUpdate,
     allowed : ["admin"],
-    serviceHandler: ServiceManager.updateTransfer,
+    serviceHandler: Service.updateTransfer,
     serviceHandlerArgs: ["transfer-123", transferUpdate]
   },
   {
     path: "/transfers/transfer-123", method: "delete", 
     body: {},
     allowed : ["admin"],
-    serviceHandler: ServiceManager.deleteTransfer,
+    serviceHandler: Service.deleteTransfer,
     serviceHandlerArgs: ["transfer-123"]
   }
 ]
 
 describe("Access Control", ()=>{
-  for (let route of routes){
+  for (const route of routes){
     const endpoint = BASE_PATH + route.path
     const anonymousUserAllowed = route.allowed.includes("anonymous")
     const regularUserAllowed = route.allowed.includes("regular-user")
 
-    test(`${route.method + " " + route.path}: anonymous user is ${anonymousUserAllowed? "allowed" : "denied"} access `, async () => {
+    test(`${`${route.method  } ${  route.path}`}: anonymous user is ${anonymousUserAllowed? "allowed" : "denied"} access `, async () => {
       const response = await request(app)[route.method](endpoint)
       if (anonymousUserAllowed){
         expect(route.serviceHandler).toHaveBeenCalled();
@@ -101,7 +99,7 @@ describe("Access Control", ()=>{
       }
     });
 
-    test(`${route.method + " " + route.path}: regular user is ${regularUserAllowed? "allowed" : "denied"} access  `, async () => {
+    test(`${`${route.method  } ${  route.path}`}: regular user is ${regularUserAllowed? "allowed" : "denied"} access  `, async () => {
       const {_id, fullName, isAdmin} = regularUser
       const jwt = createJWT(_id, fullName, isAdmin)
       const response = await request(app)[route.method](endpoint)
@@ -115,7 +113,7 @@ describe("Access Control", ()=>{
       }
     });
 
-    test(`${route.method + " " + route.path}: admin user is allowed access`, async () => {
+    test(`${`${route.method  } ${  route.path}`}: admin user is allowed access`, async () => {
       const {_id, fullName, isAdmin} = adminUser
       const jwt = createJWT(_id, fullName, isAdmin)
       await request(app)[route.method](endpoint)
@@ -127,12 +125,12 @@ describe("Access Control", ()=>{
 })
 
 describe("Service Handlers Are Called With Correct Args", ()=>{
-  for (let route of routes){
+  for (const route of routes){
 
     const queryString = new URLSearchParams(route.query).toString();
     const endpoint = BASE_PATH + route.path + (queryString ? `?${queryString}` : "");
 
-    test(`${route.method + " " + route.path} service handler is called with correct args`, async () => {
+    test(`${`${route.method  } ${  route.path}`} service handler is called with correct args`, async () => {
       const {_id, fullName, isAdmin} = adminUser
       const jwt = createJWT(_id, fullName, isAdmin)
       await request(app)[route.method](endpoint)

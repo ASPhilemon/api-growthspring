@@ -21,7 +21,7 @@ router.post(
   RouteController.resetPassword
 )
 
-//webauthn 
+//Webauthn 
 router.get(
   "/webauthn-registartion-options", 
   RouteController.getRegisterationOptionsWebAuthn
@@ -39,7 +39,7 @@ router.post(
   RouteController.verifyAuthenticationWebAuthn
 )
 
-//sign out
+//Sign out
 router.post(
   "/signout", 
   RouteController.signOut

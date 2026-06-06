@@ -1,4 +1,4 @@
-// middleware.js
+// Middleware.js
 import express from "express";
 import cors from "cors";
 import * as Errors from "./utils/error-util.js";
@@ -26,11 +26,11 @@ export function registerAfterAllMiddleware(app) {
 export function getUser(req, res, next) {
   let user = null;
       
-  let jwt = req.cookies?.jwt;
+  const jwt = req.cookies?.jwt;
   try {
-    if (jwt) user = verifyJWT(jwt);
+    if (jwt) {user = verifyJWT(jwt);}
   }
-  catch (err) {
+  catch {
     user = null;
   }
 
@@ -46,8 +46,8 @@ export function requireUser(req, res, next) {
 }
 
 export function requireAdmin(req, res, next) {
-  if (!req.user) throw new Errors.NotAuthenticatedError();
-  if (!req.user.isAdmin) throw new Errors.NotAllowedError();
+  if (!req.user) {throw new Errors.NotAuthenticatedError();}
+  if (!req.user.isAdmin) {throw new Errors.NotAllowedError();}
   next();
 }
 
@@ -56,7 +56,7 @@ export function errorHandler(err, req, res, next) {
   const statusCode = isAppError ? err.statusCode : 500;
   const errMessage = isAppError ? err.message : "Sorry, an unknown error occured";
   Response.sendError(errMessage, statusCode, { req, res });
-  const NODE_ENV = process.env.NODE_ENV;
+  const {NODE_ENV} = process.env;
   if (["debug", "debug-mongoose", "production"].includes(NODE_ENV)) {
     console.error("=== ", err);
   }

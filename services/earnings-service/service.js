@@ -7,13 +7,13 @@ import * as Validator from "../../utils/validator-util.js";
 import * as DB from "../../utils/db-util.js";
 
 // Models 
-import { Earnings, Units, FundTransactions, MonthlyInterestRecord } from "./models.js"; 
+import { Earnings, FundTransactions, MonthlyInterestRecord, Units } from "./models.js"; 
 
 // Collaborator Services
-import * as UserServiceManager from "../user-service/service.js";
-import * as DepositServiceManager from "../deposit-service/service.js";
-import * as LoanServiceManager from "../loan-service/service.js";
-import * as EmailServiceManager from "../email-service/service.js";
+import * as UserService from "../user-service/service.js";
+import * as DepositService from "../deposit-service/service.js";
+import * as LoanService from "../loan-service/service.js";
+import * as EmailService from "../email-service/service.js";
 import * as DateUtil from "../../utils/date-util.js";
 
 const LOAN_TEMPLATES_PATH = "./email-templates.js"; 
@@ -30,8 +30,8 @@ export async function getEarnings(filter) {
   }
 
   // Filter provided: resolve user and query by fullName.
-  const user = await UserServiceManager.getUserById(filter);
-  if (!user) return []; // user id not found → no earnings
+  const user = await UserService.getUserById(filter);
+  if (!user) {return [];} // User id not found → no earnings
 
   return await DB.query(Earnings.find({ fullName: user.fullName }));
 }
@@ -43,8 +43,8 @@ export async function getUnits(filter) {
   }
 
   // Filter provided: resolve user and query by fullName (NOT userName).
-  const user = await UserServiceManager.getUserById(filter);
-  if (!user) return []; // user id not found → no units
+  const user = await UserService.getUserById(filter);
+  if (!user) {return [];} // User id not found → no units
 
   return await DB.query(Units.find({ fullName: user.fullName }));
 }
@@ -99,7 +99,7 @@ export async function generateEarningAccountStandings(earningRecords) {
  * @returns {boolean} True if the loan's elapsed duration falls into the point-eligible period, false otherwise.
  */
 function isLoanCurrentlyUtilizingPoints(loanStartDate, currentDate) {
-    let elapsedMonths = getDaysDifference(loanStartDate, currentDate) / 30;
+    const elapsedMonths = getDaysDifference(loanStartDate, currentDate) / 30;
     const condition1 = elapsedMonths > CONSTANTS.ONE_YEAR_MONTH_THRESHOLD && elapsedMonths < CONSTANTS.ONE_YEAR_MONTHS;
     const condition2 = elapsedMonths > CONSTANTS.TWO_YEAR_MONTH_THRESHOLD;
 
@@ -130,7 +130,7 @@ export async function recordMonthlyAccruedInterest(currentMonthStartDate) {
     { errType: Errors.AppError, statusCode: 409 } 
   );
 
-  const ongoingLoans = LoanServiceManager.getLoans({ status: "Ongoing" });
+  const ongoingLoans = LoanService.getLoans({ status: "Ongoing" });
 
   let totalPrincipalForInterestCalculation = 0;
 
@@ -151,7 +151,7 @@ export async function recordMonthlyAccruedInterest(currentMonthStartDate) {
   // Create and persist the simplified monthly interest record
   const newMonthlyRecord = await DB.query(MonthlyInterestRecord.create({
     monthYear: monthYearKey,
-    totalCashInterestAccrued: totalCashInterestAccrued,
+    totalCashInterestAccrued,
   }));
 
   return newMonthlyRecord;
@@ -294,7 +294,7 @@ export async function distributeAnnualProfits(
 
   // 2. Get All Members' Full Details
   // Fetch all users to ensure we have their investment details for unit calculation
-  const allMembers = await UserServiceManager.getUsers();
+  const allMembers = await UserService.getUsers();
   Validator.assert(allMembers && allMembers.length > 0, "No members found to distribute profits to.", { errType: Errors.AppError, statusCode: 404 });
 
   // Create a map for quick lookup of member details
@@ -344,7 +344,7 @@ export async function distributeAnnualProfits(
         Validator.assert(reinvestCashLocationId, "Re-investment cash location ID is required for 're-invest' status.", { errType: Errors.BadRequestError });
 
         // Record as a deposit
-        await DepositServiceManager.createDeposit({
+        await DepositService.createDeposit({
           depositor: memberDetails._id, // Use member's actual ID
           amount: roundedProfitDue,
           type: "Club Saving",
@@ -376,14 +376,14 @@ export async function distributeAnnualProfits(
       // Record Units entry
       await DB.query(Units.create({
         fullName: memberDetails.fullName,
-        year: year, 
+        year, 
         units: memberUnitEntry.units,
         }));
 
       distributionSummary.totalProfitDistributed += roundedProfitDue;
       distributionSummary.membersDistributed++;
 
-      await EmailServiceManager.sendEmailWithTemplate({
+      await EmailService.sendEmailWithTemplate({
         sender: "growthspring",
         recipient: memberDetails.email, 
         subject: "Your Earnings!",
@@ -391,8 +391,8 @@ export async function distributeAnnualProfits(
         templateData: {
           user_first_name: memberDetails.displayName, 
           amount: roundedProfitDue,
-          year: year,
-          returns: returns,
+          year,
+          returns,
           destination: earningsDestination 
         },
         templatesPath: LOAN_TEMPLATES_PATH

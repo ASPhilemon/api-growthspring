@@ -1,8 +1,8 @@
 import Joi from "joi";
 import mongoose from "mongoose";
 
-//reusable fields
-let uuidv4Pattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/
+//Reusable fields
+const uuidv4Pattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/
 
 const objectId = Joi.custom((value, helpers) => {
   if (typeof value === "string" && mongoose.Types.ObjectId.isValid(value)) {
@@ -71,7 +71,7 @@ export const recordDeposit = Joi.object({
 }).required().unknown(false)
 
 export const updateDeposit = Joi.object({
-  depositId: depositId,
+  depositId,
   update: Joi.object({
     amount: depositAmount,
     date: depositDate,
@@ -82,6 +82,6 @@ export const updateDeposit = Joi.object({
 }).required().unknown(false)
 
 export const deleteDeposit = Joi.object({
-  depositId: depositId,
+  depositId,
   cashLocationToDeductId: objectId
 }).unknown(false)

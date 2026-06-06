@@ -10,7 +10,7 @@ export async function sendEmail(
   message,
 ) {
   //Dont send email in non production environment
-  if (process.env.NODE_ENV != "production") return;
+  if (process.env.NODE_ENV != "production") {return;}
 
   const transporter = nodemailer.createTransport({
     host: "live.smtp.mailtrap.io",
@@ -24,12 +24,12 @@ export async function sendEmail(
   const mailOptions = {
     from:`<${sender}@growthspringers.com>`,
     to: recipient,
-    subject: subject,
+    subject,
     html: message,
   };
 
   transporter.sendMail(mailOptions, (err)=>{
-    if (err) throw new Errors.InternalServerError("Failed to send email", err)
+    if (err) {throw new Errors.InternalServerError("Failed to send email", err)}
   });
 
 }
@@ -58,7 +58,7 @@ export async function sendEmailWithTemplate({
 }) {
   
   //Dont send email in non production environment
-  if (process.env.NODE_ENV != "production") return;
+  if (process.env.NODE_ENV != "production") {return;}
 
   try {
     // 1. Validate templatesPath
@@ -87,7 +87,7 @@ export async function sendEmailWithTemplate({
     const mailOptions = {
       from: `<${sender}@growthspringers.com>`,
       to: recipient,
-      subject: subject,
+      subject,
       html: htmlMessage, 
     };
 

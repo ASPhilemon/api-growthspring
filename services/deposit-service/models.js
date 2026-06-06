@@ -1,12 +1,12 @@
 import mongoose from "mongoose";
 
 
-//utils
+//Utils
 import * as DB from "../../utils/db-util.js"
 
 const { ObjectId } = mongoose.Types
 
-//schemas
+//Schemas
 const userSubSchema = new mongoose.Schema({
   _id: {
     type: ObjectId,
@@ -92,41 +92,41 @@ const yearlyDepositSchema = new mongoose.Schema({
   }
 })
 
-//custom static methods on model
+//Custom static methods on model
 depositSchema.statics.getDeposits = async function(
   filter,
   sort,
   pagination
 ){
-    //set args to defaults if undefined 
+    //Set args to defaults if undefined 
     const sortField = sort?.field || "date"
     const sortOrder = sort?.order || -1
     const page = pagination?.page || 1
     const perPage = pagination?.perPage || 20
 
     const pipeline = [];
-    // match stage
+    // Match stage
     const matchStage = {};
     const matchCriteria = [];
-    if (filter?.year) matchCriteria.push({ $expr: { $eq: [{ $year: "$date" }, filter.year] }});
-    if (filter?.month) matchCriteria.push({ $expr: { $eq: [{ $month: "$date" }, filter.month]}});
-    if (filter?.userId) matchCriteria.push({ "depositor._id": ObjectId.createFromHexString(filter.userId) });
+    if (filter?.year) {matchCriteria.push({ $expr: { $eq: [{ $year: "$date" }, filter.year] }});}
+    if (filter?.month) {matchCriteria.push({ $expr: { $eq: [{ $month: "$date" }, filter.month]}});}
+    if (filter?.userId) {matchCriteria.push({ "depositor._id": ObjectId.createFromHexString(filter.userId) });}
 
-    if (matchCriteria.length > 0) matchStage.$and = matchCriteria
+    if (matchCriteria.length > 0) {matchStage.$and = matchCriteria}
     pipeline.push({ $match: matchStage });
 
-    // sort stage
+    // Sort stage
     pipeline.push({ $sort: { [sortField]: sortOrder} });
 
-    // skip and Limit stages for pagination
+    // Skip and Limit stages for pagination
     pipeline.push({ $skip: (page - 1) * perPage });
     pipeline.push({ $limit: perPage });
 
-    //execute pipeline
+    //Execute pipeline
     return await DB.query(this.aggregate(pipeline))
 }
 
-//models
+//Models
 const Deposit  = mongoose.model('deposit', depositSchema );
 const YearlyDeposit  = mongoose.model('yearly-deposit', yearlyDepositSchema );
 

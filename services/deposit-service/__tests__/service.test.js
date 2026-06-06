@@ -4,19 +4,16 @@ import * as Errors from '../../../utils/error-util.js';
 import * as Mocks from "./mocks.js"
 import * as UserMocks from "../../user-service/__tests__/mocks.js"
 
-// mock dependencies
+// Mock dependencies
 let DateUtil = await import('../../../utils/date-util.js')
-jest.unstable_mockModule('../../../utils/date-util.js', async () => {
-  return {
+jest.unstable_mockModule('../../../utils/date-util.js', async () => ({
     ...DateUtil,
     getToday: jest.fn(()=>new Date("2025-06-01"))
-  }
-})
+  }))
 
 DateUtil = await import('../../../utils/date-util.js')
 
-jest.unstable_mockModule('../models.js', () => {
-  return {
+jest.unstable_mockModule('../models.js', () => ({
     Deposit: {
       find: jest.fn(),
       findById: jest.fn(),
@@ -32,61 +29,50 @@ jest.unstable_mockModule('../models.js', () => {
       updateOne: jest.fn(),
       bulkWrite: jest.fn()
     }
-  }
-})
+  }))
 
-jest.unstable_mockModule('../../../services/user-service/service.js', () => {
-  return {
+jest.unstable_mockModule('../../../services/user-service/service.js', () => ({
     getUserById: jest.fn(),
     updatePermanentInvestment: jest.fn(),
     updateTemporaryInvestment: jest.fn(),
-  }
-})
+  }))
 
-jest.unstable_mockModule('../../../services/cash-location-service/service.js', () => {
-  return {
+jest.unstable_mockModule('../../../services/cash-location-service/service.js', () => ({
     addToCashLocation: jest.fn(),
-  }
-})
+  }))
 
-jest.unstable_mockModule('../../../services/point-service/service.js', () => {
-  return {
+jest.unstable_mockModule('../../../services/point-service/service.js', () => ({
     awardPoints: jest.fn(),
     findByRefIdAndUpdatePoints: jest.fn(),
     deleteTransactionByRefId: jest.fn()
-  }
-})
+  }))
 
-jest.unstable_mockModule('../../../services/email-service/service.js', () => {
-  return {
+jest.unstable_mockModule('../../../services/email-service/service.js', () => ({
     sendEmail: jest.fn(),
-  }
-})
+  }))
 
-jest.spyOn(mongoose.connection, 'transaction').mockImplementation(async (callback) => {
-  return callback();
-});
+jest.spyOn(mongoose.connection, 'transaction').mockImplementation(async (callback) => callback());
 
-//import test module
-const ServiceManager = await import("../service.js");
+//Import test module
+const Service = await import("../service.js");
 
-// import dependencies
+// Import dependencies
 const {Deposit, YearlyDeposit} = await import("../models.js")
-const UserServiceManager = await import('../../../services/user-service/service.js')
-const CashLocationServiceManager = await import('../../../services/cash-location-service/service.js')
-const PointServiceManager = await import('../../../services/point-service/service.js')
-const EmailServiceManager = await import('../../../services/email-service/service.js')
+const UserService = await import('../../../services/user-service/service.js')
+const CashLocationService = await import('../../../services/cash-location-service/service.js')
+const PointService = await import('../../../services/point-service/service.js')
+const EmailService = await import('../../../services/email-service/service.js')
 
-//tests
+//Tests
 
 beforeEach(() => {
   jest.clearAllMocks();
 });
 
-const  ObjectId = mongoose.Types.ObjectId
+const  {ObjectId} = mongoose.Types
 
 describe("getDeposits", ()=>{
-  let userId, deposits
+  let deposits, userId
 
   beforeEach(()=>{
     userId = new ObjectId().toString()
@@ -98,12 +84,12 @@ describe("getDeposits", ()=>{
   })
   
   test("Deposit.getDeposits is called with correct args", async ()=>{
-    await ServiceManager.getDeposits({userId}, {field: "amount"}, {page: 1})
+    await Service.getDeposits({userId}, {field: "amount"}, {page: 1})
     expect(Deposit.getDeposits).toHaveBeenCalledWith({userId}, {field: "amount"}, {page: 1})
   })
 
   test("returns result of Deposit.getDeposits", async ()=>{
-    const result = await ServiceManager.getDeposits()
+    const result = await Service.getDeposits()
     expect(result).toEqual(deposits)
   })
 })
@@ -116,16 +102,16 @@ describe("getDepositById", ()=>{
   })
   
   test("Deposit.findById is called with correct args", async ()=>{
-    ServiceManager.getDepositById(deposit._id)
+    Service.getDepositById(deposit._id)
     expect(Deposit.findById).toHaveBeenCalledWith(deposit._id)
   })
   test("returns result of Deposit.findById", async ()=>{
-    const result = await ServiceManager.getDepositById(deposit._id)
+    const result = await Service.getDepositById(deposit._id)
     expect(result).toEqual(deposit)
   })
   test("throws NotFoundError if deposit is not found", async ()=>{
     Deposit.findById.mockResolvedValue(null)
-    expect(()=>ServiceManager.getDepositById(deposit._id)).rejects.toThrow(Errors.NotFoundError)
+    expect(()=>Service.getDepositById(deposit._id)).rejects.toThrow(Errors.NotFoundError)
   })
 })
 
@@ -140,18 +126,18 @@ describe("getYearlyDeposits", ()=>{
   })
 
   test("YearlyDeposit.find is called with correct args", async ()=>{
-    await ServiceManager.getYearlyDeposits()
+    await Service.getYearlyDeposits()
     expect(YearlyDeposit.find).toHaveBeenCalledWith()
   })
 
   test("returns result of YearlyDeposit.find", async ()=>{
-    const result = await ServiceManager.getYearlyDeposits()
+    const result = await Service.getYearlyDeposits()
     expect(result).toEqual(yearlyDeposits)
   })
 })
 
 describe("recordDeposit:Permanent", ()=>{
-  let depositor, recordedBy, deposit
+  let deposit, depositor, recordedBy
 
   beforeEach(async ()=>{
     depositor = UserMocks.generateDBUser()
@@ -159,12 +145,12 @@ describe("recordDeposit:Permanent", ()=>{
     deposit = Mocks.generateInputDeposit({depositor, depositType: "Permanent"})
     const {_id, fullName} = recordedBy
     deposit.recordedBy = {_id,  fullName}
-    UserServiceManager.getUserById.mockResolvedValue(depositor)
-    await ServiceManager.recordDeposit(deposit)
+    UserService.getUserById.mockResolvedValue(depositor)
+    await Service.recordDeposit(deposit)
   })
 
-  test("CashLocationServiceManager.addToCashLocation is called with correct args", ()=>{
-    expect(CashLocationServiceManager.addToCashLocation)
+  test("CashLocationService.addToCashLocation is called with correct args", ()=>{
+    expect(CashLocationService.addToCashLocation)
     .toHaveBeenCalledWith(deposit.cashLocation._id, deposit.amount )
   })
 
@@ -172,11 +158,11 @@ describe("recordDeposit:Permanent", ()=>{
     expect(Deposit.create).toHaveBeenCalledWith({...deposit, balanceBefore: depositor.permanentInvestment.amount})
   })
 
-  test("UserServiceManager.updatePermanentInvestment is called with correct args", ()=>{
+  test("UserService.updatePermanentInvestment is called with correct args", ()=>{
     const daysInvestment = DateUtil.getDaysDifference(depositor.permanentInvestment.unitsDate, DateUtil.getToday())
     const daysDeposit = DateUtil.getDaysDifference(deposit.date, DateUtil.getToday())
     const deltaUnits = depositor.permanentInvestment.amount * daysInvestment + deposit.amount * daysDeposit
-    expect(UserServiceManager.updatePermanentInvestment)
+    expect(UserService.updatePermanentInvestment)
     .toHaveBeenCalledWith(depositor._id, {
       deltaAmount: deposit.amount,
       deltaUnits,
@@ -194,25 +180,25 @@ describe("recordDeposit:Permanent", ()=>{
     const args = YearlyDeposit.updateOne.mock.calls
   })
 
-  test("PointServiceManager.awardPoints is called with correct args", ()=>{
+  test("PointService.awardPoints is called with correct args", ()=>{
     const pointsAwarded = Math.floor((deposit.amount / 10000) * 3)
-    expect(PointServiceManager.awardPoints)
+    expect(PointService.awardPoints)
     .toHaveBeenCalledWith(depositor._id, pointsAwarded, "Deposit", deposit._id )
   })
 
-  test("EmailServiceManager.sendEmail is called with correct args", ()=>{
-    const args = EmailServiceManager.sendEmail.mock.calls[0]
+  test("EmailService.sendEmail is called with correct args", ()=>{
+    const args = EmailService.sendEmail.mock.calls[0]
     expect(args[1]).toBe(depositor.email)
     expect(args[2]).toBe("Deposit Recorded")
     const contextStrings = ["Jane Doe", "UGX 10,000", "March 1, 2025", "Permanent", "3 points", "UGX 2,010,000"]
     const message = args[3]
-    //expect(contextStrings.every((contextString => message.includes(contextString)))).toBe(true)
+    //Expect(contextStrings.every((contextString => message.includes(contextString)))).toBe(true)
   })
   
 })
 
 describe("recordDeposit:Temporary", ()=>{
-  let depositor, recordedBy, deposit
+  let deposit, depositor, recordedBy
 
   beforeEach(async ()=>{
     depositor = UserMocks.generateDBUser()
@@ -223,12 +209,12 @@ describe("recordDeposit:Temporary", ()=>{
     })
     const {_id, fullName} = recordedBy
     deposit.recordedBy = {_id,  fullName}
-    UserServiceManager.getUserById.mockResolvedValue(depositor)
-    await ServiceManager.recordDeposit(deposit)
+    UserService.getUserById.mockResolvedValue(depositor)
+    await Service.recordDeposit(deposit)
   })
 
-  test("CashLocationServiceManager.addToCashLocation is called with correct args", ()=>{
-    expect(CashLocationServiceManager.addToCashLocation)
+  test("CashLocationService.addToCashLocation is called with correct args", ()=>{
+    expect(CashLocationService.addToCashLocation)
     .toHaveBeenCalledWith(deposit.cashLocation._id, deposit.amount )
   })
 
@@ -237,11 +223,11 @@ describe("recordDeposit:Temporary", ()=>{
     expect(Deposit.create).toHaveBeenCalledWith({...deposit, balanceBefore: depositor.temporaryInvestment.amount})
   })
 
-  test("UserServiceManager.updateTemporaryInvestment is called with correct args", ()=>{
+  test("UserService.updateTemporaryInvestment is called with correct args", ()=>{
     const daysInvestment = DateUtil.getDaysDifference(depositor.temporaryInvestment.unitsDate, DateUtil.getToday())
     const daysDeposit = DateUtil.getDaysDifference(deposit.date, DateUtil.getToday())
     const deltaUnits = depositor.temporaryInvestment.amount * daysInvestment + deposit.amount * daysDeposit
-    expect(UserServiceManager.updateTemporaryInvestment)
+    expect(UserService.updateTemporaryInvestment)
     .toHaveBeenCalledWith(depositor._id, {
       deltaAmount: deposit.amount,
       deltaUnits,
@@ -253,14 +239,14 @@ describe("recordDeposit:Temporary", ()=>{
     expect(YearlyDeposit.updateOne).not.toHaveBeenCalled()
   })
 
-  test("PointServiceManager.awardPoints is not called", ()=>{
-    expect(PointServiceManager.awardPoints).not.toHaveBeenCalled()
+  test("PointService.awardPoints is not called", ()=>{
+    expect(PointService.awardPoints).not.toHaveBeenCalled()
   })
 
 })
 
 describe("updateDeposit:Permanent", ()=>{
-  let depositor, recordedBy, currentDeposit, depositUpdate
+  let currentDeposit, depositUpdate, depositor, recordedBy
 
   beforeEach(async ()=>{
     depositor = UserMocks.generateDBUser()
@@ -273,17 +259,17 @@ describe("updateDeposit:Permanent", ()=>{
     currentDeposit = attachToObjectMethod(currentDeposit)
     depositUpdate = Mocks.generateDepositUpdate()
     depositUpdate.updatedById = recordedBy._id
-    UserServiceManager.getUserById.mockResolvedValue(depositor)
+    UserService.getUserById.mockResolvedValue(depositor)
     Deposit.findById.mockResolvedValue(currentDeposit)
-    await ServiceManager.updateDeposit(currentDeposit._id, depositUpdate)
+    await Service.updateDeposit(currentDeposit._id, depositUpdate)
   })
 
-  test("CashLocationServiceManager.addToCashLocation is called with correct args", ()=>{
-    expect(CashLocationServiceManager.addToCashLocation)
+  test("CashLocationService.addToCashLocation is called with correct args", ()=>{
+    expect(CashLocationService.addToCashLocation)
     .toHaveBeenCalledTimes(2)
-    expect(CashLocationServiceManager.addToCashLocation)
+    expect(CashLocationService.addToCashLocation)
     .toHaveBeenCalledWith(depositUpdate.cashLocationToAdd._id, depositUpdate.amount )
-    expect(CashLocationServiceManager.addToCashLocation)
+    expect(CashLocationService.addToCashLocation)
     .toHaveBeenCalledWith(depositUpdate.cashLocationToDeduct._id, - currentDeposit.amount )
   })
 
@@ -297,17 +283,17 @@ describe("updateDeposit:Permanent", ()=>{
   })
   })
 
-  test("UserServiceManager.updatePermanentInvestment is called with correct args", ()=>{
+  test("UserService.updatePermanentInvestment is called with correct args", ()=>{
     const daysInvestment = DateUtil.getDaysDifference(depositor.permanentInvestment.unitsDate, DateUtil.getToday())
     const daysCurrentDeposit = DateUtil.getDaysDifference(currentDeposit.date, DateUtil.getToday())
     const daysUpdatedDeposit = DateUtil.getDaysDifference(depositUpdate.date, DateUtil.getToday())
     const deltaUnits = depositor.permanentInvestment.amount * daysInvestment
     + depositUpdate.amount * daysUpdatedDeposit
     - currentDeposit.amount * daysCurrentDeposit
-    UserServiceManager.getUserById.mockResolvedValue(depositor)
+    UserService.getUserById.mockResolvedValue(depositor)
     const deltaAmount = depositUpdate.amount - currentDeposit.amount
     
-    expect(UserServiceManager.updatePermanentInvestment)
+    expect(UserService.updatePermanentInvestment)
     .toHaveBeenCalledWith(depositor._id, {
       deltaAmount,
       deltaUnits,
@@ -315,19 +301,19 @@ describe("updateDeposit:Permanent", ()=>{
     })
   })
 
-  test("PointServiceManager.findByRefIdAndUpdatePoints is called with correct args", ()=>{
-    const pointsAwarded = ServiceManager._calculatePoints(depositUpdate.amount)
-    expect(PointServiceManager.findByRefIdAndUpdatePoints)
+  test("PointService.findByRefIdAndUpdatePoints is called with correct args", ()=>{
+    const pointsAwarded = Service._calculatePoints(depositUpdate.amount)
+    expect(PointService.findByRefIdAndUpdatePoints)
     .toHaveBeenCalledWith(currentDeposit._id, pointsAwarded)
   })
 
-  test("EmailServiceManager.sendEmail is called with correct args", ()=>{
-    const currentPointsAwarded = ServiceManager._calculatePoints(currentDeposit.amount)
-    const updatedPointsAwarded = ServiceManager._calculatePoints(depositUpdate.amount)
-    const args = EmailServiceManager.sendEmail.mock.calls[0]
+  test("EmailService.sendEmail is called with correct args", ()=>{
+    const currentPointsAwarded = Service._calculatePoints(currentDeposit.amount)
+    const updatedPointsAwarded = Service._calculatePoints(depositUpdate.amount)
+    const args = EmailService.sendEmail.mock.calls[0]
     const [sender, email, subject, message] = args
 
-    let  expectedSubStringsInMessage = [
+    const  expectedSubStringsInMessage = [
       depositor.fullName,
       `UGX ${currentDeposit.amount.toLocaleString()}`,
       `${currentPointsAwarded} points`,
@@ -336,7 +322,7 @@ describe("updateDeposit:Permanent", ()=>{
       currentDeposit.type
     ]
 
-    let missingSubStringsInMessage = []
+    const missingSubStringsInMessage = []
 
     expect(sender).toBe("growthspring")
     expect(email).toBe(depositor.email)
@@ -347,7 +333,7 @@ describe("updateDeposit:Permanent", ()=>{
 })
 
 describe("updateDeposit:Temporary", ()=>{
-  let depositor, recordedBy, currentDeposit, depositUpdate
+  let currentDeposit, depositUpdate, depositor, recordedBy
 
   beforeEach(async ()=>{
     depositor = UserMocks.generateDBUser()
@@ -359,17 +345,17 @@ describe("updateDeposit:Temporary", ()=>{
     })
     depositUpdate = Mocks.generateDepositUpdate()
     depositUpdate.updatedById = recordedBy._id
-    UserServiceManager.getUserById.mockResolvedValue(depositor)
+    UserService.getUserById.mockResolvedValue(depositor)
     Deposit.findById.mockResolvedValue(currentDeposit)
-    await ServiceManager.updateDeposit(currentDeposit._id, depositUpdate)
+    await Service.updateDeposit(currentDeposit._id, depositUpdate)
   })
 
-  test("CashLocationServiceManager.addToCashLocation is called with correct args", ()=>{
-    expect(CashLocationServiceManager.addToCashLocation)
+  test("CashLocationService.addToCashLocation is called with correct args", ()=>{
+    expect(CashLocationService.addToCashLocation)
     .toHaveBeenCalledTimes(2)
-    expect(CashLocationServiceManager.addToCashLocation)
+    expect(CashLocationService.addToCashLocation)
     .toHaveBeenCalledWith(depositUpdate.cashLocationToAdd._id, depositUpdate.amount )
-    expect(CashLocationServiceManager.addToCashLocation)
+    expect(CashLocationService.addToCashLocation)
     .toHaveBeenCalledWith(depositUpdate.cashLocationToDeduct._id, - currentDeposit.amount )
   })
 
@@ -383,17 +369,17 @@ describe("updateDeposit:Temporary", ()=>{
     })
   })
 
-  test("UserServiceManager.updateTemporaryInvestment is called with correct args", ()=>{
+  test("UserService.updateTemporaryInvestment is called with correct args", ()=>{
    const daysInvestment = DateUtil.getDaysDifference(depositor.temporaryInvestment.unitsDate, DateUtil.getToday())
     const daysCurrentDeposit = DateUtil.getDaysDifference(currentDeposit.date, DateUtil.getToday())
     const daysUpdatedDeposit = DateUtil.getDaysDifference(depositUpdate.date, DateUtil.getToday())
     const deltaUnits = depositor.temporaryInvestment.amount * daysInvestment
     + depositUpdate.amount * daysUpdatedDeposit
     - currentDeposit.amount * daysCurrentDeposit
-    UserServiceManager.getUserById.mockResolvedValue(depositor)
+    UserService.getUserById.mockResolvedValue(depositor)
     const deltaAmount = depositUpdate.amount - currentDeposit.amount
     
-    expect(UserServiceManager.updateTemporaryInvestment)
+    expect(UserService.updateTemporaryInvestment)
     .toHaveBeenCalledWith(depositor._id, {
       deltaAmount,
       deltaUnits,
@@ -406,27 +392,27 @@ describe("updateDeposit:Temporary", ()=>{
 
   })
 
-  test("PointServiceManager.findByRefIdAndUpdatePoints is not called", ()=>{
-    expect(PointServiceManager.findByRefIdAndUpdatePoints).not.toHaveBeenCalled()
+  test("PointService.findByRefIdAndUpdatePoints is not called", ()=>{
+    expect(PointService.findByRefIdAndUpdatePoints).not.toHaveBeenCalled()
   })
   
 })
 
 describe("deleteDeposit:Permanent", ()=>{
-  let depositor, deposit, cashLocationToDeductId
+  let cashLocationToDeductId, deposit, depositor
   
   beforeEach(async ()=>{
     depositor = UserMocks.generateDBUser()
     deposit = Mocks.generateDBDeposit({depositor, depositType: "Permanent"})
     deposit = attachToObjectMethod(deposit)
-    UserServiceManager.getUserById.mockResolvedValue(depositor)
+    UserService.getUserById.mockResolvedValue(depositor)
     Deposit.findById.mockResolvedValue(deposit)
     cashLocationToDeductId = new ObjectId().toString()
-    await ServiceManager.deleteDeposit(deposit._id, cashLocationToDeductId)
+    await Service.deleteDeposit(deposit._id, cashLocationToDeductId)
   })
 
-  test("CashLocationServiceManager.addToCashLocation is called with correct args", ()=>{
-    expect(CashLocationServiceManager.addToCashLocation)
+  test("CashLocationService.addToCashLocation is called with correct args", ()=>{
+    expect(CashLocationService.addToCashLocation)
     .toHaveBeenCalledWith(cashLocationToDeductId, -deposit.amount )
   })
 
@@ -434,11 +420,11 @@ describe("deleteDeposit:Permanent", ()=>{
     expect(Deposit.deleteOne).toHaveBeenCalledWith({_id: deposit._id})
   })
 
-  test("UserServiceManager.updatePermanentInvestment is called with correct args", ()=>{
+  test("UserService.updatePermanentInvestment is called with correct args", ()=>{
    const daysInvestment = DateUtil.getDaysDifference(depositor.permanentInvestment.unitsDate, DateUtil.getToday())
     const daysDeposit = DateUtil.getDaysDifference(deposit.date, DateUtil.getToday())
     const deltaUnits = depositor.permanentInvestment.amount * daysInvestment - deposit.amount * daysDeposit
-    expect(UserServiceManager.updatePermanentInvestment)
+    expect(UserService.updatePermanentInvestment)
     .toHaveBeenCalledWith(depositor._id, {
       deltaAmount: -deposit.amount,
       deltaUnits,
@@ -446,23 +432,23 @@ describe("deleteDeposit:Permanent", ()=>{
     })
   })
 
-  test("PointServiceManager.deleteTransactionByRefId is called with correct args", ()=>{
-    const [refId] = PointServiceManager.deleteTransactionByRefId.mock.calls[0]
+  test("PointService.deleteTransactionByRefId is called with correct args", ()=>{
+    const [refId] = PointService.deleteTransactionByRefId.mock.calls[0]
     expect(refId).toEqual(deposit._id)
   })
 
-  test("EmailServiceManager.sendEmail is called with correct args", ()=>{
-    const args = EmailServiceManager.sendEmail.mock.calls[0]
+  test("EmailService.sendEmail is called with correct args", ()=>{
+    const args = EmailService.sendEmail.mock.calls[0]
     const [sender, email, subject, message] = args
 
-    let expectedSubStringsInMessage = [
+    const expectedSubStringsInMessage = [
       deposit.depositor.fullName,
       `${deposit.amount.toLocaleString()}`,
       DateUtil.formatDateShortUS(deposit.date),
       deposit.type,
     ]
 
-    let missingSubStringsInMessage = []
+    const missingSubStringsInMessage = []
 
     expect(sender).toEqual("growthspring")
     expect(email).toEqual(depositor.email)
@@ -473,19 +459,19 @@ describe("deleteDeposit:Permanent", ()=>{
 })
 
 describe("deleteDeposit:Temporary", ()=>{
-  let depositor, deposit, cashLocationToDeductId
+  let cashLocationToDeductId, deposit, depositor
   
   beforeEach(async ()=>{
     depositor = UserMocks.generateDBUser()
     deposit = Mocks.generateDBDeposit({depositor, depositType: "Temporary"})
-    UserServiceManager.getUserById.mockResolvedValue(depositor)
+    UserService.getUserById.mockResolvedValue(depositor)
     Deposit.findById.mockResolvedValue(deposit)
     cashLocationToDeductId = new ObjectId().toString()
-    await ServiceManager.deleteDeposit(deposit._id, cashLocationToDeductId)
+    await Service.deleteDeposit(deposit._id, cashLocationToDeductId)
   })
 
-  test("CashLocationServiceManager.addToCashLocation is called with correct args", ()=>{
-    expect(CashLocationServiceManager.addToCashLocation)
+  test("CashLocationService.addToCashLocation is called with correct args", ()=>{
+    expect(CashLocationService.addToCashLocation)
     .toHaveBeenCalledWith(cashLocationToDeductId, -deposit.amount )
   })
 
@@ -493,12 +479,12 @@ describe("deleteDeposit:Temporary", ()=>{
     expect(Deposit.deleteOne).toHaveBeenCalledWith({_id: deposit._id})
   })
 
-  test("UserServiceManager.updateTemporaryInvestment is called with correct args", ()=>{
+  test("UserService.updateTemporaryInvestment is called with correct args", ()=>{
    const daysInvestment = DateUtil.getDaysDifference(depositor.temporaryInvestment.unitsDate, DateUtil.getToday())
     const daysDeposit = DateUtil.getDaysDifference(deposit.date, DateUtil.getToday())
     const deltaUnits = depositor.temporaryInvestment.amount * daysInvestment - deposit.amount * daysDeposit
 
-    expect(UserServiceManager.updateTemporaryInvestment)
+    expect(UserService.updateTemporaryInvestment)
     .toHaveBeenCalledWith(depositor._id, {
       deltaAmount: -deposit.amount,
       deltaUnits,
@@ -510,23 +496,23 @@ describe("deleteDeposit:Temporary", ()=>{
     expect(YearlyDeposit.updateOne).not.toHaveBeenCalled()
   })
 
-  test("PointServiceManager.deleteTransactionByRefId is not called", ()=>{
-    expect(PointServiceManager.deleteTransactionByRefId)
+  test("PointService.deleteTransactionByRefId is not called", ()=>{
+    expect(PointService.deleteTransactionByRefId)
     .not.toHaveBeenCalled()
   })
 
-  test("EmailServiceManager.sendEmail is called with correct args", ()=>{
-    const args = EmailServiceManager.sendEmail.mock.calls[0]
+  test("EmailService.sendEmail is called with correct args", ()=>{
+    const args = EmailService.sendEmail.mock.calls[0]
     const [sender, email, subject, message] = args
 
-    let expectedSubStringsInMessage = [
+    const expectedSubStringsInMessage = [
       deposit.depositor.fullName,
       `${deposit.amount.toLocaleString()}`,
       DateUtil.formatDateShortUS(deposit.date),
       deposit.type,
     ]
 
-    let missingSubStringsInMessage = []
+    const missingSubStringsInMessage = []
 
     expect(sender).toEqual("growthspring")
     expect(email).toEqual(depositor.email)
@@ -536,7 +522,7 @@ describe("deleteDeposit:Temporary", ()=>{
   
 })
 
-//util 
+//Util 
 function attachToObjectMethod(obj){
   const copy = {...obj}
   copy.toObject = function(){

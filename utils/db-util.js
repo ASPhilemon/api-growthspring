@@ -14,9 +14,9 @@ export async function transaction(callback) {
     })
   }
   catch (err) {
-    if (err instanceof Errors.AppError) throw err;
-    if(err.name == "MongoServerError") _handleMongoServerError(err);
-    if (err instanceof mongoose.Error) _handleMongooseError(err);
+    if (err instanceof Errors.AppError) {throw err;}
+    if(err.name == "MongoServerError") {_handleMongoServerError(err);}
+    if (err instanceof mongoose.Error) {_handleMongooseError(err);}
     throw new Errors.UnknownError({ cause: err });
   }
 }

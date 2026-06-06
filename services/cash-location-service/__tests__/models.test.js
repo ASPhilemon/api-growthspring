@@ -35,7 +35,7 @@ describe("CashLocation Model:Write Operations", ()=>{
 
   test("CashLocation.updateOne should update existing cashLocation", async ()=>{
     await CashLocation.updateOne({_id: cashLocation._id}, {$set: {amount: 1_000}})
-    let updatedCashLocation = await CashLocation.findById(cashLocation._id)
+    const updatedCashLocation = await CashLocation.findById(cashLocation._id)
     expect(updatedCashLocation.amount).toEqual(1_000)
   })
 
@@ -63,7 +63,7 @@ describe("CashLocationTransfer Model:Write Operations", ()=>{
 
   test("CashLocationTransfer.updateOne should update existing transfer", async ()=>{
     await CashLocationTransfer.updateOne({_id: transfer._id}, {$set: {amount: 1_000}})
-    let updatedTransfer = await CashLocationTransfer.findById(transfer._id)
+    const updatedTransfer = await CashLocationTransfer.findById(transfer._id)
     expect(updatedTransfer.amount).toEqual(1_000)
   })
 

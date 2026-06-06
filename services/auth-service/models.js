@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 const { ObjectId } = mongoose.Types 
 
-//schemas
+//Schemas
 const userSubSchema = new mongoose.Schema({
   _id: {
     type: ObjectId,
@@ -64,7 +64,7 @@ const passkeySchema = new mongoose.Schema({
 const challengeSchema = new mongoose.Schema({
   email: {
     type: String,
-    required: function () {
+    required () {
     return this.type === 'registration';
   }
   },
@@ -74,7 +74,7 @@ const challengeSchema = new mongoose.Schema({
   },
   webAuthnUserID:{
     type: String,
-    required: function () {
+    required () {
     return this.type === 'registration';
   }
   },
@@ -109,7 +109,7 @@ const otpSchema = new mongoose.Schema({
   }
 }, { timestamps:true });
 
-//models
+//Models
 const OTP = mongoose.model('otp', otpSchema );
 const Password  = mongoose.model('password', passwordSchema );
 const Passkey  = mongoose.model('passkey', passkeySchema );

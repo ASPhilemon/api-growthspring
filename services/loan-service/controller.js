@@ -3,8 +3,8 @@ import * as Response from "../../utils/http-response-util.js";
 import * as UserServiceManager from "../user-service/service.js";
 
 export async function getLoans(req, res) {
-  let { borrowerId, status, type, year, month, sortBy, sortOrder, page, perPage } = req.query;
-  let filter = {
+  const { borrowerId, status, type, year, month, sortBy, sortOrder, page, perPage } = req.query;
+  const filter = {
     "borrower.id": borrowerId,
     status,
     type,
@@ -13,11 +13,11 @@ export async function getLoans(req, res) {
   };
   // Remove undefined properties from filter
   Object.keys(filter).forEach(key => filter[key] === undefined && delete filter[key]);
-  let sort = {
+  const sort = {
     field: sortBy,
     order: Number(sortOrder) || undefined
   };
-  let pagination = {
+  const pagination = {
     page: Number(page) || undefined,
     perPage: Number(perPage) || undefined
   };

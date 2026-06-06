@@ -5,7 +5,7 @@ import * as Validator from "../../utils/validator-util.js"
 
 import * as DateUtil from "../../utils/date-util.js"
 
-//collaborator services
+//Collaborator services
 import * as UserServiceManager from "../user-service/service.js"
 import * as EmailServiceManager from "../email-service/service.js"
 
@@ -17,13 +17,13 @@ export async function getTransactions(filter, sort, pagination){
 
 export async function getTransactionById(transactionId){
   const transaction =  await DB.query(PointTransaction.findById(transactionId))
-  if (!transaction) throw new Errors.NotFoundError("Failed to find transaction")
+  if (!transaction) {throw new Errors.NotFoundError("Failed to find transaction")}
   return transaction
 }
 
 export async function getTransactionByRefId(refId){
   const transaction =  DB.query(PointTransaction.findOne({refId}))
-  if (!transaction) throw new Errors.NotFoundError("Failed to find transaction")
+  if (!transaction) {throw new Errors.NotFoundError("Failed to find transaction")}
   return transaction
 }
 
@@ -94,13 +94,13 @@ export async function transferPoints(senderId, recipientId, points, reason){
 
 export async function deleteTransactionById(transactionId){
   Validator.schema(Schemas.deleteTransactionById, transactionId)
-  let transaction = await getTransactionById(transactionId)
+  const transaction = await getTransactionById(transactionId)
   await _deleteTransaction(transaction)
 }
 
 export async function deleteTransactionByRefId(refId,){
   Validator.schema(Schemas.deleteTransactionByRefId, refId)
-  let transaction = await getTransactionByRefId(refId)
+  const transaction = await getTransactionByRefId(refId)
   await _deleteTransaction(transaction)
 }
 
@@ -123,7 +123,7 @@ export async function findByIdAndUpdatePoints(transactionId, newPoints){
   })
 }
 
-//helpers
+//Helpers
 async function _deleteTransaction(transaction){
   await DB.transaction(async()=>{
     const {type, recipient, sender, redeemedBy, points} = transaction

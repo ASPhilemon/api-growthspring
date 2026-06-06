@@ -1,7 +1,7 @@
 import express from "express";
 
 import * as RouteController from "./controller.js";
-import { requireUser, requireAdmin } from "../../middleware.js";
+import { requireAdmin, requireUser } from "../../middleware.js";
 
 const router = express.Router();
 

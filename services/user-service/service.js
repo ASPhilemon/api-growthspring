@@ -9,7 +9,7 @@ const filePath = fileURLToPath(fileURL)
 const moduleDirectory = path.dirname(filePath)
 const publicDirectory = path.join(moduleDirectory, "..", "..", "public")
 
-//utils
+//Utils
 import * as DB from "../../utils/db-util.js"
 import * as Errors from "../../utils/error-util.js"
 import * as DateUtil from "../../utils/date-util.js"
@@ -19,15 +19,15 @@ import { ACCOUNT_BALANCE_RANGES, categorizeAmounts, getTotalSumsAndSort } from "
 
 import CONSTANTS from '../../src/config/constants.js'; 
 
-//collaborator services
-import * as AuthServiceManager from "../auth-service/service.js"
-import * as DepositServiceManager from "../deposit-service/service.js"
-import * as PointServiceManager from "../point-service/service.js"
-import * as EmailServiceManager from "../email-service/service.js"
-import * as CashLocationServiceManager from '../cash-location-service/service.js';
-import * as LoansServiceManager from '../loan-service/service.js';
-import * as EarningsServiceManager from '../profits-service/service.js';
-import * as AdminServiceManager from "../admin-service/service.js";
+//Collaborator services
+import * as AuthService from "../auth-service/service.js"
+import * as DepositService from "../deposit-service/service.js"
+import * as PointService from "../point-service/service.js"
+import * as EmailService from "../email-service/service.js"
+import * as CashLocationService from '../cash-location-service/service.js';
+import * as LoansService from '../loan-service/service.js';
+import * as EarningsService from '../profits-service/service.js';
+import * as AdminService from "../admin-service/service.js";
 
 import * as Schemas from "./schemas.js"
 
@@ -39,20 +39,20 @@ export async function getUsers(){
 export async function getUserById(userId){
   Validator.schema(Schemas.getUserById, userId)
   const user = await DB.query(User.findById(userId))
-  if (!user) throw new Errors.NotFoundError("Failed to find user")
+  if (!user) {throw new Errors.NotFoundError("Failed to find user")}
   return user
 }
 
 export async function getUserByEmail(email){
   Validator.schema(Schemas.getUserByEmail, email)
   const user = await DB.query(User.findOne({email}))
-  if (!user) throw new Errors.NotFoundError("Failed to find user")
+  if (!user) {throw new Errors.NotFoundError("Failed to find user")}
   return user
 }
 
 export async function getUserDashboardAppearance(userId){
   const dashboards = await Appearance.find({});
-  if (!dashboards) throw new Errors.NotFoundError("Failed to find user")
+  if (!dashboards) {throw new Errors.NotFoundError("Failed to find user")}
   return dashboards.find(d => d.userId == userId)  
 }
 
@@ -63,7 +63,6 @@ export async function changeUserDashboardAppearance(userId, layOut, color) {
   await appearance.save();
 }
 
-
 export async function getUserDashboard(userId){
   const currentYear = DateUtil.getToday().getFullYear();
   const year = currentYear;
@@ -71,21 +70,21 @@ export async function getUserDashboard(userId){
   const pagination = { page: 1, perPage: 100000 }; 
   const sort = { field: "date", order: -1 };
 
-  // pagination-utils.js (or near your dashboard code)
-const MAX_PER_PAGE = 100; // must match your Joi/schema cap
+  // Pagination-utils.js (or near your dashboard code)
+const MAX_PER_PAGE = 100; // Must match your Joi/schema cap
 
 async function fetchAllDeposits(filter = {}, sort = { field: "date", order: -1 }) {
   let page = 1;
   const all = [];
 
   while (true) {
-    const chunk = await DepositServiceManager.getDeposits(filter, sort, { page, perPage: MAX_PER_PAGE });
-    if (!chunk || chunk.length === 0) break;
+    const chunk = await DepositService.getDeposits(filter, sort, { page, perPage: MAX_PER_PAGE });
+    if (!chunk || chunk.length === 0) {break;}
 
     all.push(...chunk);
 
-    // last page when we got fewer than the cap
-    if (chunk.length < MAX_PER_PAGE) break;
+    // Last page when we got fewer than the cap
+    if (chunk.length < MAX_PER_PAGE) {break;}
 
     page += 1;
   }
@@ -119,26 +118,26 @@ async function fetchAllDeposits(filter = {}, sort = { field: "date", order: -1 }
     getUsers(),
     fetchAllDeposits({ userId } , sort, pagination ),
     fetchAllDeposits({}, sort, pagination),
-    PointServiceManager.getTransactions(filter1),
-    EarningsServiceManager.getEarnings(userId),
-    EarningsServiceManager.getEarnings(),
-    LoansServiceManager.getLoans({ userId, sort, pagination }),
-    LoansServiceManager.getLoans({ userId, status: "Ongoing", sort, pagination }),
-    LoansServiceManager.getLoans({ userId, year, sort, pagination }),
-    LoansServiceManager.getLoans({ sort, pagination }),
-    LoansServiceManager.getLoans({ year, sort, pagination }),
-    EarningsServiceManager.getUnits(),
-    DepositServiceManager.getYearlyDeposits()
+    PointService.getTransactions(filter1),
+    EarningsService.getEarnings(userId),
+    EarningsService.getEarnings(),
+    LoansService.getLoans({ userId, sort, pagination }),
+    LoansService.getLoans({ userId, status: "Ongoing", sort, pagination }),
+    LoansService.getLoans({ userId, year, sort, pagination }),
+    LoansService.getLoans({ sort, pagination }),
+    LoansService.getLoans({ year, sort, pagination }),
+    EarningsService.getUnits(),
+    DepositService.getYearlyDeposits()
   ])
  
   // ---- helpers ----
   function processArray(array, transformFn, noDataValue = 'No Data Available') {
-    if (!Array.isArray(array) || array.length === 0) return noDataValue;
+    if (!Array.isArray(array) || array.length === 0) {return noDataValue;}
     return transformFn(array);
   }
 
   function formatDate(dateInput) {
-    if (!dateInput) return '';
+    if (!dateInput) {return '';}
     const d = new Date(dateInput);
     return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
   }
@@ -147,7 +146,7 @@ async function fetchAllDeposits(filter = {}, sort = { field: "date", order: -1 }
   const monthsForSaving = member.membershipDate < new Date(DateUtil.getToday().getFullYear(), 0, 1) ? monthsPassedThisYear : getDaysDifference(member.membershipDate, DateUtil.getToday()) / 30;
   const formatCurrency = (amount) => {
     const safe = Number(amount || 0);
-    return 'UGX ' + Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(safe);
+    return `UGX ${  Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(safe)}`;
   };
   const safeNumber = v => Number(v || 0);
 
@@ -166,19 +165,19 @@ async function fetchAllDeposits(filter = {}, sort = { field: "date", order: -1 }
   const totalSavingsEarnings = memberEarnings.filter(t => t.source === "Temporary Savings").reduce((t, l) => t + (l.amount || 0), 0);
   const thisYearSavingsEarningsSum = (savingsEarningsProcessed?.yearsSums?.[currentYear]?.amount) || 0;
 
-  //units and returns
+  //Units and returns
   const memberUnits = allUnits.filter(t => t.fullName === member.fullName);
-  let yearlyRates = [];
+  const yearlyRates = [];
 
   // Calculate Member Ownership
   let allCurrentUnits = 0;
-  let people = [];
-  let memberNames = [];
+  const people = [];
+  const memberNames = [];
 
   for (const member of allMembers) {
       memberNames.push(member.fullName);
       const investmentDays = getDaysDifference(member.permanentInvestment.unitsDate, DateUtil.getToday());
-      let totalUnits = investmentDays * member.permanentInvestment.amount + member.permanentInvestment.units;
+      const totalUnits = investmentDays * member.permanentInvestment.amount + member.permanentInvestment.units;
       
       allCurrentUnits += totalUnits;
       people.push({name: member.fullName, units: totalUnits});
@@ -191,14 +190,14 @@ async function fetchAllDeposits(filter = {}, sort = { field: "date", order: -1 }
   const currentClubInvestmentAmount = allCurrentUnits / (getDaysDifference(startOfYear, DateUtil.getToday()));
   const ownershipPercentage = currentMemberInfo.units/allCurrentUnits;
 
-  // points & credits
+  // Points & credits
   const pointsRecordsProcessed = processArray(pointsTransactions, arr => getTotalSumsAndSort(arr, 'date', 'amount'));
   const pointsSpentTransactions = pointsTransactions.filter(t => t.type === "redeem");
   const totalPointsRedeemed = Math.round(pointsSpentTransactions.reduce((t, l) => t + (l.points || 0), 0));
   const pointsEarnedTransactions = pointsTransactions.filter(t => t.type !== "redeem");
   const totalPointsEarned = pointsEarnedTransactions.reduce((t, l) => t + (l.points || 0), 0);
 
-  // points this year (safe)
+  // Points this year (safe)
   const pointsThisYearEarned = pointsEarnedTransactions.filter(p => new Date(p.date).getFullYear() === currentYear)
       .reduce((t, p) => t + (p.points || 0), 0);
   const pointsThisYearRedeemed = pointsSpentTransactions.filter(p => new Date(p.date).getFullYear() === currentYear)
@@ -207,23 +206,23 @@ async function fetchAllDeposits(filter = {}, sort = { field: "date", order: -1 }
   const pointUnitValue = (typeof CONSTANTS !== 'undefined' && CONSTANTS?.POINTS_VALUE_PER_UNIT) ? CONSTANTS.POINTS_VALUE_PER_UNIT : 1000;
   const pointsWorth = Math.round(pointUnitValue * (member.points || 0));
   
-  // member debt totals & loans
+  // Member debt totals & loans
   const totalStandardLoanDebt = ongoingMemberLoans.filter(t => t.type === "Standard").reduce((t, l) => {
-    const interestDue = LoansServiceManager.calculateCashInterestDueAmount(l, DateUtil.getToday(), member.points)?.totalInterestDue || 0;
+    const interestDue = LoansService.calculateCashInterestDueAmount(l, DateUtil.getToday(), member.points)?.totalInterestDue || 0;
     return t + (Number(l.principalLeft || 0) + Number(interestDue));
   }, 0);
   const totalFreeLoanDebt = ongoingMemberLoans.filter(t => t.type === "Permanent").reduce((t, l) => {
-    const interestDue = LoansServiceManager.calculateCashInterestDueAmount(l, DateUtil.getToday(), member.points)?.totalInterestDue || 0;
+    const interestDue = LoansService.calculateCashInterestDueAmount(l, DateUtil.getToday(), member.points)?.totalInterestDue || 0;
     return t + (Number(l.principalLeft || 0) + Number(interestDue));
   }, 0);
   const thisYearMemberStandardLoansSum = thisYearMemberLoans.filter(t => t.type === "Standard").reduce((t, l) => t + (l.amount || 0), 0);
   const thisYearMemberFreeLoansSum = thisYearMemberLoans.filter(t => t.type === "Interest-Free").reduce((t, l) => t + (l.amount || 0), 0);
-  const totalStandardLoansInterestDue = ongoingMemberLoans.filter(t => t.type === "Standard").reduce((t, l) => t + (LoansServiceManager.calculateCashInterestDueAmount(l, DateUtil.getToday(), member.points).totalInterestDue || 0), 0);
-  const totalFreeLoansInterestDue = 0; //ongoingMemberLoans.filter(t => t.type === "Interest-Free").reduce((t, l) => t + (LoansServiceManager.calculateCashInterestDueAmount(l, DateUtil.getToday(), member.points)?.totalInterestDue || 0), 0);
+  const totalStandardLoansInterestDue = ongoingMemberLoans.filter(t => t.type === "Standard").reduce((t, l) => t + (LoansService.calculateCashInterestDueAmount(l, DateUtil.getToday(), member.points).totalInterestDue || 0), 0);
+  const totalFreeLoansInterestDue = 0; //OngoingMemberLoans.filter(t => t.type === "Interest-Free").reduce((t, l) => t + (LoansService.calculateCashInterestDueAmount(l, DateUtil.getToday(), member.points)?.totalInterestDue || 0), 0);
   const totalStandardLoansEver = memberLoans.filter(t => t.type === "Standard").reduce((t, l) => t + (l.amount || 0), 0);
   const totalFreeLoansEver = memberLoans.filter(t => t.type === "Interest-Free").reduce((t, l) => t + (l.amount || 0), 0);
 
-  // club totals
+  // Club totals
   const clubWorth = allMembers.reduce((s, m) => s + (m.permanentInvestment?.amount || 0), 0);
   const clubTemporarySavingsWorth = allMembers.reduce((s, m) => s + (m.temporaryInvestment?.amount || 0), 0);
   const clubDepositsArray = processArray(allDeposits.filter(t => t.type === "Permanent"), arr => getTotalSumsAndSort(arr, 'date', 'amount'));
@@ -244,7 +243,7 @@ async function fetchAllDeposits(filter = {}, sort = { field: "date", order: -1 }
   const totalFreeClubLoans = allLoans.filter(t => t.type === "Interest-Free").reduce((t, l) => t + (l.amount || 0), 0);
 
   //Limits and other figures
-  const {loanMultiplier, loanLimit, interestPaidInLastYear} = await LoansServiceManager.calculateStandardLoanLimit(userId);
+  const {loanMultiplier, loanLimit, interestPaidInLastYear} = await LoansService.calculateStandardLoanLimit(userId);
 
   const temporaryDeposits = memberDeposits.filter(t => t.type === "Temporary");
 
@@ -254,24 +253,24 @@ async function fetchAllDeposits(filter = {}, sort = { field: "date", order: -1 }
   ) : 0;
 
   const requestedAmount = 0.4 * largestContribution;
-  const temporaryLoanLimit = await LoansServiceManager.calculateFreeLoanEligibility(member, requestedAmount, 365);//Default is one year
+  const temporaryLoanLimit = await LoansService.calculateFreeLoanEligibility(member, requestedAmount, 365);//Default is one year
   const savingsDays = Math.round(member.temporaryInvestment.units / member.temporaryInvestment.amount);
   
   
   // ---- savings categorization (map members -> totals, categorize, find user's category/rank) ----
   const memberTotalsMap = {};
   (allMembers || []).forEach(m => {
-    // use permanentInvestment.amount as the member's savings/holding
+    // Use permanentInvestment.amount as the member's savings/holding
     const id = (m._id || m.id || '').toString();
     memberTotalsMap[id] = (memberTotalsMap[id] || 0) + (m.permanentInvestment?.amount || 0);
   });
 
-  // standings by range
+  // Standings by range
   const standings = categorizeAmounts(memberTotalsMap, ACCOUNT_BALANCE_RANGES);
-  // determine current member's category label
+  // Determine current member's category label
   const findCategoryLabel = (value) => {
     for (const r of ACCOUNT_BALANCE_RANGES) {
-      if (value >= r.min && value <= r.max) return r.label;
+      if (value >= r.min && value <= r.max) {return r.label;}
     }
     return ACCOUNT_BALANCE_RANGES[ACCOUNT_BALANCE_RANGES.length - 1].label;
   };
@@ -279,7 +278,7 @@ async function fetchAllDeposits(filter = {}, sort = { field: "date", order: -1 }
   const memberCategoryLabel = findCategoryLabel(memberAmount);
   const categoryMembershipCount = (standings.find(s => s.range === memberCategoryLabel)?.count) || 0;
 
-  // compute user's rank among members by amount (1 = highest)
+  // Compute user's rank among members by amount (1 = highest)
   const sortedMembersByAmount = (allMembers || []).slice().sort((a,b) => (b.permanentInvestment?.amount || 0) - (a.permanentInvestment?.amount || 0));
   const userRank = sortedMembersByAmount.findIndex(m => (m._id || m.id || '').toString() === (member._id || member.id || '').toString());
   const userRankDisplay = userRank === -1 ? 'N/A' : (userRank + 1);
@@ -287,9 +286,9 @@ async function fetchAllDeposits(filter = {}, sort = { field: "date", order: -1 }
   
 
 function formatRecordsForYears(processedObj, dateFormatter) {
-  if (!processedObj || processedObj === 'No Data Available') return [];
+  if (!processedObj || processedObj === 'No Data Available') {return [];}
   const entries = Object.entries(processedObj.yearsSums || {});
-  // sort descending by year
+  // Sort descending by year
   entries.sort((a, b) => b[0] - a[0]);
   return entries.map(([year, sum]) => {
     const records = processedObj.recordsByYear?.[year] || [];
@@ -300,7 +299,7 @@ function formatRecordsForYears(processedObj, dateFormatter) {
 }
 
 function formatClubDeposits(clubDepositsArray) {
-  if (!clubDepositsArray || clubDepositsArray === 'No Data Available') return [];
+  if (!clubDepositsArray || clubDepositsArray === 'No Data Available') {return [];}
 
   return Object.entries(clubDepositsArray.yearsSums)
     .sort((a, b) => b[0] - a[0])
@@ -325,26 +324,26 @@ function formatClubDeposits(clubDepositsArray) {
 
 
 function formatClubEarnings(clubEarningsArray, clubUnits) {
-  if (!clubEarningsArray || clubEarningsArray === 'No Data Available') return [];
-  if (!clubUnits || clubUnits === 'No Data Available') return [];
+  if (!clubEarningsArray || clubEarningsArray === 'No Data Available') {return [];}
+  if (!clubUnits || clubUnits === 'No Data Available') {return [];}
 
   return Object.entries(clubEarningsArray.yearsSums)
-    .sort((a, b) => Number(b[0]) - Number(a[0])) // sort by year desc
+    .sort((a, b) => Number(b[0]) - Number(a[0])) // Sort by year desc
     .map(([year, sum]) => {
-      // totals
+      // Totals
       const totalEarn = Math.round(sum.amount ?? sum.earnings_amount ?? 0);
 
-      // annualized ROI (%): (earnings / units) * 365 * 100
+      // Annualized ROI (%): (earnings / units) * 365 * 100
       const unitsForYear = Number(clubUnits.yearsSums?.[year]?.units || 0);
       const roiAnnualPct = unitsForYear > 0 ? Math.round((totalEarn * 36500) / unitsForYear) : 0;
       yearlyRates.push({year, roiAnnualPct});
 
-      // monthly values: [month, amount]
+      // Monthly values: [month, amount]
       const monthly = Object.entries(clubEarningsArray.monthlySums?.[year] || {}).map(
         ([month, mRec]) => [month, Math.round(mRec.amount ?? 0), "Savings"]
       );
 
-      // optional: average monthly earnings (handles partial current year like deposits)
+      // Optional: average monthly earnings (handles partial current year like deposits)
       const monthsSoFar = (Number(year) !== DateUtil.getToday().getFullYear())
         ? 12
         : (DateUtil.getToday().getMonth() + 1);
@@ -354,7 +353,7 @@ function formatClubEarnings(clubEarningsArray, clubUnits) {
         year,
         total: totalEarn,
         avgMonthlyEarnings,
-        roiAnnualPct,        // annualized % for the year
+        roiAnnualPct,        // Annualized % for the year
         values: monthly      
       };
     });
@@ -373,16 +372,16 @@ function meanRoiForMemberYears(yearRates, memberUnits) {
     .map(r => Number(r?.roiAnnualPct))
     .filter(v => Number.isFinite(v));
 
-  if (vals.length === 0) return 0;
+  if (vals.length === 0) {return 0;}
   return vals.reduce((a, b) => a + b, 0) / vals.length;
 }
 
   // ---- build response with real values (no dummy strings) ----
-  const user = member; // keep property name consistent in response
+  const user = member; // Keep property name consistent in response
 
   const response = {
     user,
-    dashboardAppearance: dashboardAppearance,
+    dashboardAppearance,
     home: {
       memberStats : [
         { title: "Your Worth", value: formatCurrency(member.permanentInvestment?.amount || 0) },
@@ -405,10 +404,10 @@ function meanRoiForMemberYears(yearRates, memberUnits) {
         {
           title: "Earnings",
           rows: [
-            ["Projected Earnings", formatCurrency(Math.round(0.15 * currentInvestmentAmount))],//replace later with more accurate calculations
+            ["Projected Earnings", formatCurrency(Math.round(0.15 * currentInvestmentAmount))],//Replace later with more accurate calculations
             ["Your Percentage", `${(ownershipPercentage * 100).toFixed(2)}` + "%"],
             ["Avg. monthly earnings", formatCurrency(Math.round(0.15 * currentInvestmentAmount / Math.max(1, monthsForSaving)))],
-            ["Avg. annual earnings rate",  meanRoiForMemberYears(yearlyRates, memberUnits) + "%"],
+            ["Avg. annual earnings rate",  `${meanRoiForMemberYears(yearlyRates, memberUnits)  }%`],
           ],
         },
         {
@@ -433,7 +432,7 @@ function meanRoiForMemberYears(yearRates, memberUnits) {
           title: "Club Figures",
           rows: [
             ["Savings this year", formatCurrency(thisYearClubDeposits)],
-            ["Projected Earnings", formatCurrency(0.16 * currentClubInvestmentAmount)],//update with accurate calculations
+            ["Projected Earnings", formatCurrency(0.16 * currentClubInvestmentAmount)],//Update with accurate calculations
             ["Loans this year", formatCurrency(thisYearClubLoans)],
             ["Members", String((allMembers || []).length - 2)],
           ],
@@ -446,7 +445,7 @@ function meanRoiForMemberYears(yearRates, memberUnits) {
         { title: "Your Earnings", value: formatCurrency(totalSavingsEarnings || 0)},
         { title: "Your Current Loans", value: formatCurrency(totalFreeLoanDebt || 0) },
         { title: "Total Contributions", value: formatCurrency(clubTemporarySavingsWorth || 0) },
-        { title: "Club Earnings (Total)", value: formatCurrency(([]).reduce((s,e) => s + (e.amount || 0), 0)) },  //allTemporarySavingsEarnings ||       
+        { title: "Club Earnings (Total)", value: formatCurrency(([]).reduce((s,e) => s + (e.amount || 0), 0)) },  //AllTemporarySavingsEarnings ||       
         { title: "Total Withdrawals", value: formatCurrency(([]).reduce((s,e) => s + (e.amount || 0), 0)) },
       ],
       memberOverviewGroups : [
@@ -480,24 +479,24 @@ function meanRoiForMemberYears(yearRates, memberUnits) {
       ],
     },
 
-    // list views / year grouped records (reuse your formatters)
+    // List views / year grouped records (reuse your formatters)
     memberDeposits: formatRecordsForYears(depositsProcessed, formatDate),
-    memberTemporaryDeposits: formatRecordsForYears(temporarySavingsProcessed, formatDate),//combine with withdrawals and extra table column for transaction type
+    memberTemporaryDeposits: formatRecordsForYears(temporarySavingsProcessed, formatDate),//Combine with withdrawals and extra table column for transaction type
     memberEarnings: formatRecordsForYears(earningsProcessed, formatDate),
     memberSavingsEarnings: formatRecordsForYears(savingsEarningsProcessed, formatDate),
     clubDeposits: formatClubDeposits(clubDepositsArray),
-    clubTemporaryFigures: formatClubDeposits(clubTemporaryDepositsArray),//combine with withdrawals, loans and extra table column for transaction type
-    clubEarnings: clubEarnings,
+    clubTemporaryFigures: formatClubDeposits(clubTemporaryDepositsArray),//Combine with withdrawals, loans and extra table column for transaction type
+    clubEarnings,
     memberLoans: await buildMemberLoanRecords(memberLoans.filter(t => t.type === "Standard"), user, formatDate),
     memberFreeLoans: await buildMemberLoanRecords(memberLoans.filter(t => t.type === "Interest-Free"), user, formatDate),
     memberTemporarySavingsWithdrawals: [],
 
-    // points: produce structured year-grouped lists from transactions
+    // Points: produce structured year-grouped lists from transactions
     pointsRecords:formatRecordsForYears(processArray(pointsTransactions, arr => getTotalSumsAndSort(arr, 'date', 'points')), formatDate),
     pointsSpent: formatRecordsForYears(processArray(pointsTransactions.filter(t => t.type === 'redeem'), arr => getTotalSumsAndSort(arr, 'date', 'points')), formatDate),
     pointsEarned: formatRecordsForYears(processArray(pointsTransactions.filter(t => t.type !== 'redeem'), arr => getTotalSumsAndSort(arr, 'date', 'points')), formatDate),
 
-    // discounts not fetched above -> return empty array for now
+    // Discounts not fetched above -> return empty array for now
     discounts: []
   };
 
@@ -505,12 +504,12 @@ function meanRoiForMemberYears(yearRates, memberUnits) {
 }
 
 async function buildMemberLoanRecords(memberLoans, ctx, dateFormatter) {
-  const isSingleUser = ctx && !ctx.usersById && ctx._id; // looks like a user doc
+  const isSingleUser = ctx && !ctx.usersById && ctx._id; // Looks like a user doc
   const usersById = ctx && ctx.usersById ? ctx.usersById : null;
 
   const getBorrowerId = (b) => b?._id || b?.id || null;
   const getBorrowerDoc = (b) => {
-    if (isSingleUser) return ctx; // single user passed in
+    if (isSingleUser) {return ctx;} // Single user passed in
     const id = getBorrowerId(b);
     return usersById && id ? (usersById[String(id)] || b || {}) : (b || {});
   };
@@ -519,7 +518,7 @@ async function buildMemberLoanRecords(memberLoans, ctx, dateFormatter) {
   return (memberLoans || []).map((record) => {
     const borrowerDoc = getBorrowerDoc(record.borrower);
 
-    // prefer `date`, fallback to `earliestDate`
+    // Prefer `date`, fallback to `earliestDate`
     const issue = record.date || record.earliestDate || null;
     const issueDateStr = issue ? dateFormatter(issue) : "";
 
@@ -533,7 +532,7 @@ async function buildMemberLoanRecords(memberLoans, ctx, dateFormatter) {
     // Use borrower points if available (0 otherwise)
     const points = Number(borrowerDoc?.points || 0);
     const interestDue =
-      LoansServiceManager.calculateCashInterestDueAmount(
+      LoansService.calculateCashInterestDueAmount(
         record,
         DateUtil.getToday(),
         points
@@ -596,10 +595,10 @@ export async function updateUserPhoto(userId, tempPhotoPath){
     user = await getUserById(userId)
   }
   catch(err){
-    //remove uploaded photo if user was not found
+    //Remove uploaded photo if user was not found
     if (err instanceof Errors.NotFoundError){
       fs.unlink(tempPhotoPath, (err)=>{
-        if(err) throw new Errors.InternalServerError("An error occured deleting uploaded photo", err);
+        if(err) {throw new Errors.InternalServerError("An error occured deleting uploaded photo", err);}
       })
     }
 
@@ -610,7 +609,7 @@ export async function updateUserPhoto(userId, tempPhotoPath){
   const fileName = `img/profile-photos/${user.fullName}-${currentTime}.jpg`;
   const permPhotoPath = path.join(publicDirectory, fileName);
 
-  //move photo to the public directory
+  //Move photo to the public directory
   try{
     fs.mkdirSync(path.dirname(permPhotoPath), { recursive: true });
     fs.renameSync(tempPhotoPath, permPhotoPath)
@@ -619,7 +618,7 @@ export async function updateUserPhoto(userId, tempPhotoPath){
     throw new Errors.InternalServerError("An error occured saving photo",  err)
   }
 
-  //save photo reference to database
+  //Save photo reference to database
   user.photoURL = fileName
   await user.save()
 }
@@ -639,7 +638,7 @@ export async function deleteUserPhoto(userId){
     throw new Errors.InternalServerError("An error occured deleting photo", err)
   }
 
-  //update user
+  //Update user
   user.photoURL = ""
   await user.save()
 }
@@ -658,7 +657,7 @@ export async function addPoints(userId, points){
 
 export async function transferPoints(senderId, recipientId, points, reason){
   Validator.schema(Schemas.transferPoints, {senderId, recipientId, points, reason})
-  await PointServiceManager.transferPoints(senderId, recipientId, points, reason)
+  await PointService.transferPoints(senderId, recipientId, points, reason)
 }
 
 export async function updatePermanentInvestment(userId, {deltaAmount, deltaUnits, newUnitsDate}){
@@ -668,10 +667,10 @@ export async function updatePermanentInvestment(userId, {deltaAmount, deltaUnits
     newUnitsDate,
   }})
 
-  let update = {$set: {}, $inc: {}}
-  if (newUnitsDate) update.$set["permanentInvestment.unitsDate"] = newUnitsDate
-  if (deltaAmount) update.$inc["permanentInvestment.amount"] = deltaAmount
-  if (deltaUnits) update.$inc["permanentInvestment.units"] = deltaUnits
+  const update = {$set: {}, $inc: {}}
+  if (newUnitsDate) {update.$set["permanentInvestment.unitsDate"] = newUnitsDate}
+  if (deltaAmount) {update.$inc["permanentInvestment.amount"] = deltaAmount}
+  if (deltaUnits) {update.$inc["permanentInvestment.units"] = deltaUnits}
   await DB.query(User.updateOne({_id: userId}, update))
 }
 
@@ -682,10 +681,10 @@ export async function updateTemporaryInvestment(userId, {deltaAmount, deltaUnits
     newUnitsDate
   }})
 
-  let update = {$set: {}, $inc: {}}
-  if (newUnitsDate) update.$set["temporaryInvestment.unitsDate"] = newUnitsDate
-  if (deltaAmount) update.$inc["temporaryInvestment.amount"] = deltaAmount
-  if (deltaUnits) update.$inc["temporaryInvestment.units"] = deltaUnits
+  const update = {$set: {}, $inc: {}}
+  if (newUnitsDate) {update.$set["temporaryInvestment.unitsDate"] = newUnitsDate}
+  if (deltaAmount) {update.$inc["temporaryInvestment.amount"] = deltaAmount}
+  if (deltaUnits) {update.$inc["temporaryInvestment.units"] = deltaUnits}
 
   await DB.query(User.updateOne({_id: userId}, update))
 }
@@ -700,7 +699,7 @@ export async function deleteUser(userId){
 }
 
 export async function sendUserCreatedEmail(user, password){
-  EmailServiceManager.sendEmail({
+  EmailService.sendEmail({
     sender: "accounts",
     recipient: user.email,
     subject: "Account Created",
@@ -708,7 +707,7 @@ export async function sendUserCreatedEmail(user, password){
   })
 }
 
-//helpers
+//Helpers
 function _buildUser(user){
   user = {
     ...user,
@@ -743,13 +742,13 @@ async function fetchAllDeposits(filter = {}, sort = { field: "date", order: -1 }
   const all = [];
 
   while (true) {
-    const chunk = await DepositServiceManager.getDeposits(filter, sort, { page, perPage: MAX_PER_PAGE });
-    if (!chunk || chunk.length === 0) break;
+    const chunk = await DepositService.getDeposits(filter, sort, { page, perPage: MAX_PER_PAGE });
+    if (!chunk || chunk.length === 0) {break;}
 
     all.push(...chunk);
 
-    // last page when we got fewer than the cap
-    if (chunk.length < MAX_PER_PAGE) break;
+    // Last page when we got fewer than the cap
+    if (chunk.length < MAX_PER_PAGE) {break;}
 
     page += 1;
   }
@@ -764,15 +763,15 @@ async function fetchAllDeposits(filter = {}, sort = { field: "date", order: -1 }
     cashLocations,
   ] = await Promise.all([
     fetchAllDeposits({}, sort, pagination),
-    LoansServiceManager.getLoans({ sort, pagination }),
+    LoansService.getLoans({ sort, pagination }),
     getUsers(),
-    CashLocationServiceManager.getCashLocations()
+    CashLocationService.getCashLocations()
   ]);
 
   // ---------- Helpers ----------
   function safeNumber(v) {
-    if (v === undefined || v === null) return 0;
-    if (typeof v === "number" && !isNaN(v)) return v;
+    if (v === undefined || v === null) {return 0;}
+    if (typeof v === "number" && !isNaN(v)) {return v;}
     const digits = String(v).replace(/[^\d.-]/g, "");
     const n = Number(digits);
     return isNaN(n) ? 0 : n;
@@ -780,40 +779,40 @@ async function fetchAllDeposits(filter = {}, sort = { field: "date", order: -1 }
 
   function formatCurrency(amount) {
     const safe = Number(amount || 0);
-    return "UGX " + Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(safe);
+    return `UGX ${  Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(safe)}`;
   }
 
   // Accept dd/mm/yyyy or ISO or Date; return ISO string for internal use or null
   function toISODate(value) {
-    if (!value) return null;
-    if (value instanceof Date && !isNaN(value)) return value.toISOString();
+    if (!value) {return null;}
+    if (value instanceof Date && !isNaN(value)) {return value.toISOString();}
     if (typeof value === "string") {
       const parts = value.split("/");
       if (parts.length === 3) {
         const [dRaw, mRaw, yRaw] = parts.map((p) => p.trim());
         const d = dRaw.padStart(2, "0");
         const m = mRaw.padStart(2, "0");
-        const y = yRaw.length === 2 ? "20" + yRaw : yRaw;
-        const isoCandidate = new Date(`${y}-${m}-${d}`); // yyyy-mm-dd
-        if (!isNaN(isoCandidate)) return isoCandidate.toISOString();
+        const y = yRaw.length === 2 ? `20${  yRaw}` : yRaw;
+        const isoCandidate = new Date(`${y}-${m}-${d}`); // Yyyy-mm-dd
+        if (!isNaN(isoCandidate)) {return isoCandidate.toISOString();}
       }
-      const parsed = new Date(value); // try ISO
-      if (!isNaN(parsed)) return parsed.toISOString();
+      const parsed = new Date(value); // Try ISO
+      if (!isNaN(parsed)) {return parsed.toISOString();}
     }
     return null;
   }
 
   // Format ISO string back to dd/mm/yyyy for display
   function displayDateFromISO(iso) {
-    if (!iso) return "";
+    if (!iso) {return "";}
     const d = new Date(iso);
-    if (isNaN(d)) return "";
+    if (isNaN(d)) {return "";}
     return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
   }
 
-  // processArray returns array (not string)
+  // ProcessArray returns array (not string)
   function processArray(array, transformFn) {
-    if (!Array.isArray(array) || array.length === 0) return [];
+    if (!Array.isArray(array) || array.length === 0) {return [];}
     return transformFn(array);
   }
 
@@ -824,7 +823,7 @@ async function fetchAllDeposits(filter = {}, sort = { field: "date", order: -1 }
       const dateISO = toISODate(it[dateKey]) || null;
       return {
         ...it,
-        [amountKey]: amountNum, // ensure numeric for totals
+        [amountKey]: amountNum, // Ensure numeric for totals
         dateISO,
       };
     });
@@ -844,25 +843,25 @@ async function fetchAllDeposits(filter = {}, sort = { field: "date", order: -1 }
   }
 
   // ---------- Resolve location IDs to names (batch) ----------
-  let locations = cashLocations || [];
+  const locations = cashLocations || [];
 
   function resolveLocationName(value) {
-    if (!value) return null;
+    if (!value) {return null;}
     // If value is an object with _id or id, try to match
     if (typeof value === "object") {
       const vid = String(value._id ?? value.id ?? "");
       const found = locations.find((l) => String(l._id) === vid || String(l.id) === vid);
-      if (found) return found.name ?? found.locationName ?? found.displayName ?? vid;
-      // fallback to known fields
+      if (found) {return found.name ?? found.locationName ?? found.displayName ?? vid;}
+      // Fallback to known fields
       return value.name || value.location || vid || null;
     }
-    // value is a string - try to find by id or by name
+    // Value is a string - try to find by id or by name
     const str = String(value);
     const foundById = locations.find((l) => String(l._id) === str || String(l.id) === str);
-    if (foundById) return foundById.name ?? foundById.locationName ?? foundById.displayName ?? str;
+    if (foundById) {return foundById.name ?? foundById.locationName ?? foundById.displayName ?? str;}
     const foundByName = locations.find((l) => (l.name && String(l.name) === str) || (l.locationName && String(l.locationName) === str));
-    if (foundByName) return foundByName.name ?? foundByName.locationName ?? foundByName.displayName ?? str;
-    // fallback to returning the string itself
+    if (foundByName) {return foundByName.name ?? foundByName.locationName ?? foundByName.displayName ?? str;}
+    // Fallback to returning the string itself
     return str;
   }
 
@@ -870,7 +869,7 @@ async function fetchAllDeposits(filter = {}, sort = { field: "date", order: -1 }
 
   const allRecords = [];
 
-  // deposits
+  // Deposits
   for (const deposit of (allDeposits || [])) {
     const dateISO = toISODate(deposit.date);
     const amountNum = safeNumber(deposit.amount);
@@ -878,24 +877,24 @@ async function fetchAllDeposits(filter = {}, sort = { field: "date", order: -1 }
       __amountNum: amountNum,
       __dateISO: dateISO,
       type: "Deposit",
-      // returned/display fields
+      // Returned/display fields
       amount: formatCurrency(amountNum),
       date: displayDateFromISO(dateISO) || (deposit.date || ""),
       name: deposit.depositor?.fullName || deposit.depositorName || "Unknown",
       destination: resolveLocationName(deposit.cashLocation) || "Not Available",
-      notes: `${deposit.type || ""}${deposit.source ? ", " + deposit.source : ""}` || "None",
+      notes: `${deposit.type || ""}${deposit.source ? `, ${  deposit.source}` : ""}` || "None",
       isInflow: true,
       isOutflow: false,
     });
   }
 
-  // loans and payments
+  // Loans and payments
   for (const loan of (allLoans || [])) {
     if (loan.status != "Pending Approval" ){ 
     const loanDateISO = toISODate(loan.date);
     const loanAmountNum = safeNumber(loan.amount);
 
-    // resolve sources -> string (do not await here; resolution done via locations array)
+    // Resolve sources -> string (do not await here; resolution done via locations array)
     let sourceStr = "Not Available";
     if (Array.isArray(loan.sources) && loan.sources.length) {
       sourceStr = loan.sources
@@ -964,7 +963,7 @@ async function fetchAllDeposits(filter = {}, sort = { field: "date", order: -1 }
       };
     }
 
-    // keep internal numbers in monthly structure, but put client-facing object in records array
+    // Keep internal numbers in monthly structure, but put client-facing object in records array
     const clientRecord = {
       type: rec.type,
       amount: rec.amount,
@@ -984,12 +983,12 @@ async function fetchAllDeposits(filter = {}, sort = { field: "date", order: -1 }
       type: rec.type,
     });
 
-    if (rec.isOutflow) acc[monthKey].totalOutflow += Number(rec.__amountNum || 0);
-    else acc[monthKey].totalInflow += Number(rec.__amountNum || 0);
+    if (rec.isOutflow) {acc[monthKey].totalOutflow += Number(rec.__amountNum || 0);}
+    else {acc[monthKey].totalInflow += Number(rec.__amountNum || 0);}
 
-    if (rec.type === "Deposit") acc[monthKey].totalDeposits += Number(rec.__amountNum || 0);
-    else if (rec.type === "Loan Issued") acc[monthKey].totalLoans += Number(rec.__amountNum || 0);
-    else if (rec.type === "Loan Payment") acc[monthKey].totalLoanPayments += Number(rec.__amountNum || 0);
+    if (rec.type === "Deposit") {acc[monthKey].totalDeposits += Number(rec.__amountNum || 0);}
+    else if (rec.type === "Loan Issued") {acc[monthKey].totalLoans += Number(rec.__amountNum || 0);}
+    else if (rec.type === "Loan Payment") {acc[monthKey].totalLoanPayments += Number(rec.__amountNum || 0);}
 
     return acc;
   }, {});
@@ -1008,12 +1007,12 @@ async function fetchAllDeposits(filter = {}, sort = { field: "date", order: -1 }
   }
 
   function formatDate(dateInput) {
-    if (!dateInput) return '';
+    if (!dateInput) {return '';}
     const d = new Date(dateInput);
     return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
   }
 
-  // overall totals
+  // Overall totals
   const totalInflow = Object.values(monthlyRecordsInternal).reduce((s, m) => s + (m.totalInflow || 0), 0);
   const totalOutflow = Object.values(monthlyRecordsInternal).reduce((s, m) => s + (m.totalOutflow || 0), 0);
   const netFlow = totalInflow - totalOutflow;
@@ -1056,8 +1055,8 @@ const adminLoans = await buildMemberLoanRecords(allLoans, { usersById }, formatD
     allDeposits: processArray(allDeposits, (arr) => getTotalSumsAndSort(arr, "date", "amount")),
     allUsers: allMembers.map(m => ({name: m.fullName, id: m._id })),
     allLoans: adminLoans,
-    cashLocations: cashLocations,
-    clubFundAnnualSummaries: await AdminServiceManager.toAnnualSummariesForFrontend()
+    cashLocations,
+    clubFundAnnualSummaries: await AdminService.toAnnualSummariesForFrontend()
   };
 
   return response;

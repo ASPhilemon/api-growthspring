@@ -1,4 +1,4 @@
-// admin-service/club-fund-annual-transactions/routes.js
+// Admin-service/club-fund-annual-transactions/routes.js
 import express from "express";
 
 import * as RouteController from "./controller.js";

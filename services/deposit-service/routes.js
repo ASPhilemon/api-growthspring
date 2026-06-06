@@ -5,8 +5,6 @@ import { requireAdmin } from "../../middleware.js"
 
 const router = express.Router()
 
-router.use(requireAdmin)
-
 router.get(
   "/", 
   RouteController.getDeposits
@@ -24,7 +22,7 @@ router.post(
   RouteController.recordDeposit
 )
 router.put(
-  "/:id", 
+  "/:id",
   RouteController.updateDeposit
 )
 router.delete(

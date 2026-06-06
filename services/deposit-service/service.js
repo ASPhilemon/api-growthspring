@@ -1,24 +1,24 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-//models
+//Models
 import { Deposit, YearlyDeposit } from "./models.js"
 
-//util
+//Util
 import * as DB from "../../utils/db-util.js"
 import * as Errors from "../../utils/error-util.js"
 import * as Validator from "../../utils/validator-util.js"
 import * as DateUtil from "../../utils/date-util.js"
 import * as EJSUtil from "../../utils/ejs-util.js"
 
-//validation Schemas
+//Validation Schemas
 import * as Schemas from "./schemas.js"
 
-//collaborator services
-import * as UserServiceManager from "../user-service/service.js"
-import * as CashLocationServiceManager from "../cash-location-service/service.js"
-import * as PointServiceManager from "../point-service/service.js"
-import * as EmailServiceManager from "../email-service/service.js"
+//Collaborator services
+import * as UserService from "../user-service/service.js"
+import * as CashLocationService from "../cash-location-service/service.js"
+import * as PointService from "../point-service/service.js"
+import * as EmailService from "../email-service/service.js"
 
 const modulePath = fileURLToPath(import.meta.url)
 const moduleDirectory = path.dirname(modulePath)
@@ -32,7 +32,7 @@ export async function getDeposits(filter, sort, pagination){
 export async function getDepositById(depositId){
   Validator.schema(Schemas.getDepositById, depositId)
   const deposit = await DB.query(Deposit.findById(depositId))
-  if (!deposit) throw new Errors.NotFoundError("Failed to find deposit")
+  if (!deposit) {throw new Errors.NotFoundError("Failed to find deposit")}
   return deposit
 }
 
@@ -42,20 +42,20 @@ export async function getYearlyDeposits(){
 
 export async function recordDeposit(deposit){
   Validator.schema(Schemas.recordDeposit, deposit)
-  let user
+  let user = null
   await DB.transaction(async ()=> {
     const userId = deposit.depositor._id
-    user = await UserServiceManager.getUserById(userId)
+    user = await UserService.getUserById(userId)
     deposit = _buildDeposit(deposit, user)
 
     await DB.query(Deposit.create(deposit))
 
-    await CashLocationServiceManager.addToCashLocation(deposit.cashLocation._id, deposit.amount)
+    await CashLocationService.addToCashLocation(deposit.cashLocation._id, deposit.amount)
 
-    let investmentAmount = deposit.type == "Permanent"? user.permanentInvestment.amount: user.temporaryInvestment.amount
-    let unitsDate = deposit.type == "Permanent"? user.permanentInvestment.unitsDate: user.temporaryInvestment.unitsDate
-    let newUnitsDate = DateUtil.getToday()
-    let investmentUpdates = [
+    const investmentAmount = deposit.type === "Permanent"? user.permanentInvestment.amount: user.temporaryInvestment.amount
+    const unitsDate = deposit.type === "Permanent"? user.permanentInvestment.unitsDate: user.temporaryInvestment.unitsDate
+    const newUnitsDate = DateUtil.getToday()
+    const investmentUpdates = [
       {amount: investmentAmount, deltaAmount: 0, startDate: unitsDate, endDate: newUnitsDate},
       {amount: deposit.amount, deltaAmount: deposit.amount, startDate: deposit.date, endDate: newUnitsDate}
     ]
@@ -76,18 +76,18 @@ export async function recordDeposit(deposit){
 
 export async function updateDeposit(depositId, update){
   Validator.schema(Schemas.updateDeposit, {depositId, update} )
-  let deposit, user
+  let deposit = null, user = null
 
   await DB.transaction(async()=> {
     deposit = await getDepositById(depositId)
-    if(!update.amount) update.amount = deposit.amount
-    if(!update.date) update.date = deposit.date
-    if(!update.cashLocationToAdd) update.cashLocationToAdd = deposit.cashLocation
-    if(!update.cashLocationToDeduct) update.cashLocationToDeduct = deposit.cashLocation
+    if(!update.amount) {update.amount = deposit.amount}
+    if(!update.date) {update.date = deposit.date}
+    if(!update.cashLocationToAdd) {update.cashLocationToAdd = deposit.cashLocation}
+    if(!update.cashLocationToDeduct) {update.cashLocationToDeduct = deposit.cashLocation}
 
     const { _id: userId } = deposit.depositor
 
-    user = await UserServiceManager.getUserById(userId)
+    user = await UserService.getUserById(userId)
 
     await Deposit.updateOne({_id: depositId},
       {
@@ -99,16 +99,11 @@ export async function updateDeposit(depositId, update){
       }
     )
 
-    //skip cash location updates for legacy deposit with no cashLocation
-    if (update.cashLocationToAdd && update.cashLocationToDeduct){
-      await CashLocationServiceManager.addToCashLocation(update.cashLocationToAdd._id, update.amount)
-      await CashLocationServiceManager.addToCashLocation(update.cashLocationToDeduct._id, -deposit.amount)
-    }
-    let investmentAmount = deposit.type == "Permanent"? user.permanentInvestment.amount: user.temporaryInvestment.amount
-    let unitsDate = deposit.type == "Permanent"? user.permanentInvestment.unitsDate: user.temporaryInvestment.unitsDate
-    let newUnitsDate = DateUtil.getToday()
+    const investmentAmount = deposit.type === "Permanent"? user.permanentInvestment.amount: user.temporaryInvestment.amount
+    const unitsDate = deposit.type === "Permanent"? user.permanentInvestment.unitsDate: user.temporaryInvestment.unitsDate
+    const newUnitsDate = DateUtil.getToday()
 
-    let investmentUpdates = [
+    const investmentUpdates = [
       {amount: investmentAmount, deltaAmount: 0, startDate: unitsDate, endDate: newUnitsDate},
       {amount: -deposit.amount, deltaAmount: -deposit.amount, startDate: deposit.date, endDate: newUnitsDate},
       {amount: update.amount, deltaAmount: update.amount, startDate: update.date, endDate: newUnitsDate}
@@ -117,8 +112,8 @@ export async function updateDeposit(depositId, update){
     if (deposit.type === "Permanent"){
       await _updatePermanentInvestment(userId, investmentUpdates)
       await _updateYearlyDeposit(deposit, update)
-      //skip point transaction update for legacy deposit
-      if(deposit.cashLocation) await _updatePointTransaction(deposit._id, update.amount);
+      //Skip point transaction update for legacy deposit
+      if(deposit.cashLocation) {await _updatePointTransaction(deposit._id, update.amount);}
     }
     else{
       await _updateTemporaryInvestment(userId, investmentUpdates)
@@ -132,31 +127,31 @@ export async function updateDeposit(depositId, update){
 export async function deleteDeposit(depositId, cashLocationToDeductId) {
   Validator.schema(Schemas.deleteDeposit, {depositId, cashLocationToDeductId})
 
-  let deposit, user
+  let deposit = null, user = null
   
   await DB.transaction(async ()=> {
     deposit = await getDepositById(depositId)
-    if (!cashLocationToDeductId) cashLocationToDeductId = deposit.cashLocation._id
+    if (!cashLocationToDeductId) {cashLocationToDeductId = deposit.cashLocation._id}
 
     const { _id: userId } = deposit.depositor
-    user = await UserServiceManager.getUserById(userId)
+    user = await UserService.getUserById(userId)
 
     await Deposit.deleteOne({_id: depositId})
 
-    await CashLocationServiceManager.addToCashLocation(cashLocationToDeductId, -deposit.amount)
+    await CashLocationService.addToCashLocation(cashLocationToDeductId, -deposit.amount)
 
-    let newUnitsDate = DateUtil.getToday()
-    let investmentAmount = deposit.type == "Permanent"? user.permanentInvestment.amount: user.temporaryInvestment.amount
-    let unitsDate = deposit.type == "Permanent"? user.permanentInvestment.unitsDate: user.temporaryInvestment.unitsDate
-    let investmentUpdates = [
+    const newUnitsDate = DateUtil.getToday()
+    const investmentAmount = deposit.type === "Permanent"? user.permanentInvestment.amount: user.temporaryInvestment.amount
+    const unitsDate = deposit.type === "Permanent"? user.permanentInvestment.unitsDate: user.temporaryInvestment.unitsDate
+    const investmentUpdates = [
       {amount: investmentAmount, deltaAmount: 0, startDate: unitsDate, endDate: newUnitsDate},
       {amount: -deposit.amount, deltaAmount: -deposit.amount, startDate: deposit.date, endDate: newUnitsDate},
     ]
 
-    if (deposit.type == "Permanent"){
+    if (deposit.type === "Permanent"){
       await _updatePermanentInvestment(userId, investmentUpdates)
       await _deleteYearlyDeposit(deposit, "delete")
-      await PointServiceManager.deleteTransactionByRefId(deposit._id)
+      await PointService.deleteTransactionByRefId(deposit._id)
     }
     else{
       await _updateTemporaryInvestment(userId, investmentUpdates)
@@ -167,20 +162,21 @@ export async function deleteDeposit(depositId, cashLocationToDeductId) {
 }
 
 async function sendDepositRecordedEmail(deposit, user){
+  const pointsTempDeposit = 0
   deposit = {
     ...deposit,
-    pointsAwarded: deposit.type == "Permanent"? _calculatePoints(deposit.amount) : 0,
+    pointsAwarded: deposit.type === "Permanent"? _calculatePoints(deposit.amount) : pointsTempDeposit,
     date: DateUtil.formatDateShortUS(deposit.date),
   }
 
-  user.newWorth = deposit.amount + (deposit.type == "Permanent"? user.permanentInvestment.amount  : user.temporaryInvestment.amount),
+  user.newWorth = deposit.amount + (deposit.type === "Permanent"? user.permanentInvestment.amount  : user.temporaryInvestment.amount)
   user.newPoints = deposit.pointsAwarded + user.points
 
-  let emailTemplate = path.join(moduleDirectory, "email-templates/deposit-received.ejs")
+  const emailTemplate = path.join(moduleDirectory, "email-templates/deposit-received.ejs")
 
-  let message = await EJSUtil.renderTemplate(emailTemplate, {deposit, user})
+  const message = await EJSUtil.renderTemplate(emailTemplate, {deposit, user})
 
-  EmailServiceManager.sendEmail(
+  EmailService.sendEmail(
     "growthspring",
     user.email,
     "Deposit Recorded",
@@ -189,12 +185,13 @@ async function sendDepositRecordedEmail(deposit, user){
 }
 
 async function sendDepositUpdatedEmail(currentDeposit, depositUpdate, user){
-  currentDeposit.pointsAwarded = currentDeposit.type == "Permanent"? _calculatePoints(currentDeposit.amount): 0
-  depositUpdate.pointsAwarded = depositUpdate.type == "Permanent"? _calculatePoints(depositUpdate.amount): 0
-  let emailTemplate = path.join(moduleDirectory, "email-templates/deposit-updated.ejs")
-  let message = await EJSUtil.renderTemplate(emailTemplate, {currentDeposit, depositUpdate})
+  const pointsTempDeposit = 0
+  currentDeposit.pointsAwarded = currentDeposit.type === "Permanent"? _calculatePoints(currentDeposit.amount): pointsTempDeposit
+  depositUpdate.pointsAwarded = depositUpdate.type === "Permanent"? _calculatePoints(depositUpdate.amount): pointsTempDeposit
+  const emailTemplate = path.join(moduleDirectory, "email-templates/deposit-updated.ejs")
+  const message = await EJSUtil.renderTemplate(emailTemplate, {currentDeposit, depositUpdate})
 
-  EmailServiceManager.sendEmail(
+  EmailService.sendEmail(
     "growthspring",
     user.email,
     "Deposit Updated",
@@ -203,11 +200,12 @@ async function sendDepositUpdatedEmail(currentDeposit, depositUpdate, user){
 }
 
 async function sendDepositDeletedEmail(deposit, user){
-  deposit.pointsAwarded = deposit.type == "Permanent"? _calculatePoints(deposit.amount) : 0
-  let emailTemplate = path.join(moduleDirectory, "email-templates/deposit-deleted.ejs")
-  let message = await EJSUtil.renderTemplate(emailTemplate, deposit)
+  const pointsTempDeposit = 0
+  deposit.pointsAwarded = deposit.type === "Permanent"? _calculatePoints(deposit.amount) : pointsTempDeposit
+  const emailTemplate = path.join(moduleDirectory, "email-templates/deposit-deleted.ejs")
+  const message = await EJSUtil.renderTemplate(emailTemplate, deposit)
 
- EmailServiceManager.sendEmail(
+ EmailService.sendEmail(
     "growthspring",
     user.email,
     "Deposit Deleted",
@@ -215,22 +213,23 @@ async function sendDepositDeletedEmail(deposit, user){
   )
 }
 
-//helper functions
+//Helper functions
 export function _calculatePoints(depositAmount){
-  return Math.floor((depositAmount / 10000) * 3)
+  const points = 3, unitDeposit = 10000
+  return Math.floor((depositAmount / unitDeposit) * points)
 }
 
 async function _awardPoints(deposit){
-  let points = _calculatePoints(deposit.amount)
-  let userId = deposit.depositor._id
-  let reason = "Deposit"
-  let refId = deposit._id
-  await PointServiceManager.awardPoints(userId, points, reason, refId)
+  const points = _calculatePoints(deposit.amount)
+  const userId = deposit.depositor._id
+  const reason = "Deposit"
+  const refId = deposit._id
+  await PointService.awardPoints(userId, points, reason, refId)
 }
 
 function _buildDeposit(deposit, user){
   deposit.pointsBefore = user.points
-  if (deposit.type == "Permanent"){
+  if (deposit.type === "Permanent"){
     deposit.balanceBefore = user.permanentInvestment.amount
   }
   else{
@@ -241,11 +240,11 @@ function _buildDeposit(deposit, user){
 }
 
 async function _recordYearlyDeposit(deposit) {
-  let depositDate = new Date(deposit.date);
+  const depositDate = new Date(deposit.date);
   const year = depositDate.getFullYear();
   const month = depositDate.getMonth();
 
-  let yearlyDeposit = await DB.query(YearlyDeposit.findOne({year}))
+  const yearlyDeposit = await DB.query(YearlyDeposit.findOne({year}))
 
   if (yearlyDeposit){
     await DB.query(YearlyDeposit.updateOne({ year }, {
@@ -256,7 +255,9 @@ async function _recordYearlyDeposit(deposit) {
     }))
   }
   else{
-    let monthTotals = new Array(12).fill(0)
+    const months = 12
+    const defaultMonthDeposit = 0
+    const monthTotals = new Array(months).fill(defaultMonthDeposit)
     monthTotals[month] = deposit.amount
     await DB.query(
       YearlyDeposit.create({
@@ -282,13 +283,14 @@ async function _deleteYearlyDeposit(deposit) {
 
 async function _updatePointTransaction(depositId, newDepositAmount){
   const newPoints =  _calculatePoints(newDepositAmount)
-  await PointServiceManager.findByRefIdAndUpdatePoints(depositId, newPoints)
+  await PointService.findByRefIdAndUpdatePoints(depositId, newPoints)
 }
 
 async function _updateTemporaryInvestment(userId, updates){
-  let newUnitsDate = updates[0].endDate
-  let {totalDeltaAmount, totalDeltaUnits} = _calculateInvestmentUpdate(updates)
-  await UserServiceManager.updateTemporaryInvestment(userId, {
+  const [currentInvestmentUpdate] = updates
+  const newUnitsDate = currentInvestmentUpdate.endDate
+  const {totalDeltaAmount, totalDeltaUnits} = _calculateInvestmentUpdate(updates)
+  await UserService.updateTemporaryInvestment(userId, {
     deltaAmount: totalDeltaAmount,
     deltaUnits: totalDeltaUnits,
     newUnitsDate
@@ -296,9 +298,10 @@ async function _updateTemporaryInvestment(userId, updates){
 }
 
 async function _updatePermanentInvestment(userId, updates){
-  let newUnitsDate = updates[0].endDate
-  let {totalDeltaAmount, totalDeltaUnits} = _calculateInvestmentUpdate(updates)
-  await UserServiceManager.updatePermanentInvestment(userId, {
+  const [currentInvestmentUpdate] = updates
+  const newUnitsDate = currentInvestmentUpdate.endDate
+  const {totalDeltaAmount, totalDeltaUnits} = _calculateInvestmentUpdate(updates)
+  await UserService.updatePermanentInvestment(userId, {
     deltaAmount: totalDeltaAmount,
     deltaUnits: totalDeltaUnits,
     newUnitsDate
@@ -308,12 +311,13 @@ async function _updatePermanentInvestment(userId, updates){
 function _calculateInvestmentUpdate(updates){
   let totalDeltaUnits = 0
   let totalDeltaAmount = 0
-  for(let update of updates){
-    let {amount, deltaAmount, startDate, endDate} = update
+  for(const update of updates){
+    const {amount, deltaAmount} = update
+    let {startDate, endDate} = update
     startDate = new Date(startDate)
     endDate = new Date(endDate)
-    if (startDate > endDate) throw new Errors.InternalServerError("startDate can not be greater than endDate");
-    let days = DateUtil.getDaysDifference(startDate, endDate)
+    if (startDate > endDate) {throw new Errors.InternalServerError("startDate can not be greater than endDate");}
+    const days = DateUtil.getDaysDifference(startDate, endDate)
     totalDeltaUnits +=  amount * days
     totalDeltaAmount += deltaAmount
   }
