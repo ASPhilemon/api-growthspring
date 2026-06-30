@@ -8,6 +8,7 @@ import app from "./app.js"
 import { AppError } from './utils/error-util.js';
 import { sendEmail } from './services/email-service/service.js';
 
+
 //load environemnt variables 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
