@@ -90,6 +90,10 @@ a{
       <h6 class='mb-1'>Deposit Details:</h6>
       <ul>
         <li class='mb-1'>
+          Deposit Type:
+          <span class="fw-bold"> <%= deposit.type %>. </span>
+        </li>
+        <li class='mb-1'>
           Amount Deposited:
           <span class="fw-bold"> UGX <%= Math.floor(deposit.amount).toLocaleString() %>. </span>
         </li>
