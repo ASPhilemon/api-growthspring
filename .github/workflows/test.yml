@@ -46,11 +46,11 @@ jobs:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: 18.205.163.202
+          host: 13.245.9.204
           username: ubuntu
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /home/ubuntu/apps/api-growthspring
             git switch main
             git pull
-            pm2 restart prod-api-growthspring
+            sudo systemctl restart api-growthspring
