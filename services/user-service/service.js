@@ -724,13 +724,13 @@ export async function sendBirthdayReminder(){
 
   const emailTemplate = path.join(moduleDirectory, "email-templates/birthday-reminder.ejs")
   const message = await EJS.renderTemplate(emailTemplate, {users: birthdayUsers.map((user)=>user.fullName)})
-  console.log("message", message)
-  await EmailServiceManager.sendEmail({
-    sender: 'Growthspring Birthdays',
-    recipient: adminUsers.map((user)=>user.email),
-    subject: "Tomorrow's Birthdays",
+  // console.log("message", message)
+  await EmailServiceManager.sendEmail(
+    'Growthspring Birthdays',
+    adminUsers.map((user)=>user.email),
+    "Tomorrow's Birthdays",
     message
-  })
+  )
 }
 //helpers
 function _buildUser(user){

@@ -29,7 +29,12 @@ export async function sendEmail(
   };
 
   transporter.sendMail(mailOptions, (err)=>{
-    if (err) throw new Errors.InternalServerError("Failed to send email", err)
+    if (err) {
+      console.error("Failed to send email", err)
+    } else{
+      console.log("Email sent successfully to: ", recipient)
+    }
+
   });
 
 }
