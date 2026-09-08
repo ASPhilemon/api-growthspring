@@ -3,6 +3,7 @@ import { Appearance, User } from "./models.js"
 import fs from "fs"
 import mongoose from "mongoose"
 import { fileURLToPath } from "url"
+import * as EJS from "../../utils/ejs-util.js"
 
 const fileURL = import.meta.url
 const filePath = fileURLToPath(fileURL)
@@ -31,8 +32,8 @@ import * as AdminServiceManager from "../admin-service/service.js";
 
 import * as Schemas from "./schemas.js"
 
-export async function getUsers(){
-  const users = await DB.query(User.find())
+export async function getUsers(filter={}){
+  const users = await DB.query(User.find(filter))
   return users
 }
 
@@ -708,6 +709,28 @@ export async function sendUserCreatedEmail(user, password){
   })
 }
 
+export async function sendBirthdayReminder(){
+  let birthdayUsers, adminUsers;
+  const today = new Date()
+  const targetMonth = today.getMonth() + 1
+  const targetDay = today.getDate() + 1
+  birthdayUsers = await getUsers({"dob.month": targetMonth, "dob.day": targetDay})
+
+  console.log("birthday users ==", birthdayUsers)
+
+  if (birthdayUsers.length == 0) return;
+  adminUsers = await getUsers({isAdmin:true})
+
+  const emailTemplate = path.join(moduleDirectory, "email-templates/birthday-reminder.ejs")
+  const message = await EJS.renderTemplate(emailTemplate, {users: birthdayUsers.map((user)=>user.fullName)})
+  console.log("message", message)
+  // await DepositServiceManager.sendEmail({
+  //   sender: 'Growthspring Birthdays',
+  //   recipient: adminUsers.map((user)=>user.email),
+  //   subject: "Tomorrow's Birthdays",
+  //   message
+  // })
+}
 //helpers
 function _buildUser(user){
   user = {
