@@ -36,6 +36,7 @@ function _handleMongooseError(err){
       err instanceof StrictModeError){
     throw new Errors.BadRequestError("Failed to validate user input", err)
   }
+  console.log(err)
   throw new Errors.InternalServerError({cause: err})
   
 }

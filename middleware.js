@@ -26,7 +26,7 @@ export function registerAfterAllMiddleware(app) {
 export function getUser(req, res, next) {
   let user = null;
       
-  let jwt = req.cookies?.jwt;
+  let jwt = req.cookies?.jwt || req.headers?.authorization?.split(' ')[1];
   try {
     if (jwt) user = verifyJWT(jwt);
   }
@@ -37,6 +37,7 @@ export function getUser(req, res, next) {
   req.user = user;
   next();
 }
+
 
 export function requireUser(req, res, next) {
   if (!req.user) {

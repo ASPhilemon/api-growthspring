@@ -3,6 +3,7 @@ import { Appearance, User } from "./models.js"
 import fs from "fs"
 import mongoose from "mongoose"
 import { fileURLToPath } from "url"
+import * as EJS from "../../utils/ejs-util.js"
 
 const fileURL = import.meta.url
 const filePath = fileURLToPath(fileURL)
@@ -31,8 +32,8 @@ import * as AdminServiceManager from "../admin-service/service.js";
 
 import * as Schemas from "./schemas.js"
 
-export async function getUsers(){
-  const users = await DB.query(User.find())
+export async function getUsers(filter={}){
+  const users = await DB.query(User.find(filter))
   return users
 }
 
@@ -706,6 +707,48 @@ export async function sendUserCreatedEmail(user, password){
     subject: "Account Created",
     message: `Dear ${user.fullName}, your growthspring account has been created successfuly. Your default login password is: ${password}`
   })
+}
+
+export async function sendBirthdayReminder(){
+  let birthdayUsers, adminUsers;
+  const today = new Date()
+  const targetMonth = today.getMonth() + 1
+  const targetDay = today.getDate() + 1
+  birthdayUsers = await getUsers({"dob.month": targetMonth, "dob.day": targetDay})
+
+  if (birthdayUsers.length == 0) return;
+  adminUsers = await getUsers({isAdmin:true})
+
+  const emailTemplate = path.join(moduleDirectory, "email-templates/birthday-reminder.ejs")
+  const message = await EJS.renderTemplate(emailTemplate, {users: birthdayUsers.map((user)=>user.fullName)})
+  await EmailServiceManager.sendEmail(
+    'Growthspring',
+    adminUsers.map((user)=>user.email),
+    "Tomorrow's Birthdays",
+    message
+  )
+}
+
+export async function sendBirthdayCelebration(){
+  let birthdayUsers;
+  const today = new Date()
+  const targetMonth = today.getMonth() + 1
+  const targetDay = today.getDate() + 1
+  birthdayUsers = await getUsers({"dob.month": targetMonth, "dob.day": targetDay})
+
+  if (birthdayUsers.length == 0) return;
+
+  const emailTemplate = path.join(moduleDirectory, "email-templates/birthday-celebration.ejs")
+
+  for (let user of birthdayUsers){
+    const message = await EJS.renderTemplate(emailTemplate, {user: user.fullName})
+    await EmailServiceManager.sendEmail(
+      'Growthspring',
+      user.email,
+      "Happy Birthday",
+      message
+    )
+  }
 }
 
 //helpers

@@ -8,6 +8,7 @@ import app from "./app.js"
 import { AppError } from './utils/error-util.js';
 import { sendEmail } from './services/email-service/service.js';
 
+
 //connect to database
 const MONGODB_URI = process.env.MONGODB_URI
 await connectDB(MONGODB_URI)
@@ -18,6 +19,7 @@ const PORT = process.env.PORT
 app.listen(PORT, ()=> {
   console.log(`=== Listening for requests on port ${PORT}`)
 })
+
 
 
 //handle server errors
