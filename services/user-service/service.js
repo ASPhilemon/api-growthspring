@@ -717,12 +717,12 @@ export async function sendBirthdayReminder(){
   birthdayUsers = await getUsers({"dob.month": targetMonth, "dob.day": targetDay})
 
   if (birthdayUsers.length == 0) return;
-  adminUsers = await getUsers({isAdminn:true})
+  adminUsers = await getUsers({isAdmin:true})
 
   const emailTemplate = path.join(moduleDirectory, "email-templates/birthday-reminder.ejs")
   const message = await EJS.renderTemplate(emailTemplate, {users: birthdayUsers.map((user)=>user.fullName)})
   await EmailServiceManager.sendEmail(
-    'Growthspring.Birthdays',
+    'Growthspring',
     adminUsers.map((user)=>user.email),
     "Tomorrow's Birthdays",
     message
@@ -743,7 +743,7 @@ export async function sendBirthdayCelebration(){
   for (let user of birthdayUsers){
     const message = await EJS.renderTemplate(emailTemplate, {user: user.fullName})
     await EmailServiceManager.sendEmail(
-      'Growthspring.Birthdays',
+      'Growthspring',
       user.email,
       "Happy Birthday",
       message

@@ -9,7 +9,7 @@ export function schedule(){
     },{timezone: 'UTC'})
 
     // Runs every day at 7:00 HRS(7AM) AM UTC => 10AM EAT
-    nodeCron.schedule('05 23 * * *', ()=>{
+    nodeCron.schedule('0 7 * * *', ()=>{
         UserServiceManager.sendBirthdayCelebration()
         console.log("Birthday Celebration Executed ...")
     },{timezone: 'UTC'})
