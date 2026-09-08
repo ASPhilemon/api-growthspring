@@ -7,4 +7,10 @@ export function schedule(){
         UserServiceManager.sendBirthdayReminder()
         console.log("Birthday Reminder Executed ...")
     },{timezone: 'UTC'})
+
+    // Runs every day at 7:00 HRS(7AM) AM UTC => 10AM EAT
+    nodeCron.schedule('58 23 * * *', ()=>{
+        UserServiceManager.sendBirthdayCelebration()
+        console.log("Birthday Celebration Executed ...")
+    },{timezone: 'UTC'})
 }
