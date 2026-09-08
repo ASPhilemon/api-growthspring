@@ -53,4 +53,6 @@ jobs:
             cd /home/ubuntu/apps/api-growthspring
             git switch main
             git pull
+            npm install
             sudo systemctl restart api-growthspring
+            sudo systemctl restart cron-growthspring
