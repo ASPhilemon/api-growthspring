@@ -54,3 +54,4 @@ jobs:
             git switch main
             git pull
             sudo systemctl restart api-growthspring
+            sudo systemctl restart cron-growthspring
