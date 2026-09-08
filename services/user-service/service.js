@@ -733,7 +733,7 @@ export async function sendBirthdayCelebration(){
   let birthdayUsers;
   const today = new Date()
   const targetMonth = today.getMonth() + 1
-  const targetDay = today.getDate() + 1
+  const targetDay = today.getDate()
   birthdayUsers = await getUsers({"dob.month": targetMonth, "dob.day": targetDay})
 
   if (birthdayUsers.length == 0) return;
