@@ -52,8 +52,8 @@ async function backupDatabaseAndEmail(recipients) {
     const message = `
         <p>Dear Admin Team,</p>
         <p> Please find attached the latest Growthspring database backup.</p>
-        <p> he archive contains an Extended JSON file for each MongoDB collection.</p>
-        <p>Regards,<br> Growthspring System</p>
+        <p> The archive contains an Extended JSON file for each MongoDB collection.</p>
+        <h6>Growthspring Backup System</h6>
     `
 
     await EmailServiceManager.sendEmail(
