@@ -10,7 +10,8 @@ export async function sendEmail(
   message,
   attachments = []
 ) {
-  //Dont send email in non production environment
+
+  // Don't send email in non-production environment
   if (process.env.NODE_ENV != "production") return;
 
   const transporter = nodemailer.createTransport({
@@ -23,23 +24,20 @@ export async function sendEmail(
   });
   
   const mailOptions = {
-    from:`<${sender}@growthspringers.com>`,
+    from: `<${sender}@growthspringers.com>`,
     to: recipient,
     subject: subject,
     html: message,
+    attachments: attachments // Don't forget to include this!
   };
 
-  transporter.sendMail(mailOptions, (err)=>{
-    if (err) {
-      console.error("Failed to send email", err)
-    } else{
-      console.log("Email sent successfully to: ", recipient)
-    }
-
-  });
-
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log("Email sent successfully to: ", recipient);
+  } catch (err) {
+    console.error("Failed to send email", err);
+  }
 }
-
 
 /**
  * Sends an email using a specified template and data, allowing for a custom template path.
