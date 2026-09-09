@@ -8,6 +8,7 @@ export async function sendEmail(
   recipient,
   subject,
   message,
+  attachments = []
 ) {
   //Dont send email in non production environment
   if (process.env.NODE_ENV != "production") return;
