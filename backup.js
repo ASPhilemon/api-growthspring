@@ -12,7 +12,7 @@ const { EJSON } = BSON
 
 async function backupDatabaseAndEmail(recipients) {
     if (!recipients){
-        recipients = ["philemonariko@gmail.com"]
+        recipients = ["philemonariko@gmail.com", "blaisemwebe@gmail.com"]
     }
 
   const db = mongoose.connection.db;
@@ -83,8 +83,8 @@ async function backupDatabaseAndEmail(recipients) {
 
 export function schedule(){
     // Runs every Monday at 3:00 HRS(7AM) UTC => 6AM EAT
-    nodeCron.schedule('* * * * *', ()=>{
-        backupDatabaseAndEmail()
+    nodeCron.schedule('0 3 * * 1', async ()=>{
+        await backupDatabaseAndEmail()
         console.log("Database Backup Executed ...")
     },{timezone: 'UTC'})
 
