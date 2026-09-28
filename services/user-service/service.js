@@ -406,9 +406,9 @@ function meanRoiForMemberYears(yearRates, memberUnits) {
         {
           title: "Earnings",
           rows: [
-            ["Projected Earnings", formatCurrency(Math.round(0.15 * currentInvestmentAmount))],//replace later with more accurate calculations
+            ["Projected Earnings", formatCurrency(Math.round(0.12 * currentInvestmentAmount))],//replace later with more accurate calculations
             ["Your Percentage", `${(ownershipPercentage * 100).toFixed(2)}` + "%"],
-            ["Avg. monthly earnings", formatCurrency(Math.round(0.15 * currentInvestmentAmount / Math.max(1, monthsForSaving)))],
+            ["Avg. monthly earnings", formatCurrency(Math.round(0.12 * currentInvestmentAmount / Math.max(1, monthsForSaving)))],
             ["Avg. annual earnings rate",  meanRoiForMemberYears(yearlyRates, memberUnits) + "%"],
           ],
         },
@@ -434,7 +434,7 @@ function meanRoiForMemberYears(yearRates, memberUnits) {
           title: "Club Figures",
           rows: [
             ["Savings this year", formatCurrency(thisYearClubDeposits)],
-            ["Projected Earnings", formatCurrency(0.16 * currentClubInvestmentAmount)],//update with accurate calculations
+            ["Projected Earnings", formatCurrency(0.14 * currentClubInvestmentAmount)],//update with accurate calculations
             ["Loans this year", formatCurrency(thisYearClubLoans)],
             ["Members", String((allMembers || []).length - 2)],
           ],
