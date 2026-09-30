@@ -30,6 +30,7 @@ services:
       - "traefik.http.routers.api-growthspring-https.entrypoints=websecure"
       - "traefik.http.routers.api-growthspring-https.tls=true"
       - "traefik.http.services.api-growthspring-service.loadbalancer.server.port=80"
+      - "traefik.http.routers.api-growthspring-https.tls.certresolver=myresolver"
 
   cron:
     build:
