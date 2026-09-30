@@ -1,0 +1,21 @@
+services:
+  server:
+    build:
+      context: ./
+    environment:
+      NODE_ENV: production
+      MAILTRAP_SECRET: $MAILTRAP_SECRET
+      JWT_SECRET: $JWT_SECRET
+      MONGODB_URI: $MONGODB_URI
+    command: ["node", "cron.js"]
+
+  cron:
+    build:
+      context: ./
+    environment:
+      MONGODB_URI: $MONGODB_URI
+    command: ["node", "cron.js"]
+
+networks:
+  docker-bridge-1:
+    external: true
